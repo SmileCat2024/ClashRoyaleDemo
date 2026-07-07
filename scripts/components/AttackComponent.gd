@@ -61,7 +61,8 @@ func _process(delta: float) -> void:
 			_get_movement_type(),
 			_get_can_jump_river()
 		)
-		if dist <= attack_range:
+		var reach := attack_range + combatant.collision_radius + _get_target_hurt_radius(current_target)
+		if dist <= reach:
 			# 只有目标在射程内时冷却才递减——移动/追击期间不消耗冷却，
 			# 确保 first_attack_delay 是"进入射程后"的前摇而非"部署后"的计时
 			if cooldown > 0.0:
@@ -96,8 +97,9 @@ func _update_targeting() -> void:
 			_get_movement_type(),
 			_get_can_jump_river()
 		)
-		if dist <= attack_range:
-			return  # 目标在攻击范围内，保持锁定原地攻击
+		var reach := attack_range + combatant.collision_radius + _get_target_hurt_radius(current_target)
+		if dist <= reach:
+			return  # 目标在攻击范围内（含双方半径），保持锁定原地攻击
 	# 目标超出攻击范围（或无目标）→ 重新搜索视野内最近的敌人
 	current_target = _find_nearest_target()
 
@@ -137,6 +139,14 @@ func _get_can_jump_river() -> bool:
 	if can_jump == null:
 		return false
 	return bool(can_jump)
+
+
+## 获取目标的受击半径。非 CombatantBase 的目标返回 0。
+func _get_target_hurt_radius(target: Node) -> float:
+	var hr = target.get("hurt_radius")
+	if hr != null:
+		return float(hr)
+	return 0.0
 
 
 ## 目标的 ground/air 状态可能运行时变化（例如跳河），锁定后也要重新校验。

@@ -24,6 +24,9 @@ static func resolve_impact(target: Node, damage: int) -> void:
 static func deal_area_damage(center: Vector2, radius: float, damage: int, attacker_team: String) -> void:
 	var enemies = EntityRegistry.get_enemies_of(attacker_team)
 	for e in enemies:
-		if center.distance_to(BattlePathing.game_position_of(e)) <= radius:
+		# 受击半径偏移：大体积目标更容易被范围伤害命中
+		var hr = e.get("hurt_radius")
+		var hurt_r: float = float(hr) if hr != null else 0.0
+		if center.distance_to(BattlePathing.game_position_of(e)) <= radius + hurt_r:
 			if e.has_method("take_damage"):
 				e.take_damage(damage)

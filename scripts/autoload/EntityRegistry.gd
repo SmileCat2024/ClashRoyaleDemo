@@ -57,6 +57,16 @@ func get_all() -> Array:
 	return all
 
 
+## 获取所有活跃战斗实体（含友军和塔），供碰撞分离系统使用。
+func get_all_combatants() -> Array:
+	var all: Array = []
+	for t in _entities_by_team:
+		for e in _entities_by_team[t]:
+			if is_instance_valid(e) and not e.is_dead:
+				all.append(e)
+	return all
+
+
 ## 清空注册表（场景切换时调用）
 func clear() -> void:
 	_entities_by_team.clear()

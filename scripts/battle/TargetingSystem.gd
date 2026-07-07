@@ -109,6 +109,10 @@ static func find_best_target(
 			mover_movement_type,
 			mover_can_jump_river
 		)
+		# 碰撞半径偏移：大目标的边缘比中心更早进入索敌范围
+		var cr = e.get("collision_radius")
+		if cr != null:
+			d -= float(cr)
 		if d < nearest_dist:
 			nearest_dist = d
 			nearest = e

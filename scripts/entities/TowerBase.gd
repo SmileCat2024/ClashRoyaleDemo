@@ -23,6 +23,11 @@ func setup(tower_data: Dictionary, team_name: String, tower_name: String) -> voi
 	# 初始化战斗属性（基类方法）
 	_init_combat_stats(tower_data)
 
+	# 碰撞几何参数（格 → 像素）
+	collision_radius = BattleConstants.px(float(tower_data.get("collision_radius", 1.5)))
+	hurt_radius = BattleConstants.px(float(tower_data.get("hurt_radius", 1.5)))
+	mass = int(tower_data.get("mass", 0))
+
 	# 塔尺寸：主塔 4x4 格(80x80px)，公主塔 3x3 格(60x60px)
 	var body_size: Vector2
 	if tower_type == "king":

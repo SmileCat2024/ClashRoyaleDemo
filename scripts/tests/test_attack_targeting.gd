@@ -175,3 +175,30 @@ func test_keeps_nearest_during_pursuit() -> void:
 	b.global_position = Vector2(90, 0)
 	_comp._update_targeting()
 	assert_eq(_comp.current_target, a, "B 移远后应切换到 A（新的最近）")
+
+
+# ============================================================
+#  碰撞半径扩展攻击射程
+# ============================================================
+
+func test_reach_includes_collision_radius() -> void:
+	# attack_range = 30px, attacker collision_radius = 10px, target hurt_radius = 10px
+	# reach = 30 + 10 + 10 = 50px
+	# 目标在 40px：超出 attack_range(30) 但在 reach(50) 内 → 应保持锁定
+	var enemy := _make_enemy(Vector2(40, 0))
+	_comp.current_target = enemy
+	_comp._update_targeting()
+	assert_eq(_comp.current_target, enemy,
+		"目标在扩展射程内(40px <= 50px)应保持锁定")
+
+
+func test_large_hurt_radius_extends_reach() -> void:
+	# 默认 reach = 30 + 10 + 10 = 50
+	# 给目标设大 hurt_radius(30px) → reach = 30 + 10 + 30 = 70
+	# 目标在 60px：超出默认 reach(50) 但在扩展 reach(70) 内 → 保持锁定
+	var enemy := _make_enemy(Vector2(60, 0))
+	enemy.hurt_radius = 30.0
+	_comp.current_target = enemy
+	_comp._update_targeting()
+	assert_eq(_comp.current_target, enemy,
+		"大 hurt_radius 目标在扩展射程内(60px <= 70px)应保持锁定")

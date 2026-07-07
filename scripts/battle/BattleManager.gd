@@ -120,6 +120,8 @@ func _process(delta: float) -> void:
 	battle_time += delta
 	update_energy(delta)
 	_check_time_limit()
+	# 碰撞分离：在所有单位移动之后统一执行（场景树顺序保证单位先于 Manager 执行 _process）
+	CollisionSystem.resolve_overlaps(EntityRegistry.get_all_combatants())
 
 
 ## 能量恢复逻辑：每 energy_interval 秒，双方各 +1 能量（不超过上限）

@@ -60,6 +60,27 @@ func test_only_hog_rider_can_jump_river_for_now() -> void:
 			"当前版本只有野猪骑士允许跳河: " + uid)
 
 
+func test_all_units_have_collision_radius() -> void:
+	for uid in DataRegistry.unit_data:
+		var u: Dictionary = DataRegistry.unit_data[uid]
+		assert_true(float(u.get("collision_radius", 0)) > 0,
+			"单位 %s collision_radius 应 > 0" % uid)
+
+
+func test_all_units_have_hurt_radius() -> void:
+	for uid in DataRegistry.unit_data:
+		var u: Dictionary = DataRegistry.unit_data[uid]
+		assert_true(float(u.get("hurt_radius", 0)) > 0,
+			"单位 %s hurt_radius 应 > 0" % uid)
+
+
+func test_all_units_have_valid_mass() -> void:
+	for uid in DataRegistry.unit_data:
+		var u: Dictionary = DataRegistry.unit_data[uid]
+		assert_true(int(u.get("mass", -1)) >= 0,
+			"单位 %s mass 应 >= 0" % uid)
+
+
 # ============================================================
 #  卡牌数据
 # ============================================================
@@ -115,6 +136,20 @@ func test_all_towers_have_attacks() -> void:
 		var attacks: Array = t.get("attacks", [])
 		assert_false(attacks.is_empty(),
 			"塔 %s attacks 不应为空" % tid)
+
+
+func test_all_towers_have_collision_radius() -> void:
+	for tid in DataRegistry.tower_data:
+		var t: Dictionary = DataRegistry.tower_data[tid]
+		assert_true(float(t.get("collision_radius", 0)) > 0,
+			"塔 %s collision_radius 应 > 0" % tid)
+
+
+func test_all_towers_have_zero_mass() -> void:
+	for tid in DataRegistry.tower_data:
+		var t: Dictionary = DataRegistry.tower_data[tid]
+		assert_eq(int(t.get("mass", -1)), 0,
+			"塔 %s mass 必须为 0（不可移动）" % tid)
 
 
 # ============================================================

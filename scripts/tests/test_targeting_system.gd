@@ -169,3 +169,21 @@ func test_ignores_dead_enemies() -> void:
 		Vector2.ZERO, "player", 300.0, "any", true, false)
 	assert_not_null(target, "应跳过死亡的，找到活着的")
 	assert_eq(target.global_position, Vector2(100, 0))
+
+
+# ============================================================
+#  find_best_target — 碰撞半径偏移
+# ============================================================
+
+func test_collision_radius_extends_effective_sight() -> void:
+	# 两个敌人都在 125px（超出 sight_range=120），但碰撞半径不同
+	# 大半径(30px)有效距离 = 125-30 = 95 < 120 → 可发现
+	# 小半径(1px)有效距离 = 125-1 = 124 > 120 → 不可发现
+	var big := _make_enemy(Vector2(-125, 0))
+	big.collision_radius = 30.0
+	var small := _make_enemy(Vector2(125, 0))
+	small.collision_radius = 1.0
+	var target = TargetingSystem.find_best_target(
+		Vector2.ZERO, "player", 120.0, "any", true, false)
+	assert_not_null(target, "应找到大半径目标")
+	assert_eq(target, big, "大半径目标在有效视野内，小半径目标不在")

@@ -114,3 +114,19 @@ func test_deal_area_damage_hits_in_radius() -> void:
 	a.free()
 	b.free()
 	c.free()
+
+
+func test_area_damage_uses_hurt_radius() -> void:
+	# MockCombatant 默认 hurt_radius = 10px
+	# 法术 radius = 60px，目标在 65px
+	# 65 <= 60 + 10 = 70 → 命中（不考虑 hurt_radius 时 65 > 60 → 不命中）
+	var target := _make_target(100)
+	target.global_position = Vector2(65, 0)
+	EntityRegistry.clear()
+	EntityRegistry.register(target)
+
+	DamageSystem.deal_area_damage(Vector2.ZERO, 60.0, 40, "player")
+	assert_eq(target.current_hp, 60, "65px处目标(hurt_radius=10)应被60px半径法术命中")
+
+	EntityRegistry.clear()
+	target.free()
