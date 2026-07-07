@@ -11,14 +11,18 @@ extends Node
 # ---- 战斗状态 ----
 var battle_running: bool = false
 var battle_time: float = 0.0
-var max_battle_time: float = 180.0
+var max_battle_time: float = 180.0       ## 常规时间（秒），参考皇室战争 3 分钟
+var battle_phase: String = "regular"      ## "regular" | "overtime"
+var overtime_duration: float = 60.0       ## 加时赛时长（秒），参考皇室战争 1 分钟
+var overtime_energy_multiplier: float = 2.0  ## 加时赛圣水加速倍率
 
 # ---- 能量系统 ----
 var player_energy: int = 5
 var enemy_energy: int = 5
 var max_energy: int = 10
 var energy_timer: float = 0.0
-var energy_interval: float = 2.8  ## 每 2.8 秒恢复 1 点能量
+const BASE_ENERGY_INTERVAL: float = 2.8   ## 常规时间每 2.8 秒恢复 1 点能量
+var energy_interval: float = BASE_ENERGY_INTERVAL
 
 # ---- 卡组管理 ----
 var deck_manager: DeckManager = null
@@ -68,6 +72,8 @@ func _setup_towers() -> void:
 func start_battle() -> void:
 	battle_running = true
 	battle_time = 0.0
+	battle_phase = "regular"
+	energy_interval = BASE_ENERGY_INTERVAL
 	player_energy = 5
 	enemy_energy = 5
 	energy_timer = 0.0
@@ -75,6 +81,7 @@ func start_battle() -> void:
 	# 初始化卡组
 	deck_manager.setup(DataRegistry.get_default_player_deck())
 	SignalBus.battle_started.emit()
+	SignalBus.battle_phase_changed.emit("regular", max_battle_time)
 	SignalBus.energy_changed.emit("player", player_energy, max_energy)
 	SignalBus.energy_changed.emit("enemy", enemy_energy, max_energy)
 	if enemy_ai and enemy_ai.has_method("setup"):
@@ -109,6 +116,7 @@ func _process(delta: float) -> void:
 		return
 	battle_time += delta
 	update_energy(delta)
+	_check_time_limit()
 
 
 ## 能量恢复逻辑：每 energy_interval 秒，双方各 +1 能量（不超过上限）
@@ -263,6 +271,75 @@ func _on_tower_destroyed(tower_id: String, team_name: String, tower_type: String
 			end_battle("victory")
 		elif team_name == "player":
 			end_battle("defeat")
+
+
+# =============================================================================
+# 时间限制与加时赛
+# =============================================================================
+
+## 每帧检查时间是否到限，触发阶段切换或胜负判定
+func _check_time_limit() -> void:
+	if battle_phase == "regular":
+		if battle_time >= max_battle_time:
+			var player_towers := _count_alive_towers("player")
+			var enemy_towers := _count_alive_towers("enemy")
+			if player_towers != enemy_towers:
+				var result := "victory" if player_towers > enemy_towers else "defeat"
+				end_battle(result)
+			else:
+				_enter_overtime()
+	elif battle_phase == "overtime":
+		if battle_time >= max_battle_time + overtime_duration:
+			end_battle(_determine_result_by_stats())
+
+
+## 进入加时赛：圣水加速，广播阶段变化
+func _enter_overtime() -> void:
+	battle_phase = "overtime"
+	energy_interval = BASE_ENERGY_INTERVAL / overtime_energy_multiplier
+	energy_timer = 0.0
+	SignalBus.battle_phase_changed.emit("overtime", overtime_duration)
+	print("[BattleManager] overtime started (energy x%.1f)" % overtime_energy_multiplier)
+
+
+## 统计指定阵营存活的塔数量
+func _count_alive_towers(team_name: String) -> int:
+	var count := 0
+	for tower in towers_root.get_children():
+		if tower.team == team_name and not tower.is_dead:
+			count += 1
+	return count
+
+
+## 计算指定阵营所有塔的总血量百分比（含已毁塔，分母为总 max_hp）
+func _get_total_hp_percent(team_name: String) -> float:
+	var total_hp := 0
+	var total_max := 0
+	for tower in towers_root.get_children():
+		if tower.team == team_name:
+			total_hp += tower.current_hp
+			total_max += tower.max_hp
+	if total_max == 0:
+		return 0.0
+	return float(total_hp) / float(total_max)
+
+
+## 时间到时的综合判定：塔数 → 总血量百分比 → 平局
+func _determine_result_by_stats() -> String:
+	var player_towers := _count_alive_towers("player")
+	var enemy_towers := _count_alive_towers("enemy")
+	if player_towers > enemy_towers:
+		return "victory"
+	elif enemy_towers > player_towers:
+		return "defeat"
+	# 塔数相同，比总血量百分比
+	var player_pct := _get_total_hp_percent("player")
+	var enemy_pct := _get_total_hp_percent("enemy")
+	if player_pct > enemy_pct:
+		return "victory"
+	elif enemy_pct > player_pct:
+		return "defeat"
+	return "draw"
 
 
 # ==============================================================================

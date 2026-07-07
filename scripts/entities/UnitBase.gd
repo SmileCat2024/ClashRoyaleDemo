@@ -51,6 +51,11 @@ func setup(unit_data: Dictionary, team_name: String) -> void:
 	# 初始化战斗属性（基类方法）
 	_init_combat_stats(unit_data)
 
+	# 死亡范围伤害配置（如气球兵的死亡掉落）
+	death_damage = int(unit_data.get("death_damage", 0))
+	death_radius = BattleConstants.px(float(unit_data.get("death_radius", 0.0)))
+	death_fuse_time = float(unit_data.get("death_fuse_time", 0.0))
+
 	# 视觉设置：统一方块大小，颜色按阵营区分
 	var size: int = 16
 	if team == "player":
@@ -242,7 +247,7 @@ func _find_nearest_enemy_tower():
 	return nearest
 
 
-## 死亡：从注册表注销，发出信号，销毁
+## 死亡：触发死亡范围伤害（super.die），从注册表注销，发出信号，销毁
 func die() -> void:
 	super.die()
 	EntityRegistry.unregister(self)

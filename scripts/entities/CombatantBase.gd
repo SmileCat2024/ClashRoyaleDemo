@@ -28,6 +28,11 @@ var is_dead: bool = false
 # ---- 攻击数据（原始字典数组，由 AttackComponent 读取）----
 var attacks_data: Array = []
 
+# ---- 死亡范围伤害（如气球兵的死亡掉落）----
+var death_damage: int = 0          ## 死亡时对周围敌方造成的伤害（0 = 无死亡伤害）
+var death_radius: float = 0.0      ## 死亡伤害范围（像素）
+var death_fuse_time: float = 0.0   ## 死亡炸弹引信时间（秒，0 = 无延迟效果）
+
 # ---- 离地高度 ----
 ## 离地高度（格）。地面单位 = 0，飞行单位 > 0。
 ## 仅影响视觉渲染（Body/HealthBar 向上偏移），不影响逻辑坐标和索敌。
@@ -112,6 +117,11 @@ func take_damage(amount: int) -> void:
 		die()
 
 
-## 死亡。基类仅标记 is_dead，具体死亡表现由子类重写。
+## 死亡。基类标记 is_dead 并发出死亡伤害信号（由 EffectManager 接收并生成延迟炸弹效果）。
+## 具体死亡表现（注销、信号、queue_free）由子类重写。
 func die() -> void:
 	is_dead = true
+	if death_damage > 0 and death_radius > 0.0:
+		SignalBus.death_damage_triggered.emit(
+			global_position, death_damage, death_radius, death_fuse_time, team
+		)

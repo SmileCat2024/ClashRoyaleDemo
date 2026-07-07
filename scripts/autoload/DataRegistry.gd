@@ -124,7 +124,9 @@ var unit_data := {
 		"movement_type": "air",
 		"sight_range": 6.0,
 		"movement_targeting": "any",
-		# 死亡时造成 240 范围伤害，暂未实现（需要 death_damage 机制）
+		"death_damage": 240,    # 死亡时范围伤害
+		"death_radius": 2.0,    # 死亡伤害半径（格）
+		"death_fuse_time": 3.0, # 死亡炸弹引信时间（秒）
 		"attacks": [{
 			"name": "bomb_drop",
 			"targeting": "building_only",

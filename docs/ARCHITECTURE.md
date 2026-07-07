@@ -42,8 +42,12 @@
 │  │                   Managers                       │     │
 │  │  ┌───────────────┐ ┌──────────────┐ ┌─────────┐│     │
 │  │  │BattleManager  │ │SpawnManager  │ │EnemyAI  ││     │
-│  │  │(总指挥)       │ │(生成单位)    │ │(敌方AI) ││     │
+│  │  │(总指挥/时间)  │ │(生成单位)    │ │(敌方AI) ││     │
 │  │  └───────────────┘ └──────────────┘ └─────────┘│     │
+│  │  ┌───────────────┐ ┌──────────────┐            │     │
+│  │  │ProjectileMgr  │ │EffectManager │            │     │
+│  │  │(飞行物管理)   │ │(战场效果生成)│            │     │
+│  │  └───────────────┘ └──────────────┘            │     │
 │  └─────────────────────────────────────────────────┘     │
 │                                                          │
 │  ┌─────────────────────────────────────────────────┐     │
@@ -114,23 +118,22 @@ find_target()
 ### 胜负判断流程
 
 ```
-塔受到伤害 take_damage()
-  ↓
-current_hp <= 0 ?
-  ├─ 否 → 继续
-  └─ 是 → die()
-            ↓
-          SignalBus.tower_destroyed.emit(tower_id, team, tower_type)
-            ↓
-          BattleManager._on_tower_destroyed()
-            ↓
-          tower_type == "king" ?
-            ├─ team == "enemy" → end_battle("victory")
-            └─ team == "player" → end_battle("defeat")
-                                      ↓
-                            SignalBus.battle_ended.emit(result)
-                                      ↓
-                            BattleHUD 显示结果面板
+ ┌─ 国王塔被摧毁（任意时刻）
+ │    → TowerBase.die()
+ │    → SignalBus.tower_destroyed.emit()
+ │    → BattleManager._on_tower_destroyed()
+ │    → tower_type == "king" → end_battle("victory"/"defeat")
+ │
+ ├─ 常规时间 180s 到 → _check_time_limit()
+ │    → 比塔数 → 不等则判胜负
+ │    → 塔数相等 → _enter_overtime()（圣水 2x，battle_phase_changed 信号）
+ │
+ └─ 加时赛 60s 到 → _determine_result_by_stats()
+      → 比塔数 → 比总血量百分比 → 平局("draw")
+                    ↓
+          SignalBus.battle_ended.emit(result)
+                    ↓
+          BattleHUD 显示结果面板
 ```
 
 ## 设计原则
@@ -189,3 +192,24 @@ func _on_energy_changed(team, current, max):
 ```
 
 发出方不需要知道谁在听，接收方不需要知道谁在发。松散耦合。
+
+### 为什么死亡伤害要发信号而不是直接造成伤害？
+
+气球兵死亡时的范围伤害不是瞬时结算，而是延迟炸弹（引信 3 秒后才爆炸）。
+
+如果 `CombatantBase.die()` 直接调 `DamageSystem.deal_area_damage()`：
+- 实体层需要知道"炸弹效果"这个概念（违反职责分离）
+- 无法延迟执行（die → queue_free 后实体已不存在）
+- 其他需要监听死亡伤害的系统无法介入
+
+通过信号解耦：
+```gdscript
+# CombatantBase 只负责声明"我死了，有死亡伤害参数"
+SignalBus.death_damage_triggered.emit(pos, damage, radius, fuse, team)
+
+# EffectManager 负责生成效果实例
+func _on_death_damage_triggered(pos, damage, radius, fuse, team):
+    spawn_delayed_damage(pos, damage, radius, fuse, team)
+```
+
+实体层不知道效果系统的存在，效果系统不知道哪个实体会触发它。新增其他死亡效果类型时，只需在 EffectManager 中添加新的监听分支。

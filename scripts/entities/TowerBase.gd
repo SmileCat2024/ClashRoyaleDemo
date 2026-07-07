@@ -1,9 +1,9 @@
 # 文件名：TowerBase.gd
-# 作用：控制塔的行为——受伤、死亡。
+# 作用：控制塔的行为——受伤、死亡、攻击。
 #       塔不会移动。主塔（king）死亡时战斗结束。
-#       D1 阶段：塔只存在，不攻击（D2 接入 AttackComponent）。
+#       攻击逻辑由子节点 AttackComponent 自动驱动（_init_combat_stats 时创建）。
 # 挂载位置：TowerBase.tscn 的根节点
-# 初学者阅读建议：先看 setup() 了解塔怎么初始化。
+# 初学者阅读建议：先看 setup() 了解塔怎么初始化，攻击配置怎么传递给 AttackComponent。
 
 class_name TowerBase
 extends CombatantBase
@@ -75,7 +75,8 @@ func _draw() -> void:
 func _process(_delta: float) -> void:
 	if not initialized or is_dead:
 		return
-	# D1：塔不做任何事。D2 接入 AttackComponent 后才有攻击逻辑。
+	# 塔的攻击逻辑由子节点 AttackComponent 独立处理（_init_combat_stats 时自动创建），
+	# TowerBase._process 无需额外操作。
 
 
 ## 死亡：变灰，从注册表注销，发出信号（塔不 queue_free，留在战场作为残骸）

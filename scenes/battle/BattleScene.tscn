@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/battle/Arena.tscn" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/entities/towers/KingTower.tscn" id="2"]
@@ -8,6 +8,7 @@
 [ext_resource type="Script" path="res://scripts/battle/SimpleEnemyAI.gd" id="6"]
 [ext_resource type="PackedScene" path="res://scenes/ui/BattleHUD.tscn" id="7"]
 [ext_resource type="Script" path="res://scripts/battle/ProjectileManager.gd" id="8"]
+[ext_resource type="Script" path="res://scripts/battle/EffectManager.gd" id="9"]
 
 [node name="BattleScene" type="Node2D"]
 position = Vector2(40, 0)
@@ -58,6 +59,9 @@ script = ExtResource("6")
 
 [node name="ProjectileManager" type="Node" parent="Managers"]
 script = ExtResource("8")
+
+[node name="EffectManager" type="Node" parent="Managers"]
+script = ExtResource("9")
 
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
 offset = Vector2(40, 0)

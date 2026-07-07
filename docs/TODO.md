@@ -42,15 +42,28 @@
   - BattlePathing 统一可达距离与桥路径移动
   - 普通地面单位跨河走桥
   - 野猪骑士 `can_jump_river = true`，跳河期间临时视为空中单位
+- [x] **死亡延迟伤害系统（0.8.0）**
+  - CombatantBase 死亡时发出 `death_damage_triggered` 信号
+  - EffectManager → DelayedDamageEffect 延迟炸弹（引信 + 脉冲指示 + 范围伤害）
+  - BattlefieldEffect 临时效果基类
+  - 气球兵配置 death_damage=240 / death_radius=2.0格 / death_fuse_time=3.0秒
+- [x] **时间限制与加时赛（0.8.0）**
+  - 3 分钟常规 + 1 分钟加时赛（圣水 2x 加速）
+  - 三级胜负判定：塔数 → 总血量百分比 → 平局
+- [x] **圣水条 UI（0.8.0）**
+  - CardBar 集成 ElixirBar（填充条 + 数字），监听 energy_changed 实时更新
+- [x] **塔攻击测试 + 死亡伤害测试（0.8.0）**
+  - test_tower_attack.gd：塔 AttackComponent 射程/索敌/伤害/冷却验证
+  - test_death_damage.gd：死亡信号 → 延迟炸弹伤害 → DataRegistry 配置 3 层验证
 
 ## 必须完成
 
-- [ ] **能量 UI**：EnergyBar.tscn/gd
-  - 更好看的能量显示（圣水条/数字可视化）
 - [ ] **调试面板**：DebugPanel.tscn/gd
   - Tab 切换显示
   - 显示详细信息
   - 添加测试按钮
+- [ ] **部署位置预览**：选中卡牌后鼠标跟随半透明预览，支持多单位部署散开预览
+- [ ] **国王塔激活机制**：受击或公主塔被毁后激活（当前用 first_attack_delay=4 近似）
 
 ## 可选增强
 
@@ -59,8 +72,6 @@
 - [ ] 简单音效
 - [ ] 单位死亡特效
 - [ ] 塔受伤闪烁
-- [ ] 部署位置预览
-- [ ] 时间结束判定（比较双方主塔血量）
 - [ ] 暂停功能
 - [ ] altitude 高度影响逻辑（当前纯视觉，可考虑高度差影响索敌距离）
 
@@ -77,11 +88,11 @@
 
 ## 已知问题
 
-1. **数据只有 5 单位 5 卡**：knight、hog_rider、musketeer、mini_pekka、balloon。气球兵死亡伤害未实现
-2. **能量显示仍为纯文字**：卡牌变暗已实现，但圣水条可视化待 EnergyBar
-3. **单位可重叠**：没有物理碰撞，多个单位会叠在一起
-4. **无复杂寻路/碰撞**：桥与跳河已实现，但没有 A*、障碍绕行和单位碰撞挤压
-5. **无暂停**：战斗开始后无法暂停
-6. **无时间结束判定**：只有主塔死亡才能结束战斗
-7. **altitude 离地高度仅视觉**：不影响索敌距离计算，飞行单位和地面单位仍按 2D 平面距离判定
-8. **弹道弧线 arc_height 数据未填入**：ProjectileBase 已支持 arc_height，但当前单位/塔数据中未设置此值（默认 0.0 = 直线飞行）
+1. **数据只有 5 单位 5 卡**：knight、hog_rider、musketeer、mini_pekka、balloon
+2. **单位可重叠**：没有物理碰撞，多个单位会叠在一起
+3. **无复杂寻路/碰撞**：桥与跳河已实现，但没有 A*、障碍绕行和单位碰撞挤压
+4. **无暂停**：战斗开始后无法暂停
+5. **altitude 离地高度仅视觉**：不影响索敌距离计算，飞行单位和地面单位仍按 2D 平面距离判定
+6. **弹道弧线 arc_height 数据未填入**：ProjectileBase 已支持 arc_height，但当前单位/塔数据中未设置此值（默认 0.0 = 直线飞行）
+7. **国王塔激活机制用 first_attack_delay=4 近似**：真正机制应为受击或公主塔被毁后激活
+8. **AttackComponent._fire_projectile 直接 instantiate**：未走 ProjectileManager 统一入口

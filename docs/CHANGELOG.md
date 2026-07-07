@@ -1,5 +1,43 @@
 # CHANGELOG
 
+## [0.8.0] - 2026-07-07 — 死亡炸弹 + 时间/加时赛 + 圣水条 UI
+
+### 新增
+
+#### 死亡延迟伤害系统（气球兵死亡掉落炸弹）
+- **CombatantBase**：新增 `death_damage`、`death_radius`、`death_fuse_time` 属性。`die()` 不再直接调用 DamageSystem，改为发出 `death_damage_triggered` 信号（含位置/伤害/半径/引信/阵营）
+- **SignalBus**：新增 `death_damage_triggered(pos, damage, radius, fuse, team)` 和 `impact_resolved(position, impact_type, radius, team)` 信号
+- **BattlefieldEffect**：战场临时效果基类（`scripts/effects/BattlefieldEffect.gd`），有生命周期管理 + `_on_expire()` 到期回调
+- **DelayedDamageEffect**：延迟范围伤害效果（`scripts/effects/DelayedDamageEffect.gd`）。引信期间显示脉冲爆炸半径指示圈，到期对范围内敌方造成全额伤害。视觉：渐亮脉冲 + 临近爆炸变红
+- **EffectManager**：统一战场效果生成入口（`scripts/battle/EffectManager.gd`）。监听 `death_damage_triggered` 信号，自动生成 DelayedDamageEffect。架构风格与 SpawnManager / ProjectileManager 一致
+- **EffectsRoot**：BattleScene.tscn 新增效果父容器节点
+- **DataRegistry**：气球兵配置 `death_fuse_time: 3.0`（3 秒引信）
+
+#### 时间限制与加时赛
+- **BattleManager**：完整时间机制
+  - 常规时间 180 秒（3 分钟）→ 加时赛 60 秒（1 分钟），加时赛圣水恢复 2x 加速
+  - 三级胜负判定：塔数对比 → 总血量百分比 → 平局
+  - `_check_time_limit()`、`_enter_overtime()`、`_count_alive_towers()`、`_get_total_hp_percent()`、`_determine_result_by_stats()`
+- **SignalBus**：新增 `battle_phase_changed(phase, time_remaining)` 信号
+
+#### 圣水条 UI（EnergyBar）
+- **CardBar.gd**：集成圣水条（ElixirBar / ElixirFill / ElixirLabel）。监听 `energy_changed` 信号实时更新填充比例和数字显示
+- 圣水条布局常量集中定义在 CardBar.gd 顶部（ELIXIR_X / ELIXIR_Y / ELIXIR_W / ELIXIR_H）
+
+### 变更
+- CombatantBase.die()：从直接调用 `DamageSystem.deal_area_damage` 改为发出 `death_damage_triggered` 信号（解耦：伤害由 EffectManager → DelayedDamageEffect 延迟执行）
+- UnitBase.setup()：读取 `death_fuse_time` 配置
+- BattleScene.tscn：新增 EffectManager 节点和 EffectsRoot 节点
+- BattleHUD.gd：结束面板支持 "draw"（平局）显示
+
+### 新增测试
+- **test_death_damage.gd**（3 层 12 断言）：
+  - Layer 1：die() 正确发出 death_damage_triggered 信号（参数校验、无配置不触发、take_damage 链路）
+  - Layer 2：DelayedDamageEffect._on_expire() 范围伤害结算（范围命中、友方免疫、边界、生命周期进度）
+  - Layer 3：DataRegistry 气球兵配置完整性（death_damage / death_radius / death_fuse_time）
+- **test_tower_attack.gd**（10 断言）：塔 AttackComponent 接入验证（射程格→像素、地面/空中索敌、最近优先、instant 伤害结算、冷却判定、视野兜底）
+- TestRunner SUITES 数组新增上述两个测试套件
+
 ## [0.7.0] - 2026-07-07 — 2.5D 渲染系统（Y 压缩 + 高度 + 弹道弧线）
 
 ### 新增

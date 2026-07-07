@@ -14,6 +14,9 @@ signal battle_started
 ## 战斗结束时发出，result 为 "victory" / "defeat" / "draw"
 signal battle_ended(result: String)
 
+## 战斗阶段变化（"regular" → "overtime"），time_remaining 为当前阶段剩余秒
+signal battle_phase_changed(phase: String, time_remaining: float)
+
 # ---- 卡牌相关 ----
 
 ## 玩家点击了一张卡牌槽位（点击卡牌进入部署待命状态）。
@@ -51,6 +54,10 @@ signal tower_destroyed(tower_id: String, team: String, tower_type: String)
 ## 护盾被打破
 signal shield_broken(combatant: Node)
 
+## 单位死亡时触发延迟范围伤害（如气球兵死亡掉落炸弹）。
+## pos: 死亡位置 | damage: 伤害值 | radius: 半径（像素）| fuse: 引信延迟（秒）| team: 伤害来源阵营
+signal death_damage_triggered(pos: Vector2, damage: int, radius: float, fuse: float, team: String)
+
 # ---- 飞行物相关（D2+）----
 
 ## 一个飞行物被发射到战场上
@@ -58,3 +65,7 @@ signal projectile_spawned(projectile: Node2D, team: String)
 
 ## 一个飞行物命中目标
 signal projectile_hit(position: Vector2, team: String)
+
+## 一个范围效果在指定位置结算（如炸弹爆炸、法术命中）。
+## impact_type: "single" | "splash"
+signal impact_resolved(position: Vector2, impact_type: String, radius: float, team: String)

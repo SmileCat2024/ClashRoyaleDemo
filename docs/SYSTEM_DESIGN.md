@@ -40,7 +40,7 @@
 - 多攻击（AttackComponent×N，哥布林巨人）
 - 状态效果系统（减速/加速/回血）
 - 弹道弧线（抛物线 ballistic）
-- 时间到判定（比塔数/血量）
+- ~~时间到判定（比塔数/血量）~~ ✅ 已实现（0.8.0：3min 常规 + 1min 加时赛，三级判定）
 - 多体召唤散开（骷髅军团）
 - 近战溅射 / 远程溅射
 
@@ -67,11 +67,12 @@
 ┌─────────────────────────────────────────────────────────────┐
 │               Managers（战斗系统层 / 纯逻辑）                   │
 │                                                              │
-│  BattleManager     战斗生命周期、能量、出牌分发、胜负            │
+│  BattleManager     战斗生命周期、能量、出牌分发、胜负、时间/加时 │
 │  DeckManager       卡组轮转（8牌循环队列）                      │
 │  SpawnManager      实体生成（单位/建筑）                        │
 │  SpellManager      法术执行（延迟范围伤害/状态施加）             │
 │  ProjectileManager 飞行物管理                                  │
+│  EffectManager     战场效果生成入口（监听 death_damage_triggered）│
 │  StatusSystem      状态效果管理（P2）                          │
 │  SimpleEnemyAI     敌方AI                                     │
 └─────────────────────────────────────────────────────────────┘
@@ -88,6 +89,9 @@
 │                                                              │
 │  AttackComponent (Node)    攻击组件（D2+，独立索敌+冷却+攻击）  │
 │  ProjectileBase      飞行物                                   │
+│                                                              │
+│  BattlefieldEffect (Node2D) 战场效果基类（生命周期+_on_expire） │
+│  └── DelayedDamageEffect   延迟范围伤害炸弹（引信→爆炸）       │
 └─────────────────────────────────────────────────────────────┘
                            │
 ┌─────────────────────────────────────────────────────────────┐
@@ -110,9 +114,11 @@
 | **SpellManager** | DamageSystem（static）, EntityRegistry（query） | 法术查实体造成伤害 |
 | **DeckManager** | 无 | 纯状态管理，被 BattleManager 调用 |
 | **SimpleEnemyAI** | BattleManager（调 try_play_card） | 和玩家走同一条路径 |
+| **EffectManager** | 无 Manager 引用，监听 SignalBus.death_damage_triggered | 独立工作，信号驱动生成效果 |
 | **UI** | 无 Manager 引用，只连 SignalBus | UI 永远不直接调逻辑层 |
 | **Entity** | EntityRegistry（query）, DamageSystem（static） | 查敌人和造成伤害 |
 | **AttackComponent** | EntityRegistry（query）, DamageSystem（static）, owner | 索敌和攻击结算 |
+| **BattlefieldEffect** | DamageSystem（static）, EntityRegistry（via DamageSystem） | 到期结算伤害 |
 
 **禁止的**：SpawnManager 引用 BattleManager。SpellManager 引用 DeckManager。UI 直接引用任何 Manager。
 
@@ -420,6 +426,40 @@ P0/P1 版本：**延迟范围伤害**，不做真实弹道。
 - 视觉：ColorRect 扩散动画表示爆炸
 - 真实飞行 Projectile（弧线弹道）→ P2
 
+### 6.6.1 战场效果系统（0.8.0，已实现）
+
+战场效果是"短暂存在于地面上、有有限生命周期的非战斗实体"。典型用例：气球兵死亡掉落炸弹、法术爆炸残留区域、召唤特效。
+
+**继承体系**：
+
+```
+Node2D
+└── BattlefieldEffect         ← 生命周期管理 + _on_expire() 到期回调
+    └── DelayedDamageEffect   ← 引信期间脉冲指示 → 到期范围伤害
+```
+
+**核心设计**：
+
+- **BattlefieldEffect**（`scripts/effects/BattlefieldEffect.gd`）：基类。`setup(pos, team, lifetime)` 初始化，`_process()` 累加计时器，到期调 `_on_expire()` 然后 `queue_free()`。提供 `get_progress()` / `get_remaining_time()` 供视觉和查询使用
+- **DelayedDamageEffect**（`scripts/effects/DelayedDamageEffect.gd`）：延迟伤害炸弹。`setup_damage(pos, team, fuse, dmg, radius)` 配置参数，`_on_expire()` 调 `DamageSystem.deal_area_damage()` 结算 + 发 `impact_resolved` 信号。`_draw()` 绘制脉冲爆炸半径指示圈
+- **EffectManager**（`scripts/battle/EffectManager.gd`）：统一生成入口。监听 `SignalBus.death_damage_triggered`，自动在 `EffectsRoot` 下生成效果实例。与 SpawnManager / ProjectileManager 保持一致的管理器风格
+
+**数据流（死亡炸弹完整链路）**：
+
+```
+CombatantBase.die()
+  → death_damage > 0 ?
+  → SignalBus.death_damage_triggered.emit(pos, dmg, radius, fuse, team)
+  → EffectManager._on_death_damage_triggered()
+  → spawn_delayed_damage() → DelayedDamageEffect 实例加入 EffectsRoot
+  → setup_damage() 配置炸弹参数
+  → 引信期间 _draw() 脉冲显示爆炸半径
+  → _on_expire() → DamageSystem.deal_area_damage() → impact_resolved 信号
+  → queue_free()
+```
+
+**扩展规则**：新增战场效果只需继承 `BattlefieldEffect`，重写 `_on_expire()`，创建对应场景文件，在 EffectManager 中注册生成入口。
+
 ### 6.7 卡组轮转（P1）
 
 ```
@@ -506,6 +546,7 @@ instantiate → set position → add_child → setup → register
 # 战斗生命周期
 signal battle_started
 signal battle_ended(result: String)
+signal battle_phase_changed(phase: String, time_remaining: float)  # 0.8.0: 常规/加时切换
 
 # 卡牌
 signal card_selected(card_id: String)
@@ -521,6 +562,7 @@ signal tower_destroyed(tower_id: String, team: String, tower_type: String)
 
 # 战斗结算
 signal shield_broken(combatant: Node)
+signal death_damage_triggered(pos: Vector2, damage: int, radius: float, fuse: float, team: String)  # 0.8.0: 死亡炸弹
 
 # 飞行物（D2+）
 signal projectile_spawned(projectile: Node2D, team: String)
@@ -563,9 +605,29 @@ DataRegistry._ready() 时自动运行 `_validate_all_data()`：
 
 ## 十三、胜负判定
 
-- **P0**：国王塔被摧毁 → 立即结束战斗。
-- **P2**：时间到（180秒）→ 比剩余公主塔数量 → 比国王塔血量百分比。
-- 塔注册在 PlayerBattleState.towers 里。
+### 即时胜负（P0，已实现）
+- 国王塔被摧毁 → 立即结束战斗（`end_battle("victory"/"defeat")`）
+
+### 时间限制与加时赛（0.8.0，已实现）
+
+```
+常规时间 180s
+  ├─ 国王塔被摧毁 → 立即胜负
+  └─ 时间到 → _check_time_limit()
+      ├─ 双方存活塔数不等 → 多者胜
+      └─ 塔数相等 → 进入加时赛
+
+加时赛 60s（圣水恢复 2x 加速）
+  ├─ 国王塔被摧毁 → 立即胜负
+  └─ 加时结束 → _determine_result_by_stats()
+      ├─ 比塔数 → 多者胜
+      ├─ 塔数相同 → 比总血量百分比 → 高者胜
+      └─ 都相同 → 平局（"draw"）
+```
+
+- `battle_phase` 状态：`"regular"` / `"overtime"`
+- 进入加时时广播 `battle_phase_changed("overtime", remaining)` 信号，圣水间隔减半
+- 塔注册在 PlayerBattleState.towers 里
 
 ---
 
@@ -618,6 +680,8 @@ DataRegistry._ready() 时自动运行 `_validate_all_data()`：
 7. **法术用延迟伤害而非真实弹道**（P0/P1）：P2 才加弧线弹道
 8. **多攻击 P2 才做**：P0 只读 attacks[0]，创建一个 AttackComponent
 9. **altitude 离地高度仅视觉**：不影响逻辑，飞行单位和地面单位在索敌时仍按 2D 距离计算
+10. **死亡炸弹爆炸无独立动画**：引信期间有脉冲指示圈，但到期瞬间 queue_free，无爆炸闪帧
+11. **DebugBattle.tscn 无 EffectManager**：该场景主要用于单位移动调试，死亡炸弹仅在 BattleScene 中生效
 
 ---
 
