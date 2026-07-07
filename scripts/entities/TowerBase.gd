@@ -43,8 +43,8 @@ func setup(tower_data: Dictionary, team_name: String, tower_name: String) -> voi
 	health_bar.size = Vector2(body_size.x + 10, 6)
 	health_bar.position = Vector2(-(body_size.x + 10) / 2.0, -body_size.y / 2.0 - 12)
 
-	debug_label.text = tower_name
-	debug_label.position = Vector2(-30, body_size.y / 2.0 + 4)
+	debug_label.text = ""
+	debug_label.visible = false
 
 	initialized = true
 	queue_redraw()

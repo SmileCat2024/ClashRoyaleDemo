@@ -43,9 +43,9 @@ text = "点击卡牌选中 | 左键部署 | 右键取消"
 [node name="BottomInfo" type="HBoxContainer" parent="."]
 layout_mode = 1
 offset_left = 4.0
-offset_top = 622.0
+offset_top = 515.0
 offset_right = 356.0
-offset_bottom = 636.0
+offset_bottom = 529.0
 mouse_filter = 2
 theme_override_constants/separation = 8
 

@@ -1,28 +1,87 @@
 # 文件名：CardBar.gd
-# 作用：底部卡牌栏控制器。管理 4 张手牌槽位 + 1 张预告牌的显示。
-#       监听 SignalBus 的 hand_updated / energy_changed / selection_changed，
-#       驱动各 CardSlot 刷新内容、可负担状态、选中高亮。
-#       CardBar 不直接引用任何 Manager——纯信号驱动。
+# 作用：底部卡牌栏控制器。管理背景底板图、4 张手牌槽位、预告牌、圣水条。
+#       监听 SignalBus 的 hand_updated / energy_changed / selection_changed。
+#       所有布局常量集中在本文件顶部，供视觉模型微调对齐。
 # 挂载位置：BattleHUD/CardBar（场景 CardBar.tscn 的根节点）
-# 初学者阅读建议：先看 _ready() 了解信号连接，再看 _on_hand_updated() 了解刷新流程。
+# 初学者阅读建议：先看顶部布局常量区，再看 _ready() 了解信号连接和定位。
+#
+# ============================================================
+#  视觉模型交接区：以下常量控制底板图中所有元素的位置和尺寸。
+#  坐标系：CardBar 本地坐标（左上角为原点），单位 = 逻辑像素。
+#  CardBar 覆盖区域由 BattleHUD.tscn 中 CardBar 节点的 offset 决定。
+#  改这里面的数字即可调整对应元素位置，无需改 .tscn 文件。
+# ============================================================
 
 extends Control
 
+## ── CardBar 自身覆盖区域 ──
+## CanvasLayer offset=(40,0)，HUD x=0 → viewport x=40。
+## 要占满 viewport 440px 宽，CardBar 需从 HUD x=-40 到 x=400。
+const BAR_LEFT   := -40   ## 延伸到 viewport 左边缘（-40 + CanvasLayer偏移40 = viewport 0）
+const BAR_TOP    := 590   ## 国王塔在 y≈586，卡槽从其下方开始
+const BAR_RIGHT  := 400   ## viewport 右边缘
+const BAR_BOTTOM := 780   ## 视口底部（新视口高度 780）
+
+## ── 卡牌槽位（4 张手牌）──
+## 图片比例：左面板~340px + 卡区~1576px (1916总宽)
+## 映射到 440px：卡区起始 x≈85，每卡宽≈83，间距≈7
+const SLOT_W   := 83      ## 单个卡槽宽度
+const SLOT_H   := 113     ## 单个卡槽高度（490px × 缩放比）
+const SLOT_GAP := 7       ## 卡槽间距
+const SLOT_ROW_Y := 21    ## 卡槽行顶部 y（90px × 缩放比）
+const SLOT_START_X := 85  ## 最左边卡槽的左上角 x
+
+## ── 预告牌（下一张）区域 ──
+const NEXT_W := 65        ## 预告牌区域宽度
+const NEXT_H := 100       ## 预告牌区域高度
+const NEXT_X  := 14       ## 预告牌区域左上角 x
+const NEXT_Y  := 65       ## 预告牌区域左上角 y
+
+## ── 圣水条（跳过图片第1格，右对齐10格） ──
+## 图片圣水条约11格，我们只要后10格 → 起始x右移1格宽度
+const ELIXIR_X := 116     ## 跳过第1格后的起始 x
+const ELIXIR_Y := 147     ## 圣水条 y
+const ELIXIR_W := 315     ## 10格宽度
+const ELIXIR_H := 23      ## 圣水条高度
+
 var _player_energy: int = 5
+var _player_energy_max: int = 10
 
 @onready var slots: Array[Button] = [
-	$HBox/CardSlot0, $HBox/CardSlot1, $HBox/CardSlot2, $HBox/CardSlot3,
+	$CardSlot0, $CardSlot1, $CardSlot2, $CardSlot3,
 ]
-@onready var next_name_label: Label = $HBox/NextCardPanel/NextNameLabel
+@onready var next_name_label: Label = $NextCardPanel/NextNameLabel
+@onready var next_card_panel: Panel = $NextCardPanel
+@onready var elixir_bar: Control = $ElixirBar
+@onready var elixir_fill: ColorRect = $ElixirBar/ElixirFill
+@onready var elixir_label: Label = $ElixirBar/ElixirLabel
 
 
 func _ready() -> void:
 	SignalBus.hand_updated.connect(_on_hand_updated)
 	SignalBus.energy_changed.connect(_on_energy_changed)
 	SignalBus.selection_changed.connect(_on_selection_changed)
-	# CardBar 根节点不拦截鼠标（让卡牌间隙的点击穿透到战场），
-	# 各 CardSlot（Button）自行以 STOP 拦截自身区域。
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	# 定位 CardBar 自身
+	position = Vector2(BAR_LEFT, BAR_TOP)
+	size = Vector2(BAR_RIGHT - BAR_LEFT, BAR_BOTTOM - BAR_TOP)
+
+	# 定位 4 张卡牌槽位
+	for i in range(slots.size()):
+		var x := SLOT_START_X + i * (SLOT_W + SLOT_GAP)
+		slots[i].position = Vector2(x, SLOT_ROW_Y)
+		slots[i].size = Vector2(SLOT_W, SLOT_H)
+
+	# 定位预告牌
+	next_card_panel.position = Vector2(NEXT_X, NEXT_Y)
+	next_card_panel.size = Vector2(NEXT_W, NEXT_H)
+	var panel_sb := StyleBoxEmpty.new()
+	next_card_panel.add_theme_stylebox_override("panel", panel_sb)
+
+	# 定位圣水条
+	elixir_bar.position = Vector2(ELIXIR_X, ELIXIR_Y)
+	elixir_bar.size = Vector2(ELIXIR_W, ELIXIR_H)
 
 
 ## 手牌更新：刷新 4 张卡牌 + 预告牌 + 可负担状态
@@ -30,7 +89,6 @@ func _on_hand_updated(hand: Array, next_card: String) -> void:
 	for i in range(slots.size()):
 		var card_id: String = hand[i] if i < hand.size() else ""
 		slots[i].setup(card_id, i)
-	# 更新预告牌名称
 	if next_card == "":
 		next_name_label.text = "—"
 	else:
@@ -39,10 +97,12 @@ func _on_hand_updated(hand: Array, next_card: String) -> void:
 	_refresh_affordability()
 
 
-## 能量变化：重新评估各卡牌是否可负担
-func _on_energy_changed(team: String, current: int, _max: int) -> void:
+## 能量变化：更新圣水条 + 重新评估各卡牌是否可负担
+func _on_energy_changed(team: String, current: int, max_val: int) -> void:
 	if team == "player":
 		_player_energy = current
+		_player_energy_max = max_val
+		_update_elixir_bar()
 		_refresh_affordability()
 
 
@@ -58,3 +118,10 @@ func _refresh_affordability() -> void:
 		var card := DataRegistry.get_card_data(slot.card_id)
 		var cost := int(card.get("cost", 0))
 		slot.set_affordable(_player_energy >= cost)
+
+
+## 更新圣水条显示
+func _update_elixir_bar() -> void:
+	var ratio := float(_player_energy) / float(max(_player_energy_max, 1))
+	elixir_fill.size = Vector2(ELIXIR_W * ratio, ELIXIR_H)
+	elixir_label.text = "%d/%d" % [_player_energy, _player_energy_max]

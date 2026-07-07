@@ -26,9 +26,9 @@ EntityRegistry="*res://scripts/autoload/EntityRegistry.gd"
 [display]
 
 window/size/viewport_width=440
-window/size/viewport_height=720
+window/size/viewport_height=780
 window/size/window_width_override=880
-window/size/window_height_override=1440
+window/size/window_height_override=1560
 window/stretch/mode="canvas_items"
 
 [rendering]

@@ -71,24 +71,11 @@ func _update_appearance() -> void:
 		modulate = Color.WHITE
 
 
-## 扁平像素风按钮样式（运行时生成 StyleBoxFlat，无需 .tres 文件）
+## 透明背景——底板图由 CardBar/BgTexture 提供，卡槽只做交互层。
+## 选中/变暗通过 modulate 实现，不画任何 StyleBox。
 func _apply_theme() -> void:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.16, 0.2, 0.3)
-	sb.set_border_width_all(2)
-	sb.border_color = Color(0.4, 0.45, 0.58)
-	sb.set_content_margin_all(2)
-	add_theme_stylebox_override("normal", sb)
-
-	var sb_hover := sb.duplicate()
-	sb_hover.bg_color = Color(0.26, 0.3, 0.42)
-	add_theme_stylebox_override("hover", sb_hover)
-
-	var sb_pressed := sb.duplicate()
-	sb_pressed.bg_color = Color(0.12, 0.15, 0.22)
-	add_theme_stylebox_override("pressed", sb_pressed)
-
-	var sb_disabled := sb.duplicate()
-	sb_disabled.bg_color = Color(0.1, 0.1, 0.14)
-	sb_disabled.border_color = Color(0.18, 0.18, 0.22)
-	add_theme_stylebox_override("disabled", sb_disabled)
+	var empty := StyleBoxEmpty.new()
+	add_theme_stylebox_override("normal", empty)
+	add_theme_stylebox_override("hover", empty)
+	add_theme_stylebox_override("pressed", empty)
+	add_theme_stylebox_override("disabled", empty)

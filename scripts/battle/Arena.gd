@@ -18,10 +18,10 @@ func _ready() -> void:
 	var img_w: float = _map_bg.texture.get_width()
 	var s: float = float(BattleConstants.VIEWPORT_WIDTH) / img_w
 	_map_bg.scale = Vector2(s, s)
-	# 垂直居中于视口（上下自然留白）
+	# 居中于竞技场游戏区域（不受视口高度变化影响）
 	_map_bg.position = Vector2(
 		BattleConstants.VIEWPORT_WIDTH * 0.5,
-		BattleConstants.VIEWPORT_HEIGHT * 0.5,
+		BattleConstants.ARENA_TOP_OFFSET_Y + BattleConstants.ARENA_SCREEN_HEIGHT * 0.5,
 	)
 	_map_bg.z_index = -1  # 底板下沉，所有游戏元素画在其上
 

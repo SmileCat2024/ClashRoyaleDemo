@@ -43,10 +43,10 @@ const ARENA_HEIGHT := MAP_TILES_H * CELL_SIZE   ## 640（游戏空间高度）
 const ARENA_SCREEN_HEIGHT := ARENA_HEIGHT * Y_COMPRESS  ## 480
 const VIEWPORT_WIDTH := (MAP_TILES_W + VIEWPORT_BORDER_CELLS * 2) * CELL_SIZE  ## 440
 ## 必须与 project.godot 一致（竞技场压缩高度 + 上下留白 + 卡牌区）
-const VIEWPORT_HEIGHT := 720
+const VIEWPORT_HEIGHT := 780
 
 ## 竞技场在视口中的垂直偏移（在卡牌区上方居中，上下留白）
-const ARENA_TOP_OFFSET_Y := (float(VIEWPORT_HEIGHT) - float(VIEW_EXTRA_ROWS * CELL_SIZE) - ARENA_SCREEN_HEIGHT) * 0.5 + 31.452  ## 99（+2压缩格下移校正）
+const ARENA_TOP_OFFSET_Y := 99.0  ## 固定值，不随视口高度变化
 ## 竞技场在视口中的水平偏移（= 左侧边距格数 × 格大小）
 const ARENA_OFFSET_X := VIEWPORT_BORDER_CELLS * CELL_SIZE                        ## 40
 
