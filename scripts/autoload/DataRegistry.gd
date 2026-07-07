@@ -156,6 +156,28 @@ var unit_data := {
 			"impact_radius": 0.0,
 			"damage": 640,
 		}],
+		# ---- 帧动画配置 ----
+		# 单帧静态图（无序列帧动画），idle / walk 共用同一帧
+		# 原始 PNG 1254×1254px，scale 0.0792 ≈ 99px（0.066 × 1.2）
+		# 气球兵为飞行单位，altitude 系统自动上移 2.5 格（50px），无需额外 visual_offset_y
+		"animation": {
+			"visual_offset_x": 0.0,
+			"visual_offset_y": -40.0,
+			"visual_scale": 0.0792,
+			"health_bar_y": -95.0,
+			"states": {
+				"idle": {
+					"frames": ["balloon.png"],
+					"duration": [1.0],
+					"mode": "loop",
+				},
+				"walk": {
+					"frames": ["balloon.png"],
+					"duration": [1.0],
+					"mode": "loop",
+				},
+			},
+		},
 	},
 	"archers": {
 		"id": "archers",
@@ -188,7 +210,7 @@ var unit_data := {
 		# 原始 PNG 1254×1254px，缩放到约 83px（≈4格）显示
 		"animation": {
 			"visual_offset_x": 0.0,
-			"visual_offset_y": -65.0,   # 上移让脚底接近格子中心，目测微调
+			"visual_offset_y": -5.0,     # 父坐标系像素（原 -65 经 offset×scale 换算 ≈ -5px）
 			"visual_scale": 0.066,      # 1254 × 0.066 ≈ 83px
 			"health_bar_y": -45.0,      # 血条在角色头顶上方
 			"states": {

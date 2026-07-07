@@ -52,7 +52,8 @@ func setup(unit_data: Dictionary, entity: CombatantBase) -> void:
 	_sprite.name = "Sprite"
 	_sprite.sprite_frames = frames
 	_sprite.centered = true
-	_sprite.offset = _base_offset
+	# visual_offset 通过 position 设置（父坐标系，不受 sprite scale 影响）
+	_sprite.position = _base_offset
 	var vs: float = float(anim_data.get("visual_scale", 1.0))
 	# 反向补偿 World 的 Y_COMPRESS：角色贴图不应被透视压扁，保持原始宽高比
 	_sprite.scale = Vector2(vs, vs / BattleConstants.Y_COMPRESS)
@@ -120,9 +121,10 @@ func _update_animation() -> void:
 
 
 ## 传递 altitude 离地偏移。由宿主实体的 altitude 系统调用。
+## 使用 position（父坐标系）叠加 base_offset + altitude，与 body_rect.position 同空间。
 func apply_altitude_offset(dy: float) -> void:
 	if _sprite:
-		_sprite.offset = _base_offset + Vector2(0, dy)
+		_sprite.position = _base_offset + Vector2(0, dy)
 
 
 ## 帧变化回调（P2 扩展：帧事件 / hit frame 通知）。
