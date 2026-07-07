@@ -23,13 +23,11 @@ const BAR_RIGHT  := 400   ## viewport 右边缘
 const BAR_BOTTOM := 780   ## 视口底部（新视口高度 780）
 
 ## ── 卡牌槽位（4 张手牌）──
-## 图片比例：左面板~340px + 卡区~1576px (1916总宽)
-## 映射到 440px：卡区起始 x≈85，每卡宽≈83，间距≈7
-const SLOT_W   := 83      ## 单个卡槽宽度
-const SLOT_H   := 113     ## 单个卡槽高度（490px × 缩放比）
-const SLOT_GAP := 7       ## 卡槽间距
-const SLOT_ROW_Y := 21    ## 卡槽行顶部 y（90px × 缩放比）
-const SLOT_START_X := 85  ## 最左边卡槽的左上角 x
+## 底板图的 4 个卡框不是数学等距，逐个定位能更贴合边框。
+const SLOT_W   := 75      ## 单个卡槽宽度
+const SLOT_H   := 104     ## 单个卡槽高度
+const SLOT_ROW_Y := 29    ## 卡槽行顶部 y（CardBar 本地坐标）
+const SLOT_XS := [103, 187, 270, 354]  ## 4 张手牌的左上角 x
 
 ## ── 预告牌（下一张）区域 ──
 const NEXT_W := 65        ## 预告牌区域宽度
@@ -37,12 +35,13 @@ const NEXT_H := 100       ## 预告牌区域高度
 const NEXT_X  := 14       ## 预告牌区域左上角 x
 const NEXT_Y  := 65       ## 预告牌区域左上角 y
 
-## ── 圣水条（跳过图片第1格，右对齐10格） ──
-## 图片圣水条约11格，我们只要后10格 → 起始x右移1格宽度
-const ELIXIR_X := 116     ## 跳过第1格后的起始 x
-const ELIXIR_Y := 147     ## 圣水条 y
-const ELIXIR_W := 315     ## 10格宽度
-const ELIXIR_H := 23      ## 圣水条高度
+## ── 圣水条（底板桥是 11 格，实际圣水只占右侧 10 格） ──
+## 以桥的右侧为锚点，宽度只覆盖右侧 10 格，跳过最左边的空格。
+const ELIXIR_RIGHT := 426
+const ELIXIR_W := 300
+const ELIXIR_X := ELIXIR_RIGHT - ELIXIR_W
+const ELIXIR_Y := 146     ## 圣水条 y
+const ELIXIR_H := 20      ## 圣水条高度
 
 var _player_energy: int = 5
 var _player_energy_max: int = 10
@@ -69,7 +68,7 @@ func _ready() -> void:
 
 	# 定位 4 张卡牌槽位
 	for i in range(slots.size()):
-		var x := SLOT_START_X + i * (SLOT_W + SLOT_GAP)
+		var x := int(SLOT_XS[i])
 		slots[i].position = Vector2(x, SLOT_ROW_Y)
 		slots[i].size = Vector2(SLOT_W, SLOT_H)
 
