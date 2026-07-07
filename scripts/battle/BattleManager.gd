@@ -393,7 +393,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if battle_running and selected_hand_index >= 0:
 				# 通过 World 节点的逆变换获取游戏空间坐标（自动处理 Y 压缩 + 偏移）
-				var world_pos: Vector2 = world.get_local_mouse_position()
+				# 吸附到最近的格中心
+				var world_pos: Vector2 = BattleConstants.snap_to_cell_center(world.get_local_mouse_position())
 				_try_deploy(world_pos)
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
 			_cancel_selection()

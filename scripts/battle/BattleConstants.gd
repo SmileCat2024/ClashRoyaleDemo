@@ -143,3 +143,12 @@ static func tile_to_pixel(tile_x: float, tile_y: float) -> Vector2:
 	var px = tile_x * CELL_SIZE
 	var py = (float(MAP_TILES_H) - 0.5 - tile_y) * CELL_SIZE
 	return Vector2(px, py)
+
+
+## 将任意像素坐标吸附到最近的格中心。
+## 格 n 的中心在 (n + 0.5) * CELL_SIZE，例如格0中心 = 10px，格1中心 = 30px。
+## 部署、法术释放等操作都先经过此函数对齐到格中心。
+static func snap_to_cell_center(pos: Vector2) -> Vector2:
+	var cx := floori(pos.x / CELL_SIZE) * CELL_SIZE + CELL_SIZE / 2
+	var cy := floori(pos.y / CELL_SIZE) * CELL_SIZE + CELL_SIZE / 2
+	return Vector2(cx, cy)
