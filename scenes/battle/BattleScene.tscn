@@ -1,0 +1,65 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/battle/Arena.tscn" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/entities/towers/KingTower.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://scenes/entities/towers/GuardTower.tscn" id="3"]
+[ext_resource type="Script" path="res://scripts/battle/BattleManager.gd" id="4"]
+[ext_resource type="Script" path="res://scripts/battle/SpawnManager.gd" id="5"]
+[ext_resource type="Script" path="res://scripts/battle/SimpleEnemyAI.gd" id="6"]
+[ext_resource type="PackedScene" path="res://scenes/ui/BattleHUD.tscn" id="7"]
+[ext_resource type="Script" path="res://scripts/battle/ProjectileManager.gd" id="8"]
+
+[node name="BattleScene" type="Node2D"]
+position = Vector2(40, 0)
+
+[node name="World" type="Node2D" parent="."]
+position = Vector2(0, 99)
+scale = Vector2(1, 0.7863)
+
+[node name="Arena" parent="World" instance=ExtResource("1")]
+
+[node name="TowersRoot" type="Node2D" parent="World"]
+
+[node name="EnemyKingTower" parent="World/TowersRoot" instance=ExtResource("2")]
+position = Vector2(180, 60)
+
+[node name="EnemyLeftTower" parent="World/TowersRoot" instance=ExtResource("3")]
+position = Vector2(70, 130)
+
+[node name="EnemyRightTower" parent="World/TowersRoot" instance=ExtResource("3")]
+position = Vector2(290, 130)
+
+[node name="PlayerLeftTower" parent="World/TowersRoot" instance=ExtResource("3")]
+position = Vector2(70, 510)
+
+[node name="PlayerRightTower" parent="World/TowersRoot" instance=ExtResource("3")]
+position = Vector2(290, 510)
+
+[node name="PlayerKingTower" parent="World/TowersRoot" instance=ExtResource("2")]
+position = Vector2(180, 580)
+
+[node name="UnitsRoot" type="Node2D" parent="World"]
+y_sort_enabled = true
+
+[node name="ProjectilesRoot" type="Node2D" parent="World"]
+
+[node name="EffectsRoot" type="Node2D" parent="World"]
+
+[node name="Managers" type="Node" parent="."]
+
+[node name="BattleManager" type="Node" parent="Managers"]
+script = ExtResource("4")
+
+[node name="SpawnManager" type="Node" parent="Managers"]
+script = ExtResource("5")
+
+[node name="SimpleEnemyAI" type="Node" parent="Managers"]
+script = ExtResource("6")
+
+[node name="ProjectileManager" type="Node" parent="Managers"]
+script = ExtResource("8")
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+offset = Vector2(40, 0)
+
+[node name="BattleHUD" parent="CanvasLayer" instance=ExtResource("7")]

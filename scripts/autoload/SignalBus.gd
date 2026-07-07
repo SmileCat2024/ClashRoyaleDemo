@@ -1,0 +1,60 @@
+# 文件名：SignalBus.gd
+# 作用：集中声明全局信号，让不同系统之间可以松散耦合地通信。
+#       发出方不需要知道谁在听，接收方不需要知道谁在发。
+# 挂载位置：Autoload（全局单例），在 project.godot 中注册。
+# 初学者阅读建议：这里只是声明信号（signal），不需要理解实现细节。
+
+extends Node
+
+# ---- 战斗生命周期 ----
+
+## 战斗开始时发出
+signal battle_started
+
+## 战斗结束时发出，result 为 "victory" / "defeat" / "draw"
+signal battle_ended(result: String)
+
+# ---- 卡牌相关 ----
+
+## 玩家点击了一张卡牌槽位（点击卡牌进入部署待命状态）。
+## hand_index 为手牌索引 0-3，BattleManager 据此切换选中状态。
+signal card_selected(card_id: String, hand_index: int)
+
+## 一张卡牌被成功打出（实体已生成 / 法术已执行）
+signal card_played(card_id: String, team: String, position: Vector2)
+
+## 手牌状态更新（初始分配 / 出牌轮转后发出）。
+## hand 为当前 4 张手牌 id 数组，next_card 为下一张预告 id。
+signal hand_updated(hand: Array, next_card: String)
+
+## 选中状态变化。hand_index 为当前选中槽位（-1 = 未选中）。
+signal selection_changed(hand_index: int)
+
+# ---- 能量相关 ----
+
+## 某一方能量发生变化
+signal energy_changed(team: String, current: int, max_value: int)
+
+# ---- 实体相关 ----
+
+## 一个单位被生成到战场上
+signal unit_spawned(unit: Node, team: String)
+
+## 一个单位死亡
+signal unit_died(unit: Node, team: String)
+
+## 一座塔被摧毁
+signal tower_destroyed(tower_id: String, team: String, tower_type: String)
+
+# ---- 战斗结算 ----
+
+## 护盾被打破
+signal shield_broken(combatant: Node)
+
+# ---- 飞行物相关（D2+）----
+
+## 一个飞行物被发射到战场上
+signal projectile_spawned(projectile: Node2D, team: String)
+
+## 一个飞行物命中目标
+signal projectile_hit(position: Vector2, team: String)

@@ -1,0 +1,30 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/entities/TowerBase.gd" id="1"]
+
+[node name="TowerBase" type="Node2D"]
+script = ExtResource("1")
+
+[node name="Body" type="ColorRect" parent="."]
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+color = Color(0.15, 0.35, 0.7, 1)
+
+[node name="HealthBar" type="ProgressBar" parent="."]
+offset_left = -25.0
+offset_top = -32.0
+offset_right = 25.0
+offset_bottom = -26.0
+max_value = 800.0
+value = 800.0
+show_percentage = false
+
+[node name="DebugLabel" type="Label" parent="."]
+offset_left = -40.0
+offset_top = 24.0
+offset_right = 40.0
+offset_bottom = 38.0
+text = "Tower"
+horizontal_alignment = 1

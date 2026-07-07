@@ -1,0 +1,36 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="PixelLaneBattle"
+run/main_scene="res://scenes/battle/BattleScene.tscn"
+config/features=PackedStringArray("4.7", "Forward Plus")
+config/icon="res://icon.svg"
+
+[autoload]
+
+Game="*res://scripts/autoload/Game.gd"
+SceneLoader="*res://scripts/autoload/SceneLoader.gd"
+DataRegistry="*res://scripts/autoload/DataRegistry.gd"
+SignalBus="*res://scripts/autoload/SignalBus.gd"
+EntityRegistry="*res://scripts/autoload/EntityRegistry.gd"
+
+[display]
+
+window/size/viewport_width=440
+window/size/viewport_height=720
+window/size/window_width_override=880
+window/size/window_height_override=1440
+window/stretch/mode="canvas_items"
+
+[rendering]
+
+textures/canvas_textures/default_texture_filter=0
