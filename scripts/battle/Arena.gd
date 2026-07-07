@@ -26,14 +26,14 @@ func _ready() -> void:
 	_map_bg.z_index = -1  # 底板下沉，所有游戏元素画在其上
 
 
-## 判断一个世界坐标是否在玩家可部署区域内（己方半场，河道下方）
+## 判断一个 World 本地游戏空间坐标是否在玩家可部署区域内（己方半场，河道下方）
 func is_player_deploy_position(pos: Vector2) -> bool:
 	return pos.y >= BattleConstants.PLAYER_DEPLOY_Y_MIN \
 		and pos.y <= BattleConstants.PLAYER_DEPLOY_Y_MAX \
 		and pos.x >= BattleConstants.px(0.5) and pos.x <= BattleConstants.ARENA_WIDTH - BattleConstants.px(0.5)
 
 
-## 判断一个世界坐标是否在敌方可部署区域内（敌方半场，河道上方）
+## 判断一个 World 本地游戏空间坐标是否在敌方可部署区域内（敌方半场，河道上方）
 func is_enemy_deploy_position(pos: Vector2) -> bool:
 	return pos.y >= BattleConstants.ENEMY_DEPLOY_Y_MIN \
 		and pos.y <= BattleConstants.ENEMY_DEPLOY_Y_MAX \

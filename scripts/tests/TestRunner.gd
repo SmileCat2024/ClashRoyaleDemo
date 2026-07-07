@@ -9,11 +9,13 @@ extends Node
 # 手动注册测试套件（preload 确保编译期检查）
 const SUITES := [
 	preload("res://scripts/tests/test_battle_constants.gd"),
+	preload("res://scripts/tests/test_battle_pathing.gd"),
 	preload("res://scripts/tests/test_targeting_system.gd"),
 	preload("res://scripts/tests/test_damage_system.gd"),
 	preload("res://scripts/tests/test_deck_manager.gd"),
 	preload("res://scripts/tests/test_data_registry.gd"),
 	preload("res://scripts/tests/test_attack_targeting.gd"),
+	preload("res://scripts/tests/test_river_jump.gd"),
 ]
 
 

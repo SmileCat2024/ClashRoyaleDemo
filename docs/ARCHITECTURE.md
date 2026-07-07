@@ -135,18 +135,18 @@ current_hp <= 0 ?
 
 ## 设计原则
 
-### 为什么有 World 容器和 Y 压缩？— 2.5D 双坐标空间
+### 为什么有 World 容器和 Y 压缩？— 视口 / 游戏空间 / 底图三层
 
 项目使用一个 `World`（Node2D）容器包裹所有游戏节点，施加 `scale = Vector2(1, 0.7863)` 的 Y 轴压缩，实现 2.5D 透视效果。
 
-| | 游戏空间（逻辑） | 屏幕空间（渲染） |
+| 层 | 谁用 | 说明 |
 |---|---|---|
-| **谁用** | 所有实体的 position、索敌、移动、部署判定 | 玩家眼睛看到的 |
-| **尺寸** | 360 × 640px（18格 × 32格） | 360 × 480px（= 640 × 0.7863） |
-| **压缩** | 不压缩 | World 施加 Y_COMPRESS |
+| **视口空间** | project.godot / CanvasLayer / HUD | 当前 440 × 780，只决定窗口裁剪和 UI 可见范围 |
+| **World 本地游戏空间** | 实体 position、索敌、移动、部署、桥/河/塔常量 | 360 × 640（18格 × 32格），唯一战斗逻辑空间 |
+| **地图底板图** | Arena.MapBackground | `top_level = true`，只负责底图显示，不改变逻辑坐标 |
 
 关键点：
-- **逻辑代码永远只碰游戏空间坐标**。`global_position.distance_to()` 等距离计算在游戏空间中进行，不受压缩影响。
+- **逻辑代码永远只碰 World 本地游戏空间坐标**。实体自身移动用 `position`；跨父节点读取目标位置时先转成 `World.to_local(node.global_position)`，不要直接拿 `global_position` 和 `BattleConstants` 的格子坐标混算。
 - **鼠标坐标自动逆变换**：`world.get_local_mouse_position()` 把屏幕点击位置转回游戏空间，部署逻辑无需关心压缩。
 - **CanvasLayer（卡牌 UI）不受压缩**：底部卡牌区在独立的 CanvasLayer 上，保持正常比例。
 - **地图底板脱离压缩**：Arena 的 MapBackground 设 `top_level = true`，脱离 World 变换树，保持原始比例不变形。

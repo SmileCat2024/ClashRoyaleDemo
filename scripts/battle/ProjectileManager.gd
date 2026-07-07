@@ -15,7 +15,7 @@ const PROJECTILE_SCENE := preload("res://scenes/entities/Projectile.tscn")
 
 
 ## 发射一个飞行物。
-## spawn_pos: 发射位置（世界坐标）
+## spawn_pos: 发射位置（World 本地游戏空间坐标）
 ## target_node: 目标节点（单位或塔）
 ## damage: 伤害值
 ## speed: 飞行速度（像素/秒）

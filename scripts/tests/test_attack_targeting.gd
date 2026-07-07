@@ -115,6 +115,17 @@ func test_locks_when_in_attack_range() -> void:
 		"在攻击范围内应保持锁定，不切换到更近的目标")
 
 
+func test_drops_locked_target_when_it_becomes_air() -> void:
+	var near := _make_enemy(Vector2(25, 0))
+	_comp.current_target = near
+
+	near.movement_type = "air"
+	_comp._update_targeting()
+
+	assert_null(_comp.current_target,
+		"目标临时变为空中后，不能对空的攻击组件应取消锁定")
+
+
 func test_re_evaluates_when_target_leaves_range() -> void:
 	# enemy_a 初始在攻击范围内(25px)
 	var enemy_a := _make_enemy(Vector2(25, 0))

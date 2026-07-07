@@ -25,7 +25,7 @@ static func find_nearest_enemy_unit(from_position: Vector2, self_team: String, u
 			continue
 		if u_team == null or not is_enemy(self_team, u_team):
 			continue
-		var d = from_position.distance_to(u.global_position)
+		var d = from_position.distance_to(BattlePathing.game_position_of(u))
 		if d < nearest_dist:
 			nearest_dist = d
 			nearest = u
@@ -45,7 +45,7 @@ static func find_nearest_enemy_tower(from_position: Vector2, self_team: String, 
 			continue
 		if t_team == null or not is_enemy(self_team, t_team):
 			continue
-		var d = from_position.distance_to(t.global_position)
+		var d = from_position.distance_to(BattlePathing.game_position_of(t))
 		if d < nearest_dist:
 			nearest_dist = d
 			nearest = t
@@ -61,7 +61,7 @@ static func find_nearest_enemy_target(from_position: Vector2, self_team: String,
 	return find_nearest_enemy_tower(from_position, self_team, towers)
 
 
-## 统一索敌入口。三重过滤：阵营 → targeting规则 → ground/air → distance。
+## 统一索敌入口。三重过滤：阵营 → targeting规则 → ground/air → 可达距离。
 ## 从 EntityRegistry 查询敌方列表，返回 max_range 内最近的合法目标。
 ## targeting_mode: "any" = 单位+塔都找 | "building_only" = 只找塔。
 ## attack_ground/attack_air: 能否攻击地面/空中目标。
@@ -72,7 +72,9 @@ static func find_best_target(
 	max_range: float,
 	targeting_mode: String,
 	p_attack_ground: bool,
-	p_attack_air: bool
+	p_attack_air: bool,
+	mover_movement_type: String = "ground",
+	mover_can_jump_river: bool = false
 ) -> Node2D:
 	var enemies = EntityRegistry.get_enemies_of(self_team)
 	var nearest: Node2D = null
@@ -99,8 +101,14 @@ static func find_best_target(
 		if movement == "air" and not p_attack_air:
 			continue
 
-		# distance 过滤
-		var d = from_position.distance_to(e.global_position)
+		# 可达距离过滤：地面单位跨河必须按桥路径计算，空中单位保持直线。
+		var e_pos := BattlePathing.game_position_of(e)
+		var d := BattlePathing.path_distance(
+			from_position,
+			e_pos,
+			mover_movement_type,
+			mover_can_jump_river
+		)
 		if d < nearest_dist:
 			nearest_dist = d
 			nearest = e

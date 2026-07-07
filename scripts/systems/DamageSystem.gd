@@ -20,9 +20,10 @@ static func resolve_impact(target: Node, damage: int) -> void:
 
 ## 范围伤害结算。对 center 周围 radius 范围内的所有敌方实体造成全额伤害（无衰减）。
 ## 通过 EntityRegistry 查询，不遍历场景树。
+## center 使用 World 本地游戏空间坐标。
 static func deal_area_damage(center: Vector2, radius: float, damage: int, attacker_team: String) -> void:
 	var enemies = EntityRegistry.get_enemies_of(attacker_team)
 	for e in enemies:
-		if center.distance_to(e.global_position) <= radius:
+		if center.distance_to(BattlePathing.game_position_of(e)) <= radius:
 			if e.has_method("take_damage"):
 				e.take_damage(damage)

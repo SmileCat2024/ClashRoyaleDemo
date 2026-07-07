@@ -52,6 +52,14 @@ func test_all_unit_attack_ranges_positive() -> void:
 				"单位 %s attacks[%d] attack_range 应 > 0" % [uid, i])
 
 
+func test_only_hog_rider_can_jump_river_for_now() -> void:
+	for uid in DataRegistry.unit_data:
+		var u: Dictionary = DataRegistry.unit_data[uid]
+		var can_jump := bool(u.get("can_jump_river", false))
+		assert_eq(can_jump, uid == "hog_rider",
+			"当前版本只有野猪骑士允许跳河: " + uid)
+
+
 # ============================================================
 #  卡牌数据
 # ============================================================

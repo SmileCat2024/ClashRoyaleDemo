@@ -15,7 +15,7 @@ var attack_ground: bool = true
 var attack_air: bool = true
 var attack_range: float = 30.0          ## 攻击射程（在此距离内才能出手）
 var attack_interval: float = 1.0        ## 两次攻击之间的冷却时间（秒）
-var first_attack_delay: float = 0.0     ## 首次出手前摇（秒），部署后不会瞬间攻击
+var first_attack_delay: float = 0.0     ## 首次出手前摇（秒），进入射程后不会瞬间攻击
 var delivery: String = "instant"        ## "instant" | "projectile"
 var damage: int = 10
 var projectile_speed: float = 250.0     ## 仅 delivery=projectile 时使用
@@ -40,25 +40,35 @@ func setup(attack_data: Dictionary) -> void:
 	delivery = attack_data.get("delivery", "instant")
 	damage = int(attack_data.get("damage", 10))
 	projectile_speed = BattleConstants.px(float(attack_data.get("projectile_speed", 12.5)))
-	# 首次出手前摇：组件就绪后等 first_attack_delay 秒才能第一次攻击
+	# 首次出手前摇：进入射程后等 first_attack_delay 秒才能第一次攻击
 	cooldown = first_attack_delay
 
 
 func _process(delta: float) -> void:
 	if combatant == null or not combatant.initialized or combatant.is_dead:
 		return
-
-	# 冷却递减
-	if cooldown > 0.0:
-		cooldown -= delta
+	if combatant.get("is_jumping_river") == true:
+		return
 
 	_update_targeting()
 
 	if has_valid_target():
-		var dist = combatant.global_position.distance_to(current_target.global_position)
-		if dist <= attack_range and cooldown <= 0.0:
-			_execute_attack()
-			cooldown = attack_interval
+		var from_pos := BattlePathing.game_position_of(combatant)
+		var target_pos := BattlePathing.game_position_of(current_target)
+		var dist = BattlePathing.path_distance(
+			from_pos,
+			target_pos,
+			_get_movement_type(),
+			_get_can_jump_river()
+		)
+		if dist <= attack_range:
+			# 只有目标在射程内时冷却才递减——移动/追击期间不消耗冷却，
+			# 确保 first_attack_delay 是"进入射程后"的前摇而非"部署后"的计时
+			if cooldown > 0.0:
+				cooldown -= delta
+			if cooldown <= 0.0:
+				_execute_attack()
+				cooldown = attack_interval
 
 
 ## 当前目标是否有效（存在、未销毁、未死亡）
@@ -66,6 +76,8 @@ func has_valid_target() -> bool:
 	if current_target == null or not is_instance_valid(current_target):
 		return false
 	if current_target.get("is_dead") == true:
+		return false
+	if not _can_attack_target(current_target):
 		return false
 	return true
 
@@ -76,7 +88,14 @@ func has_valid_target() -> bool:
 ##    追击过程中可随时切换到更近的目标，不会死追一个
 func _update_targeting() -> void:
 	if has_valid_target():
-		var dist = combatant.global_position.distance_to(current_target.global_position)
+		var from_pos := BattlePathing.game_position_of(combatant)
+		var target_pos := BattlePathing.game_position_of(current_target)
+		var dist = BattlePathing.path_distance(
+			from_pos,
+			target_pos,
+			_get_movement_type(),
+			_get_can_jump_river()
+		)
 		if dist <= attack_range:
 			return  # 目标在攻击范围内，保持锁定原地攻击
 	# 目标超出攻击范围（或无目标）→ 重新搜索视野内最近的敌人
@@ -86,12 +105,14 @@ func _update_targeting() -> void:
 ## 在视野范围内找最近的合法目标。委托给 TargetingSystem 三重过滤。
 func _find_nearest_target() -> Node:
 	return TargetingSystem.find_best_target(
-		combatant.global_position,
+		BattlePathing.game_position_of(combatant),
 		combatant.team,
 		_get_sight_range(),
 		targeting,
 		attack_ground,
-		attack_air
+		attack_air,
+		_get_movement_type(),
+		_get_can_jump_river()
 	)
 
 
@@ -101,6 +122,33 @@ func _get_sight_range() -> float:
 	if s != null:
 		return float(s)
 	return attack_range + 20.0
+
+
+## 从 owner 读取移动类型。塔和其他非单位实体按地面处理。
+func _get_movement_type() -> String:
+	var movement = combatant.get("movement_type")
+	if movement == null:
+		return "ground"
+	return str(movement)
+
+
+func _get_can_jump_river() -> bool:
+	var can_jump = combatant.get("can_jump_river")
+	if can_jump == null:
+		return false
+	return bool(can_jump)
+
+
+## 目标的 ground/air 状态可能运行时变化（例如跳河），锁定后也要重新校验。
+func _can_attack_target(target: Node) -> bool:
+	var movement = target.get("movement_type")
+	if movement == null:
+		movement = "ground"
+	if movement == "ground" and not attack_ground:
+		return false
+	if movement == "air" and not attack_air:
+		return false
+	return true
 
 
 ## 执行一次攻击，按 delivery 分支
@@ -115,9 +163,14 @@ func _execute_attack() -> void:
 ## 发射飞行物（塔和远程单位使用）
 func _fire_projectile() -> void:
 	var proj = preload("res://scenes/entities/Projectile.tscn").instantiate()
-	get_tree().current_scene.add_child(proj)
+	var scene := get_tree().current_scene
+	var projectiles_root := scene.get_node_or_null("World/ProjectilesRoot") as Node2D
+	if projectiles_root:
+		projectiles_root.add_child(proj)
+	else:
+		scene.add_child(proj)
 	proj.setup(
-		combatant.global_position,
+		BattlePathing.game_position_of(combatant),
 		current_target,
 		damage,
 		projectile_speed,

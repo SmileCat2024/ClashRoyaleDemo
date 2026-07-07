@@ -62,6 +62,36 @@ func test_find_nearest_enemy() -> void:
 	assert_eq(target.global_position, Vector2(50, 0), "应返回最近的")
 
 
+func test_ground_targeting_uses_reachable_distance_across_river() -> void:
+	_make_enemy(Vector2(180, 260))  # 直线近，但需要绕桥
+	_make_enemy(Vector2(40, 380))   # 直线远一点，但同侧可达更近
+	var target = TargetingSystem.find_best_target(
+		Vector2(180, 380), "player", 300.0, "any", true, false, "ground")
+	assert_not_null(target, "应找到可达距离最近的敌人")
+	assert_eq(target.global_position, Vector2(40, 380),
+		"地面索敌应按桥路径排序，不应被隔河直线距离误导")
+
+
+func test_air_targeting_keeps_direct_distance_across_river() -> void:
+	_make_enemy(Vector2(180, 260))  # 空中直线更近
+	_make_enemy(Vector2(40, 380))
+	var target = TargetingSystem.find_best_target(
+		Vector2(180, 380), "player", 300.0, "any", true, false, "air")
+	assert_not_null(target, "空中单位应找到直线距离最近的敌人")
+	assert_eq(target.global_position, Vector2(180, 260),
+		"空中索敌不受河道绕桥距离影响")
+
+
+func test_jump_river_targeting_uses_jump_reachable_distance() -> void:
+	_make_enemy(Vector2(180, 260))  # 跳过去更近
+	_make_enemy(Vector2(40, 380))   # 普通地面会优先选它
+	var target = TargetingSystem.find_best_target(
+		Vector2(180, 380), "player", 300.0, "any", true, false, "ground", true)
+	assert_not_null(target, "可跳河单位应找到跳跃距离最近的敌人")
+	assert_eq(target.global_position, Vector2(180, 260),
+		"可跳河单位索敌应按跳河可达距离排序")
+
+
 func test_returns_null_when_no_enemies() -> void:
 	var target = TargetingSystem.find_best_target(
 		Vector2.ZERO, "player", 300.0, "any", true, false)

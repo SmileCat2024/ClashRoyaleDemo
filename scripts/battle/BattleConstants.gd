@@ -45,21 +45,28 @@ const VIEWPORT_WIDTH := (MAP_TILES_W + VIEWPORT_BORDER_CELLS * 2) * CELL_SIZE  #
 ## 必须与 project.godot 一致（竞技场压缩高度 + 上下留白 + 卡牌区）
 const VIEWPORT_HEIGHT := 780
 
-## 竞技场在视口中的垂直偏移（在卡牌区上方居中，上下留白）
+## 地图底板在视口中的垂直定位参考值。
+## 注意：这不是逻辑坐标，也不是寻路坐标；战斗逻辑只使用 World 本地游戏空间。
 const ARENA_TOP_OFFSET_Y := 99.0  ## 固定值，不随视口高度变化
-## 竞技场在视口中的水平偏移（= 左侧边距格数 × 格大小）
+## 视口左右留白的设计宽度。只用于视口/底板/UI 对齐，不参与战斗逻辑。
 const ARENA_OFFSET_X := VIEWPORT_BORDER_CELLS * CELL_SIZE                        ## 40
 
 # ============================================================
-#  坐标体系说明（2.5D 双空间）
+#  坐标体系说明（视口 / 游戏空间 / 地图底板三者独立）
 # ============================================================
-#  游戏空间（逻辑坐标，所有实体的 position 在此空间）：
+#  1) 视口空间：
+#    project.godot 的窗口裁剪范围，当前 440×780。
+#    BattleScene / World / CanvasLayer 可以为了显示对齐而有 position/offset。
+#
+#  2) World 本地游戏空间（唯一逻辑坐标，所有 BattleConstants 坐标都在此空间）：
 #    原点(0,0)在左上角，y 增大 = 往下走
 #    竞技场区域：x=0–360, y=0–640（32格 × CELL_SIZE）
+#    实体自身移动用 position；跨父节点读目标时先转成 World.to_local(global_position)。
+#    禁止把 global_position 直接和河道/桥/塔常量混算。
 #
-#  屏幕空间（玩家看到的，World 容器统一施加 Y_COMPRESS）：
-#    竞技场区域：x=0–360, y=0–480（= 640 × Y_COMPRESS）
-#    底部卡牌区：y=480–720（CanvasLayer，不压缩）
+#  3) 地图底板图：
+#    MapBackground top_level=true，脱离 World 的 Y 压缩。
+#    它的位置只影响底图显示，不改变游戏空间里的河道、桥、塔坐标。
 #
 #  鼠标输入通过 world.get_local_mouse_position() 自动逆变换回游戏空间。
 #  改 Y_COMPRESS 后，屏幕高度自动变化，project.godot 视口需同步。

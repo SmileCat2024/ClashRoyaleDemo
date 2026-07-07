@@ -48,6 +48,7 @@ var unit_data := {
 		"shield": 0,
 		"move_speed": 2.0,  # 极快
 		"movement_type": "ground",
+		"can_jump_river": true,
 		"sight_range": 6.0,
 		"movement_targeting": "any",
 		"attacks": [{
