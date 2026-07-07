@@ -33,6 +33,16 @@ var death_damage: int = 0          ## 死亡时对周围敌方造成的伤害（
 var death_radius: float = 0.0      ## 死亡伤害范围（像素）
 var death_fuse_time: float = 0.0   ## 死亡炸弹引信时间（秒，0 = 无延迟效果）
 
+# ---- 碰撞几何（碰撞体积系统）----
+## 碰撞半径（px）。推挤分离 + 索敌/攻击边缘判定。setup 时从格值转换。
+## 大碰撞半径使单位更早进入敌方索敌范围，也更早被攻击到。
+var collision_radius: float = 10.0
+## 受击半径（px）。法术/溅射/投射物命中判定。默认 = collision_radius。
+## 与 collision_radius 拆开可单独调法术蹭塔、建筑受击等细节。
+var hurt_radius: float = 10.0
+## 质量（推挤权重）。0 = 不可移动（建筑/塔）。值越大越难被推开。
+var mass: int = 5
+
 # ---- 离地高度 ----
 ## 离地高度（格）。地面单位 = 0，飞行单位 > 0。
 ## 仅影响视觉渲染（Body/HealthBar 向上偏移），不影响逻辑坐标和索敌。
@@ -40,6 +50,9 @@ var altitude: float = 0.0
 
 # ---- 攻击组件实例列表（由 _init_combat_stats 动态创建）----
 var attack_components: Array = []
+
+# ---- 帧动画驱动器（由 _init_combat_stats 动态创建，无动画数据时为 null）----
+var sprite_animator: SpriteAnimator = null
 
 # ---- 子节点引用 ----
 # UnitBase.tscn / TowerBase.tscn 均有这三个子节点。
@@ -56,6 +69,8 @@ func _init_combat_stats(data: Dictionary) -> void:
 	current_shield = shield
 	attacks_data = data.get("attacks", [])
 	_create_attack_components()
+	_create_sprite_animator(data)
+	_style_health_bar()
 
 
 ## 根据 attacks_data 为每项攻击配置创建一个 AttackComponent（P0 只用第一个）
@@ -81,6 +96,61 @@ func get_primary_attack() -> AttackComponent:
 	if attack_components.is_empty():
 		return null
 	return attack_components[0]
+
+
+## 如果数据中包含 animation 字段，创建 SpriteAnimator 子节点。
+## 无 animation 字段 → 不创建，实体保持 ColorRect 渲染。
+func _create_sprite_animator(data: Dictionary) -> void:
+	if not data.has("animation"):
+		return
+	sprite_animator = SpriteAnimator.new()
+	sprite_animator.name = "SpriteAnimator"
+	add_child(sprite_animator)
+	sprite_animator.setup(data, self)
+
+
+## 返回当前视觉状态名，供 SpriteAnimator 轮询。
+## 基类返回 "idle"；子类（UnitBase）根据移动/攻击状态覆写。
+func get_visual_state() -> String:
+	return "idle"
+
+
+## 按阵营设置血条样式：玩家浅蓝底+正蓝填充，敌方浅红底+正红填充。
+func _style_health_bar() -> void:
+	if health_bar == null:
+		return
+	var bg := StyleBoxFlat.new()
+	var fill := StyleBoxFlat.new()
+	# 圆角 + 描边统一参数
+	for sb in [bg, fill]:
+		sb.corner_radius_top_left = 1
+		sb.corner_radius_top_right = 1
+		sb.corner_radius_bottom_left = 1
+		sb.corner_radius_bottom_right = 1
+		sb.content_margin_left = 0
+		sb.content_margin_right = 0
+		sb.content_margin_top = 0
+		sb.content_margin_bottom = 0
+	# 背景描边（细线）+ 内缩留白，让 fill 不盖住 border
+	bg.border_width_left = 1
+	bg.border_width_right = 1
+	bg.border_width_top = 1
+	bg.border_width_bottom = 1
+	bg.border_color = Color(0, 0, 0, 0.6)
+	bg.content_margin_left = 1
+	bg.content_margin_right = 1
+	bg.content_margin_top = 1
+	bg.content_margin_bottom = 1
+
+	if team == "player":
+		bg.bg_color = Color(0.55, 0.78, 1.0, 0.5)    # 浅蓝底
+		fill.bg_color = Color(0.08, 0.42, 0.92)       # 正蓝
+	else:
+		bg.bg_color = Color(1.0, 0.62, 0.58, 0.5)    # 浅红底
+		fill.bg_color = Color(0.88, 0.12, 0.08)       # 正红
+
+	health_bar.add_theme_stylebox_override("background", bg)
+	health_bar.add_theme_stylebox_override("fill", fill)
 
 
 ## 将视觉子节点（Body/HealthBar/DebugLabel）按 altitude 向上偏移。

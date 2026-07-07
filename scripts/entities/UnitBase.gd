@@ -22,6 +22,7 @@ var movement_targeting: String = "any"     ## "any" | "building_only"
 
 # ---- 运行时 ----
 var _move_target = null    ## 当前移动目标（CombatantBase 或 null）
+var _is_moving: bool = false  ## 本帧是否在移动（供 SpriteAnimator 轮询）
 var is_jumping_river: bool = false
 var _jump_start: Vector2 = Vector2.ZERO
 var _jump_end: Vector2 = Vector2.ZERO
@@ -56,6 +57,11 @@ func setup(unit_data: Dictionary, team_name: String) -> void:
 	death_radius = BattleConstants.px(float(unit_data.get("death_radius", 0.0)))
 	death_fuse_time = float(unit_data.get("death_fuse_time", 0.0))
 
+	# 碰撞几何参数（格 → 像素）
+	collision_radius = BattleConstants.px(float(unit_data.get("collision_radius", 0.5)))
+	hurt_radius = BattleConstants.px(float(unit_data.get("hurt_radius", 0.5)))
+	mass = int(unit_data.get("mass", 5))
+
 	# 视觉设置：统一方块大小，颜色按阵营区分
 	var size: int = 16
 	if team == "player":
@@ -68,8 +74,14 @@ func setup(unit_data: Dictionary, team_name: String) -> void:
 	# 血条
 	health_bar.max_value = max_hp
 	health_bar.value = current_hp
-	health_bar.size = Vector2(size + 12, 4)
-	health_bar.position = Vector2(-(size + 12) / 2.0, -size / 2.0 - 8)
+	var hb_w: float = size + 12
+	var hb_y: float = -size / 2.0 - 8
+	# 有动画配置的单位，血条位置可由数据覆盖（贴图较大时需要上移）
+	var anim_cfg: Dictionary = unit_data.get("animation", {})
+	if not anim_cfg.is_empty():
+		hb_y = float(anim_cfg.get("health_bar_y", hb_y))
+	health_bar.size = Vector2(hb_w, 4)
+	health_bar.position = Vector2(-hb_w / 2.0, hb_y)
 
 	# 调试标签
 	debug_label.text = display_name
@@ -98,7 +110,9 @@ func _draw() -> void:
 func _process(delta: float) -> void:
 	if not initialized or is_dead:
 		return
+	_is_moving = false
 	if is_jumping_river:
+		_is_moving = true
 		_process_river_jump(delta)
 		return
 
@@ -108,7 +122,10 @@ func _process(delta: float) -> void:
 	if attack and attack.has_valid_target():
 		var target_pos := BattlePathing.game_position_of(attack.current_target)
 		var dist = BattlePathing.path_distance(position, target_pos, movement_type, can_jump_river)
-		if dist > attack.attack_range:
+		var target_hr = attack.current_target.get("hurt_radius")
+		var reach: float = attack.attack_range + collision_radius + (float(target_hr) if target_hr != null else 0.0)
+		if dist > reach:
+			_is_moving = true
 			_move_towards_position(target_pos, delta)
 		# else: 在射程内，停下不动，AttackComponent 会自动出手
 		return
@@ -118,8 +135,10 @@ func _process(delta: float) -> void:
 	if _move_target:
 		var target_pos := BattlePathing.game_position_of(_move_target)
 		var dist = BattlePathing.path_distance(position, target_pos, movement_type, can_jump_river)
-		var stop_dist = _get_primary_attack_range()
+		var move_hr = _move_target.get("hurt_radius")
+		var stop_dist = _get_primary_attack_range() + collision_radius + (float(move_hr) if move_hr != null else 0.0)
 		if dist > stop_dist:
+			_is_moving = true
 			_move_towards_position(target_pos, delta)
 
 
@@ -217,6 +236,8 @@ func _set_visual_altitude(altitude_cells: float) -> void:
 		health_bar.position = _health_bar_base_position + Vector2(0, dy)
 	if debug_label:
 		debug_label.position = _debug_label_base_position + Vector2(0, dy)
+	if sprite_animator:
+		sprite_animator.apply_altitude_offset(dy)
 
 
 ## 从 attacks_data 读取主攻击的射程（格→像素），用于决定何时停下
@@ -224,6 +245,16 @@ func _get_primary_attack_range() -> float:
 	if attacks_data.is_empty():
 		return BattleConstants.px(1.5)  # 兜底值
 	return BattleConstants.px(float(attacks_data[0].get("attack_range", 1.5)))
+
+
+## 覆写视觉状态：移动中返回 "walk"，否则返回 "idle"。
+## SpriteAnimator 每帧轮询此方法决定播放什么动画。
+func get_visual_state() -> String:
+	if is_dead:
+		return "death"
+	if _is_moving:
+		return "walk"
+	return "idle"
 
 
 ## 找最近的敌方塔（用于无攻击目标时的推进方向）

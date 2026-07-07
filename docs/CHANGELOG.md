@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## [0.8.2] - 2026-07-07 — 帧动画系统 + 弓箭手单位 + 血条样式重做
+
+### 新增
+
+#### 帧动画基础设施
+- **SpriteAnimator**（`scripts/components/SpriteAnimator.gd`）：帧动画驱动器，纯观察者模式。每帧轮询实体的 `get_visual_state()` 切换动画，**永远不写回游戏逻辑**。支持 idle/walk 状态、Y 压缩反向补偿（sprite scale.y 除以 Y_COMPRESS）、阵营色调微调（玩家方偏暖、敌方偏冷）、高清图 linear / 像素风 nearest 双纹理过滤模式。无 `animation` 字段时自动退化为 ColorRect 模式
+- **SpriteRegistry**（`scripts/autoload/SpriteRegistry.gd`）：全局 Autoload 单例。按需从 `assets/sprites/{unit_id}/` 加载 PNG 构建 SpriteFrames 资源并缓存。支持逐帧 duration、loop/once/pingpong 三种播放模式
+- **CombatantBase 新增**：`sprite_animator` 引用、`get_visual_state()` 虚方法（默认返回 "idle"）、`_create_sprite_animator()` 在 `_init_combat_stats()` 末尾自动调用、`_style_health_bar()` 统一血条样式方法
+- **UnitBase 新增**：`_is_moving` 标记（在 `_process` 各移动分支中设置）、`get_visual_state()` 覆写（返回 "walk" / "idle"）、altitude 偏移传递给 sprite animator、血条位置支持 `health_bar_y` 配置
+- **assets/sprites/** 目录 + README 规范文档（美术端约定 + 命名规则 + 数据配置模板）
+- project.godot 注册 SpriteRegistry autoload
+
+#### 弓箭手单位
+- **弓箭手（archers）单位**：地面远程单位，中速，可对空对地。射程 5 格，攻击间隔 0.9 秒，单次伤害 112，血量 304。projectile + linear 弹道（箭矢飞行）
+- **弓箭手卡牌（card_archers）**：cost 3，一次部署 2 只弓箭手。`spawn_offsets: [Vector2(-1, 0), Vector2(1, 0)]`，两只分居中心格左右各一格
+- 弓箭手移动帧动画已接入（2 帧 pingpong，1254×1254px 高清图）
+- 玩家牌库和敌方 AI 牌库均已加入弓箭手卡牌
+
+#### 血条样式重做
+- **CombatantBase `_style_health_bar()`**：替换原默认 ProgressBar 样式。玩家方浅蓝半透明底 + 正蓝填充 + 深色描边（1px border + 1px content margin 让 fill 不盖住 border）；敌方浅红半透明底 + 正红填充。微圆角。所有单位 + 塔统一生效
+- 血条位置支持逐单位配置：DataRegistry `animation.health_bar_y`（像素，负=上移），无动画配置时保持原位置（body 上方 8px）
+
+### 设计决策
+- **动画与逻辑彻底解绑**：SpriteAnimator 是纯只读观察者，轮询实体状态但不改变任何游戏逻辑。AttackComponent / UnitBase 核心流程不改
+- **数据驱动 + 向后兼容**：无 `animation` 字段的单位继续使用 ColorRect，新旧模式无缝共存
+- **开发阶段保留 ColorRect**：有动画的单位同时显示 ColorRect 站位格 + sprite 贴图，方便位置校准
+- **散装 PNG 而非精灵图集**：美术帧数不统一时增删帧不改图集布局，Godot 自动导入每张 PNG 为独立纹理
+
 ## [0.8.1] - 2026-07-07 — 部署位置预览 + 国王塔激活机制
 
 ### 新增

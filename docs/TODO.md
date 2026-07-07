@@ -62,9 +62,24 @@
 - [x] **国王塔激活机制（0.8.1）**
   - 国王塔初始未激活（暗化 + 攻击禁用），受击或公主塔被毁后激活
   - first_attack_delay 从 4.0 改为 0.5（正常前摇，激活逻辑由 TowerBase 控制）
+- [x] **帧动画系统 P1 骨架（0.8.2）**
+  - SpriteAnimator 纯观察者组件（轮询实体状态切换动画，不写回逻辑）
+  - SpriteRegistry 全局 SpriteFrames 缓存（按需从 PNG 构建）
+  - 支持 idle/walk 状态、Y 压缩反向补偿、阵营色调、高清/像素双纹理过滤
+  - 无 animation 字段时 ColorRect 兜底，向后兼容
+- [x] **弓箭手单位（0.8.2）**
+  - 地面远程单位，射程 5 格，projectile + linear 弹道
+  - 卡牌 cost 3，一次部署 2 只，spawn_offsets 左右各一格
+  - 移动帧动画已接入（2 帧 1254×1254px 高清图）
+- [x] **血条样式重做（0.8.2）**
+  - 玩家方浅蓝底+正蓝填充，敌方浅红底+正红填充，fill 不盖住 border
+  - 血条位置支持逐单位 health_bar_y 配置
 
 ## 必须完成
 
+- [ ] **帧动画 P2**：攻击动画状态（AttackComponent `is_firing()` 只读标记）+ 朝向系统（front/back + flip_h 水平翻转）
+- [ ] **帧动画 P3**：死亡动画 opt-in 延迟销毁 + 受击闪白
+- [ ] **更多单位帧动画接入**：knight / hog_rider / musketeer / mini_pekka / balloon 等待美术素材
 - [ ] **调试面板**：DebugPanel.tscn/gd
   - Tab 切换显示
   - 显示详细信息
@@ -85,7 +100,6 @@
 - 联网对战
 - 真实匹配系统
 - 复杂寻路（A*）
-- 复杂动画系统
 - 商店和养成
 - 开箱和排行榜
 - 账号系统
@@ -93,11 +107,12 @@
 
 ## 已知问题
 
-1. **数据只有 5 单位 5 卡**：knight、hog_rider、musketeer、mini_pekka、balloon
-2. **单位可重叠**：没有物理碰撞，多个单位会叠在一起
-3. **无复杂寻路/碰撞**：桥与跳河已实现，但没有 A*、障碍绕行和单位碰撞挤压
-4. **无暂停**：战斗开始后无法暂停
-5. **altitude 离地高度仅视觉**：不影响索敌距离计算，飞行单位和地面单位仍按 2D 平面距离判定
-6. **弹道弧线 arc_height 数据未填入**：ProjectileBase 已支持 arc_height，但当前单位/塔数据中未设置此值（默认 0.0 = 直线飞行）
-7. **国王塔激活机制用 first_attack_delay=4 近似**：真正机制应为受击或公主塔被毁后激活
+1. **数据有 6 单位 6 卡**：knight、hog_rider、musketeer、mini_pekka、balloon、archers
+2. **帧动画系统仅 P1 骨架**：当前仅支持 idle/walk，无攻击/朝向/死亡/受击动画。仅弓箭手接入
+3. **单位可重叠**：没有物理碰撞，多个单位会叠在一起
+4. **无复杂寻路/碰撞**：桥与跳河已实现，但没有 A*、障碍绕行和单位碰撞挤压
+5. **无暂停**：战斗开始后无法暂停
+6. **altitude 离地高度仅视觉**：不影响索敌距离计算，飞行单位和地面单位仍按 2D 平面距离判定
+7. **弹道弧线 arc_height 数据未填入**：ProjectileBase 已支持 arc_height，但当前单位/塔数据中未设置此值（默认 0.0 = 直线飞行）
 8. **AttackComponent._fire_projectile 直接 instantiate**：未走 ProjectileManager 统一入口
+9. **DebugBattle.tscn 无 EffectManager**：该场景主要用于单位移动调试，死亡炸弹仅在 BattleScene 中生效

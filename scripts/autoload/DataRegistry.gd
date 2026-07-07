@@ -25,6 +25,9 @@ var unit_data := {
 		"movement_type": "ground",
 		"sight_range": 6.0,
 		"movement_targeting": "any",
+		"collision_radius": 0.5,
+		"hurt_radius": 0.5,
+		"mass": 6,
 		"attacks": [
 			{
 				"name": "sword",
@@ -51,6 +54,9 @@ var unit_data := {
 		"can_jump_river": true,
 		"sight_range": 6.0,
 		"movement_targeting": "any",
+		"collision_radius": 0.6,
+		"hurt_radius": 0.6,
+		"mass": 4,
 		"attacks": [{
 			"name": "hammer_smash",
 			"targeting": "building_only",
@@ -75,6 +81,9 @@ var unit_data := {
 		"movement_type": "ground",
 		"sight_range": 7.0,
 		"movement_targeting": "any",
+		"collision_radius": 0.5,
+		"hurt_radius": 0.5,
+		"mass": 5,
 		"attacks": [{
 			"name": "musket_shot",
 			"targeting": "any",
@@ -100,6 +109,9 @@ var unit_data := {
 		"movement_type": "ground",
 		"sight_range": 5.0,
 		"movement_targeting": "any",
+		"collision_radius": 0.45,
+		"hurt_radius": 0.45,
+		"mass": 4,
 		"attacks": [{
 			"name": "blade_slash",
 			"targeting": "any",
@@ -124,6 +136,9 @@ var unit_data := {
 		"movement_type": "air",
 		"sight_range": 6.0,
 		"movement_targeting": "any",
+		"collision_radius": 0.3,
+		"hurt_radius": 0.3,
+		"mass": 6,
 		"death_damage": 240,    # 死亡时范围伤害
 		"death_radius": 2.0,    # 死亡伤害半径（格）
 		"death_fuse_time": 3.0, # 死亡炸弹引信时间（秒）
@@ -141,6 +156,54 @@ var unit_data := {
 			"impact_radius": 0.0,
 			"damage": 640,
 		}],
+	},
+	"archers": {
+		"id": "archers",
+		"display_name": "弓箭手",
+		"max_hp": 304,
+		"shield": 0,
+		"move_speed": 1.0,  # 中速
+		"movement_type": "ground",
+		"sight_range": 6.0,
+		"movement_targeting": "any",
+		"collision_radius": 0.35,
+		"hurt_radius": 0.35,
+		"mass": 3,
+		"attacks": [{
+			"name": "bow_shot",
+			"targeting": "any",
+			"attack_ground": true,
+			"attack_air": true,
+			"attack_range": 5.0,
+			"attack_interval": 0.9,
+			"first_attack_delay": 0.5,
+			"delivery": "projectile",
+			"trajectory": "linear",
+			"impact_type": "single",
+			"impact_radius": 0.0,
+			"damage": 112,
+			"projectile_speed": 15.0,
+		}],
+		# ---- 帧动画配置 ----
+		# 原始 PNG 1254×1254px，缩放到约 83px（≈4格）显示
+		"animation": {
+			"visual_offset_x": 0.0,
+			"visual_offset_y": -65.0,   # 上移让脚底接近格子中心，目测微调
+			"visual_scale": 0.066,      # 1254 × 0.066 ≈ 83px
+			"health_bar_y": -45.0,      # 血条在角色头顶上方
+			"states": {
+				"walk": {
+					"frames": ["walk_01.png", "walk_02.png"],
+					"duration": [0.25, 0.25],
+					"mode": "loop",
+				},
+				"idle": {
+					"frames": ["walk_01.png"],  # 暂时用移动第1帧做待机
+					"duration": [0.3],
+					"mode": "loop",
+				},
+			},
+		},
 	},
 }
 
@@ -203,6 +266,17 @@ var card_data := {
 		"spawn_spread": 0.0,
 		"description": "空中单位，只攻击建筑，伤害极高。",
 	},
+	"card_archers": {
+		"id": "card_archers",
+		"display_name": "弓箭手",
+		"cost": 3,
+		"card_type": "troop",
+		"unit_id": "archers",
+		"spawn_count": 2,
+		"spawn_spread": 0.0,
+		"spawn_offsets": [Vector2(-1, 0), Vector2(1, 0)],  # 两只分居中心格左右各一格
+		"description": "两个远程射手，可对空对地。",
+	},
 }
 
 # ==============================================================================
@@ -218,6 +292,9 @@ var tower_data := {
 		"tower_type": "guard",
 		"max_hp": 3052,
 		"shield": 0,
+		"collision_radius": 1.5,  # 内切圆半径 = 3格 / 2
+		"hurt_radius": 1.5,
+		"mass": 0,  # 塔不可移动
 		"attacks": [{
 			"name": "arrow_shot",
 			"targeting": "any",
@@ -240,6 +317,9 @@ var tower_data := {
 		"tower_type": "king",
 		"max_hp": 4824,
 		"shield": 0,
+		"collision_radius": 2.0,  # 内切圆半径 = 4格 / 2
+		"hurt_radius": 2.0,
+		"mass": 0,  # 塔不可移动
 		"attacks": [{
 			"name": "cannon_shot",
 			"targeting": "any",
@@ -302,18 +382,18 @@ func get_building_data(building_id: String) -> Dictionary:
 
 
 ## 返回玩家默认卡组（8张牌 id）。
-## 目前只有5种卡牌，部分重复以凑满8张。
+## 目前只有6种卡牌，部分重复以凑满8张。
 func get_default_player_deck() -> Array:
 	return [
 		"card_knight", "card_musketeer", "card_mini_pekka",
-		"card_hog_rider", "card_balloon", "card_knight",
-		"card_musketeer", "card_mini_pekka",
+		"card_hog_rider", "card_balloon", "card_archers",
+		"card_knight", "card_musketeer",
 	]
 
 
 ## 返回敌方 AI 的默认卡组（卡牌 id 列表）。
 func get_default_enemy_deck() -> Array:
-	return ["card_knight", "card_hog_rider", "card_musketeer", "card_mini_pekka"]
+	return ["card_knight", "card_hog_rider", "card_musketeer", "card_mini_pekka", "card_archers"]
 
 
 # ==============================================================================
@@ -399,6 +479,14 @@ func _validate_all_data() -> void:
 				if dlvr != "instant" and dlvr != "projectile":
 					errors.append("%s delivery 不合法: '%s'" % [prefix, dlvr])
 
+		# 碰撞几何字段校验
+		if float(u.get("collision_radius", 0)) <= 0:
+			errors.append("单位 '%s' collision_radius <= 0" % uid)
+		if float(u.get("hurt_radius", 0)) <= 0:
+			errors.append("单位 '%s' hurt_radius <= 0" % uid)
+		if int(u.get("mass", -1)) < 0:
+			errors.append("单位 '%s' mass < 0" % uid)
+
 	# ---- 校验塔 ----
 	for tid in tower_data:
 		var tw: Dictionary = tower_data[tid]
@@ -411,6 +499,13 @@ func _validate_all_data() -> void:
 		var tt: String = tw.get("tower_type", "")
 		if tt != "king" and tt != "guard":
 			errors.append("塔 '%s' tower_type 不合法: '%s'" % [tid, tt])
+		# 碰撞几何字段校验（塔必须 mass=0）
+		if float(tw.get("collision_radius", 0)) <= 0:
+			errors.append("塔 '%s' collision_radius <= 0" % tid)
+		if float(tw.get("hurt_radius", 0)) <= 0:
+			errors.append("塔 '%s' hurt_radius <= 0" % tid)
+		if int(tw.get("mass", -1)) != 0:
+			errors.append("塔 '%s' mass 必须为 0（不可移动）" % tid)
 
 	# ---- 输出结果 ----
 	if errors.is_empty():
