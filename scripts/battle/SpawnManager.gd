@@ -6,6 +6,7 @@
 # 依赖节点：UnitsRoot（单位的父容器）
 # 初学者阅读建议：先看 spawn_unit()，了解单位怎么从卡牌变成战场上的实体。
 
+class_name SpawnManager
 extends Node
 
 ## 所有单位共用同一个场景文件。差异完全由 setup(data) 数据驱动。
@@ -36,17 +37,18 @@ func spawn_unit(card_id: String, team_name: String, pos: Vector2) -> Node:
 		push_error("[SpawnManager] Unknown unit id: " + unit_id)
 		return null
 
-	# 4. 读取召唤数量和散开半径（卡牌属性，不是单位属性）
+	# 4. 读取召唤数量和偏移配置（卡牌属性，不是单位属性）
 	var count: int = int(card.get("spawn_count", 1))
 	var spread: float = BattleConstants.px(float(card.get("spawn_spread", 0.0)))
+	var offsets_data = card.get("spawn_offsets", null)
 
 	# 5. 循环生成
 	var last_unit: Node = null
 	for i in range(count):
 		var unit = UNIT_SCENE.instantiate()
 
-		# 计算散开偏移
-		var offset = _calc_spawn_offset(i, count, spread)
+		# 计算部署偏移（与 DeployPreview 共用同一套逻辑）
+		var offset = _get_spawn_offset(i, count, spread, offsets_data)
 		unit.position = pos + offset
 
 		# 先 add_child（触发 _ready，@onready 解析）
@@ -66,9 +68,28 @@ func spawn_unit(card_id: String, team_name: String, pos: Vector2) -> Node:
 	return last_unit
 
 
-## 计算多体召唤的散开偏移
-func _calc_spawn_offset(index: int, total: int, spread: float) -> Vector2:
-	if total <= 1 or spread <= 0.0:
+## 计算第 index 个单位的部署偏移（像素，World 本地游戏空间）。
+## 优先使用卡牌中显式指定的 spawn_offsets（格 → 像素），
+## 未指定时回退到确定性圆形分布（无随机因子，与 DeployPreview 完全一致）。
+static func get_spawn_offsets(count: int, spread_px: float, offsets_data) -> Array:
+	var result: Array = []
+	for i in range(count):
+		result.append(_calc_one_offset(i, count, spread_px, offsets_data))
+	return result
+
+
+## 计算单个单位的偏移（实例方法包装，方便内部调用）
+func _get_spawn_offset(index: int, total: int, spread_px: float, offsets_data) -> Vector2:
+	return _calc_one_offset(index, total, spread_px, offsets_data)
+
+
+static func _calc_one_offset(index: int, total: int, spread_px: float, offsets_data) -> Vector2:
+	# 优先使用显式偏移（spawn_offsets 数组，每项为格坐标 Vector2）
+	if offsets_data != null and index < offsets_data.size():
+		var o: Vector2 = offsets_data[index]
+		return Vector2(BattleConstants.px(o.x), BattleConstants.px(o.y))
+	# 回退：确定性圆形分布（无随机）
+	if total <= 1 or spread_px <= 0.0:
 		return Vector2.ZERO
 	var angle = TAU * float(index) / float(total)
-	return Vector2(cos(angle), sin(angle)) * spread * randf_range(0.5, 1.0)
+	return Vector2(cos(angle), sin(angle)) * spread_px

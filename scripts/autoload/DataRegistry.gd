@@ -247,8 +247,7 @@ var tower_data := {
 			"attack_air": true,
 			"attack_range": 7.0,
 			"attack_interval": 1.0,
-			# 国王塔激活机制暂用长前摇近似（真正机制：受击或公主塔被毁后激活）
-			"first_attack_delay": 4.0,
+			"first_attack_delay": 0.5,
 			"delivery": "projectile",
 			"trajectory": "ballistic",
 			"impact_type": "single",

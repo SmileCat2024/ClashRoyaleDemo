@@ -11,6 +11,7 @@ extends CombatantBase
 # ---- 身份信息（塔独有）----
 var tower_id: String = ""
 var tower_type: String = "guard"  ## "king" 或 "guard"
+var king_activated: bool = true   ## 国王塔是否已激活（公主塔始终为 true）
 
 
 ## 初始化塔属性。由 DebugBattle / BattleManager 在场景启动时调用。
@@ -30,10 +31,18 @@ func setup(tower_data: Dictionary, team_name: String, tower_name: String) -> voi
 		body_size = BattleConstants.GUARD_TOWER_SIZE
 
 	# 颜色按阵营区分
+	var base_color: Color
 	if team == "player":
-		body_rect.color = BattleConstants.COLOR_PLAYER_TOWER
+		base_color = BattleConstants.COLOR_PLAYER_TOWER
 	else:
-		body_rect.color = BattleConstants.COLOR_ENEMY_TOWER
+		base_color = BattleConstants.COLOR_ENEMY_TOWER
+
+	# 国王塔初始未激活：暗化外观 + 禁用攻击组件
+	if tower_type == "king":
+		king_activated = false
+		base_color = base_color * 0.55
+
+	body_rect.color = base_color
 
 	body_rect.size = body_size
 	body_rect.position = Vector2(-body_size.x / 2.0, -body_size.y / 2.0)
@@ -46,14 +55,46 @@ func setup(tower_data: Dictionary, team_name: String, tower_name: String) -> voi
 	debug_label.text = ""
 	debug_label.visible = false
 
+	# 国王塔未激活时禁用攻击组件（受击或公主塔被毁后由 _activate 启用）
+	if tower_type == "king":
+		for comp in attack_components:
+			comp.set_process(false)
+
 	initialized = true
 	queue_redraw()
 	print("[TowerBase] setup:", tower_id, team, tower_type, "hp:", max_hp)
 
 
+## 受到伤害。国王塔首次受击后激活。
+func take_damage(amount: int) -> void:
+	super.take_damage(amount)
+	if tower_type == "king" and not king_activated and not is_dead:
+		_activate()
+
+
+## 激活国王塔：恢复外观亮度，启用攻击组件。
+func _activate() -> void:
+	if king_activated:
+		return
+	king_activated = true
+	# 恢复正常颜色
+	if team == "player":
+		body_rect.color = BattleConstants.COLOR_PLAYER_TOWER
+	else:
+		body_rect.color = BattleConstants.COLOR_ENEMY_TOWER
+	# 启用攻击组件
+	for comp in attack_components:
+		comp.set_process(true)
+	queue_redraw()
+	print("[TowerBase] king tower activated:", tower_id)
+
+
 ## _draw()：绘制攻击范围圆圈（调试用）
 func _draw() -> void:
 	if not initialized or is_dead:
+		return
+	# 国王塔未激活时不绘制射程圆
+	if tower_type == "king" and not king_activated:
 		return
 	if attacks_data.is_empty():
 		return

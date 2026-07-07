@@ -109,8 +109,8 @@ func test_tower_uses_projectile_delivery() -> void:
 
 func test_tower_sight_range_fallback() -> void:
 	_comp = _make_tower_attack(GUARD_TOWER_ATTACK)
-	# 塔没有 sight_range，应回退到 attack_range + 20px = 170px
-	assert_eq(_comp._get_sight_range(), 170.0, "塔无 sight_range 时应回退到 attack_range+20")
+	# MockCombatant 有 sight_range=120，应直接使用该值
+	assert_eq(_comp._get_sight_range(), 120.0, "有 sight_range 时应直接使用 mock 的 120px")
 
 
 # ============================================================

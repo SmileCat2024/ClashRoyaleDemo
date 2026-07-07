@@ -1,5 +1,30 @@
 # CHANGELOG
 
+## [0.8.1] - 2026-07-07 — 部署位置预览 + 国王塔激活机制
+
+### 新增
+
+#### 部署位置预览
+- **DeployPreview**（`scripts/battle/DeployPreview.gd`）：卡牌选中后鼠标位置跟随半透明预览圆。绿色 = 可部署，红色 = 不可部署。支持多单位（`spawn_count > 1`）时显示每个单位的精确落点
+- **SpawnManager**：偏移计算改为**确定性**（去除 `randf_range` 随机因子）。新增 `get_spawn_offsets()` 静态方法，DeployPreview 与 SpawnManager 共用同一套偏移逻辑
+- **spawn_offsets 字段**：card_data 新增可选 `spawn_offsets` 字段（Array of Vector2，格单位），支持显式指定每个单位的相对位置（如一排、前后站、间距可控）。未指定时回退到确定性圆形分布
+- **BattleManager**：选牌时显示预览，取消/部署/战斗结束时隐藏预览
+
+#### 国王塔激活机制
+- **TowerBase**：新增 `king_activated` 属性。国王塔初始未激活（外观暗化至 55% + AttackComponent `set_process(false)`）。受击时自动激活；激活后恢复外观亮度 + 启用攻击组件
+- **BattleManager**：公主塔被毁时自动激活同阵营国王塔（`_activate_king_tower()`）
+- **DataRegistry**：国王塔 `first_attack_delay` 从 4.0（近似前摇）改为 0.5（正常前摇，激活逻辑由 TowerBase 控制）
+
+### 变更
+- SpawnManager 新增 `class_name SpawnManager`（供 DeployPreview 调用静态方法）
+- SpawnManager._calc_spawn_offset → _calc_one_offset（重命名 + 支持显式偏移）
+- TowerBase._draw()：未激活国王塔不绘制射程圆
+- BattleScene.tscn：新增 DeployPreview 节点（z_index=100）
+
+### 新增测试
+- **test_king_tower_activation.gd**（8 测试 14 断言）：初始未激活、外观暗化、受击激活、颜色恢复、冷却保持、幂等性、死亡不激活、公主塔始终激活
+- 修复 test_tower_attack.gd 的 `test_tower_sight_range_fallback`（MockCombatant 有 sight_range=120，断言修正）
+
 ## [0.8.0] - 2026-07-07 — 死亡炸弹 + 时间/加时赛 + 圣水条 UI
 
 ### 新增

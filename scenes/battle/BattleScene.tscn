@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/battle/Arena.tscn" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/entities/towers/KingTower.tscn" id="2"]
@@ -9,6 +9,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/BattleHUD.tscn" id="7"]
 [ext_resource type="Script" path="res://scripts/battle/ProjectileManager.gd" id="8"]
 [ext_resource type="Script" path="res://scripts/battle/EffectManager.gd" id="9"]
+[ext_resource type="Script" path="res://scripts/battle/DeployPreview.gd" id="10"]
 
 [node name="BattleScene" type="Node2D"]
 position = Vector2(40, 0)
@@ -45,6 +46,10 @@ y_sort_enabled = true
 [node name="ProjectilesRoot" type="Node2D" parent="World"]
 
 [node name="EffectsRoot" type="Node2D" parent="World"]
+
+[node name="DeployPreview" type="Node2D" parent="World"]
+z_index = 100
+script = ExtResource("10")
 
 [node name="Managers" type="Node" parent="."]
 
