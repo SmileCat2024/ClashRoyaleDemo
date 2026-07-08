@@ -1,36 +1,72 @@
 # 文件名：SpellManager.gd
-# 作用：法术卡牌的统一部署入口。接收卡牌 id + 目标位置，创建法术飞行物。
-#       法术不生成单位，而是从施法方的国王塔发射 SpellProjectile，飞到目标位置爆炸。
+# 作用：法术卡牌的统一部署入口。接收卡牌 id + 目标位置，按 spell_type 分流：
+#       fireball / arrows：从施法方国王塔发射飞行物（SpellProjectile / ArrowsSpellController）
+#       poison：直接在目标位置创建 PoisonField（无弹道，即时部署）
 #       与 SpawnManager（生成单位）平行，BattleManager 根据 card_type 分流到对应 Manager。
 # 挂载位置：BattleScene/Managers/SpellManager
-# 依赖节点：ProjectilesRoot（法术飞行物的父容器）
-# 初学者阅读建议：看 cast_spell()，了解法术从卡牌到飞行物的完整流程。
+# 依赖节点：ProjectilesRoot（飞行物父容器）、EffectsRoot（持续效果父容器）
+# 初学者阅读建议：看 cast_spell()，了解法术从卡牌到效果的完整流程。
 
 extends Node
 
-## 法术飞行物场景
 const SPELL_PROJECTILE_SCENE := preload("res://scenes/entities/SpellProjectile.tscn")
+const ARROWS_CONTROLLER_SCRIPT := preload("res://scripts/battle/ArrowsSpellController.gd")
+const POISON_FIELD_SCENE := preload("res://scenes/effects/PoisonField.tscn")
 
-## 飞行物的父容器
+## 飞行物 / 持续效果的父容器
 @onready var projectiles_root: Node2D = $"../../World/ProjectilesRoot"
+@onready var effects_root: Node2D = $"../../World/EffectsRoot"
 
 
 ## 施放法术。由 BattleManager.try_play_card() 在 card_type == "spell" 时调用。
-## card_id: 卡牌 id（如 "card_fireball"）
-## team_name: "player" 或 "enemy"
-## target_pos: 目标位置（World 本地游戏空间坐标）
+## 根据 spell_type 分流：
+##   fireball → SpellProjectile（国王塔抛物线飞行 → 落地爆炸）
+##   arrows   → ArrowsSpellController（多波箭雨）
+##   poison   → 直接在目标位置创建 PoisonField（无弹道，即时部署）
 func cast_spell(card_id: String, team_name: String, target_pos: Vector2) -> void:
 	var card := DataRegistry.get_card_data(card_id)
 	if card.is_empty():
 		push_error("[SpellManager] Unknown card id: " + card_id)
 		return
 
-	var origin := _get_king_tower_position(team_name)
-	var projectile = SPELL_PROJECTILE_SCENE.instantiate()
-	projectiles_root.add_child(projectile)
-	projectile.setup(origin, target_pos, card, team_name)
+	var spell_type: String = card.get("spell_type", "")
+
+	match spell_type:
+		"poison":
+			# 毒药：无弹道，直接在目标位置创建持续伤害区域
+			_create_poison_field(target_pos, card, team_name)
+		"arrows":
+			var origin := _get_king_tower_position(team_name)
+			var controller = ARROWS_CONTROLLER_SCRIPT.new()
+			add_child(controller)
+			controller.setup(origin, target_pos, card, team_name, projectiles_root)
+		_:
+			# fireball / 其他 → 单体飞行物（抛物线弹道）
+			var origin2 := _get_king_tower_position(team_name)
+			var projectile = SPELL_PROJECTILE_SCENE.instantiate()
+			projectiles_root.add_child(projectile)
+			projectile.setup(origin2, target_pos, card, team_name)
 
 	print("[SpellManager] cast %s (%s) → %s" % [card_id, team_name, target_pos])
+
+
+## 毒药法术落地：直接在目标位置创建持续伤害区域（无弹道）
+func _create_poison_field(target_pos: Vector2, card: Dictionary, team_name: String) -> void:
+	var field = POISON_FIELD_SCENE.instantiate()
+	effects_root.add_child(field)
+	var tick_dmg := int(card.get("tick_damage", card.get("spell_damage", 0)))
+	var ttd = card.get("tick_tower_damage", null)
+	var tick_tower_dmg := int(ttd) if ttd != null else -1
+	field.setup(
+		target_pos,
+		BattleConstants.px(float(card.get("spell_radius", 0))),
+		tick_dmg,
+		tick_tower_dmg,
+		team_name,
+		float(card.get("duration", 0.0)),
+		float(card.get("tick_interval", 0.0)),
+		float(card.get("slow_factor", 1.0))
+	)
 
 
 ## 获取指定阵营国王塔的位置（World 本地游戏空间坐标）。

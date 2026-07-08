@@ -8,7 +8,7 @@
 #         - PoisonField 有减速效果，DelayedDamageEffect 没有
 #
 #       生命周期：setup() 首跳 → 每帧减速 + 每 tick_interval 一跳 → duration 到期 queue_free
-# 挂载位置：PoisonField.tscn 的根节点，由 SpellProjectile 在毒药落地时创建并挂到 EffectsRoot 下
+# 挂载位置：PoisonField.tscn 的根节点，由 SpellManager 直接创建并挂到 EffectsRoot 下
 # 初学者阅读建议：先看 setup() 了解参数，再看 _process() 了解 tick 和减速逻辑，最后看 _draw() 了解视觉。
 
 extends Node2D
@@ -34,7 +34,7 @@ var _tick_timer: float = 0.0          ## 距下次伤害 tick 的倒计时（秒
 const FADE_DURATION := 1.0            ## 最后1秒淡出
 
 
-## 初始化毒药区域。由 SpellProjectile._create_poison_field() 调用。
+## 初始化毒药区域。由 SpellManager._create_poison_field() 调用。
 ## center:     中心位置（World 本地游戏空间坐标）
 ## radius:     作用半径（像素）
 ## tick_dmg:   每跳对单位的伤害
