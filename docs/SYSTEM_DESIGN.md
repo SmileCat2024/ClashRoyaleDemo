@@ -181,9 +181,13 @@ var is_ai: bool = false
     "id": "card_fireball",
     "cost": 4,
     "card_type": "spell",
-    "spell_type": "damage",         # "damage" | "status" | "summon"
-    "spell_radius": 60.0,
-    "spell_damage": 300,
+    "spell_type": "fireball",       # "fireball" | "poison" | "arrows"
+    "spell_radius": 2.5,            # 格（setup 时转像素）
+    "spell_damage": 688,            # 对单位的范围伤害
+    "tower_damage": 172,            # 对皇家塔的减伤
+    "projectile_speed": 10.0,       # 格/秒
+    "knockback": true,
+    "knockback_distance": 1.0,      # 格
 }
 ```
 
@@ -475,12 +479,23 @@ CombatantBase (Node2D)  ← position = 地面坐标（逻辑不变）
 └── SpriteAnimator      ← 有 animation 字段时自动创建。创建 AnimatedSprite2D 子节点做帧动画
 ```
 
-### 6.6 法术系统（P1）
+### 6.6 法术系统（0.8.5~0.8.7，已实现）
 
-P0/P1 版本：**延迟范围伤害**，不做真实弹道。
-- SpellManager.execute_spell() 调 `DamageSystem.deal_area_damage(pos, radius, damage, team)`
-- 视觉：ColorRect 扩散动画表示爆炸
-- 真实飞行 Projectile（弧线弹道）→ P2
+SpellManager.cast_spell() 按 `card_data.spell_type` 三分支分流：
+
+| spell_type | 弹道 | 效果 | 对应类 |
+|---|---|---|---|
+| **fireball** | SpellProjectile 2.5D 抛物线（红球+地面影子+弧高随距离自适应） | 落地即时范围伤害（塔减伤）+ 击退 + 爆炸扩散圆 | SpellProjectile |
+| **poison** | 无弹道，直接在目标位置创建 PoisonField | DOT 持续伤害（每 tick_interval 一跳，共 duration/tick 跳）+ 区域内减速 | PoisonField |
+| **arrows** | ArrowsSpellController 编排 3 波箭雨（每波 15 支 ArrowProjectile） | 每波落地范围伤害，确定性向日葵分布 | ArrowsSpellController + ArrowProjectile |
+
+**fireball 流程**：SpellManager 获取施法方国王塔位置 → 在 ProjectilesRoot 下创建 SpellProjectile → setup(origin, target, card, team) → 飞行（线性移动 + sin 抛物线弧高）→ 落地 `_on_impact()`：`DamageSystem.deal_area_damage()`（tower_damage 塔减伤）+ `CombatantBase.knockback()` → 爆炸视觉 → queue_free
+
+**poison 流程**：SpellManager 获取目标位置 → 在 EffectsRoot 下直接创建 PoisonField → setup(card, pos, team) → 首跳立即伤害 → 每 tick_interval 秒一跳 `deal_area_damage` → 每帧对区域内敌方 `UnitBase.apply_slow()`（取最强减速值、最长持续时间）→ duration 到期 queue_free
+
+**arrows 流程**：SpellManager 获取施法方国王塔位置 → 创建 ArrowsSpellController → setup(origin, target, card, team, arrows_root) → 按 flight_time 编排发射+伤害时间表 → 每波 `_spawn_wave()`：横线阵型发射点 + 向日葵黄金角落点分布 + 按距离反推速度同步到达 → 每波 `_deal_wave_damage()`：`deal_area_damage` → 全部波次完成自毁
+
+**共同入口**：BattleManager.try_play_card() 检查 card_type == "spell" → SpellManager.cast_spell()。法术卡全图可施放（Arena.is_spell_deploy_position 始终 true）。DeployPreview 法术卡显示半径圆。SimpleEnemyAI 法术卡瞄准玩家半场。
 
 ### 6.6.1 战场效果系统（0.8.0，已实现）
 
@@ -635,7 +650,7 @@ instantiate → set position → add_child → setup → register
    → 按 card_type 分发：
        "troop"    → SpawnManager.spawn_unit()
        "building" → SpawnManager.spawn_building()
-       "spell"    → SpellManager.execute_spell()
+       "spell"    → SpellManager.cast_spell()
    → 成功: card_played 信号 + DeckManager.cycle_card()
    → 失败: 回滚能量
 
@@ -787,7 +802,7 @@ DataRegistry._ready() 时自动运行 `_validate_all_data()`：
 4. **数据用字典硬编码**：未用 Godot Resource (.tres)
 5. **无对象池**：飞行物每次 instantiate + queue_free
 6. **碰撞分离非物理引擎**：CollisionSystem 每帧迭代位置分离，无连续碰撞检测、无冲量/弹力/摩擦。大规模堆叠时可能有轻微抖动
-7. **法术用延迟伤害而非真实弹道**（P0/P1）：P2 才加弧线弹道
+7. **法术按 spell_type 三分支**（0.8.5+）：fireball 走 SpellProjectile 抛物线弹道；poison 无弹道直接创建 PoisonField（DOT+减速）；arrows 走 ArrowsSpellController 多波编排
 8. **多攻击 P2 才做**：P0 只读 attacks[0]，创建一个 AttackComponent
 9. **altitude 离地高度仅视觉**：不影响逻辑，飞行单位和地面单位在索敌时仍按 2D 距离计算
 10. **死亡炸弹爆炸无独立动画**：引信期间有脉冲指示圈，但到期瞬间 queue_free，无爆炸闪帧

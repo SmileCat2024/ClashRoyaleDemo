@@ -1,5 +1,5 @@
 # 文件名：test_deck_manager.gd
-# 作用：测试 DeckManager 的卡组轮转逻辑（8牌循环：4手牌+1预告+3队列）。
+# 作用：测试 DeckManager 的卡组轮转逻辑（全卡牌循环：4手牌+1预告+队列）。
 # 挂载位置：由 TestRunner 实例化。
 # 初学者阅读建议：先看 _make_deck 了解测试数据结构，再看 test_play_card_cycles 了解轮转。
 

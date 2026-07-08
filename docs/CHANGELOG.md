@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## [0.8.6] - 2026-07-08 — 通用单位影子系统
+## [0.8.9] - 2026-07-08 — 通用单位影子系统 + 圣水条平滑 + 牌库全卡牌
 
 ### 新增
 - **UnitBase._draw()**：所有单位（地面 + 飞行）统一绘制半透明黑色椭圆影子，替代旧版仅飞行单位的小矩形影子
@@ -12,6 +12,11 @@
 - **DataRegistry unit_data**：所有 7 个单位新增 `shadow_size` 字段（格）
   - knight 0.5 | hog_rider 0.55 | musketeer 0.5 | mini_pekka 0.45 | balloon 0.7 | archers 0.35 | giant 0.8
   - 未配置时退化为 `collision_radius`
+- **圣水条平滑过渡**：CardBar 新增 ElixirPending 半透明紫色填充条，`_process` 每帧驱动
+  - SignalBus 新增公开变量 `player_energy_progress`（0.0~1.0），BattleManager 每帧写入当前圣水积累进度
+  - 修复开局圣水条延迟显示的 bug（_ready 末尾初始化填充）
+- **牌库改为全卡牌**：DataRegistry.get_default_player_deck/enemy_deck 改为返回 `card_data.keys()`，新增卡牌自动入库
+  - test_data_registry 更新为校验卡组包含全部卡牌
 
 ### 变更
 - UnitBase._draw()：从仅 `altitude > 0` 时画矩形影子，改为所有单位画椭圆影子
@@ -23,7 +28,74 @@
 - `shadow_size` 单位是格，setup 时通过 `BattleConstants.px()` 转像素，遵循格系统规范
 - 跳河期间临时 altitude>0，影子自动变淡，落地恢复，无需额外代码
 
-## [0.8.4] - 2026-07-08 — 卡牌卡面图片系统
+## [0.8.8] - 2026-07-08 — 单位避障转向系统（steering）
+
+### 新增
+- **UnitBase._compute_obstacle_avoidance()**：前方 mass=0 静态实体（塔/建筑）垂直偏转避让，查询 `EntityRegistry.get_static_obstacles()`，自动跳过当前攻击/移动目标，空中单位不执行
+- **UnitBase._compute_unit_separation()**：附近同层单位 boids 式分离，将推力投影到移动方向的切平面上（保留 20% 径向 + 100% 切向），创造低摩擦侧滑效果
+- **CombatantBase.get_move_direction()**：基类方法供 CollisionSystem 切向判定
+- **CollisionSystem TANGENTIAL_SLIDE**：碰撞推挤叠加 30% 切向滑动，移动单位双方推向相反方向帮助侧滑绕过
+- **EntityRegistry.get_static_obstacles()**：查询所有 mass=0 活跃实体
+
+### 变更
+- UnitBase._process() 移动逻辑重构为四层架构：路径路由（BattlePathing）→ 障碍物避让转向 → 同类分离 → 碰撞分离
+
+### 新增测试
+- **test_obstacle_avoidance.gd**（6 测试）：前方障碍产生避让/目标不避让/空中不避让/范围过滤/方向正确性/多障碍叠加
+- **test_unit_separation.gd**（7 测试）：基础分离/空中豁免/距离过滤/静态障碍排除/切向投影侧滑/对称抵消/同侧叠加
+
+## [0.8.7] - 2026-07-08 — 万箭齐发法术卡
+
+### 新增
+- **ArrowsSpellController**（`scripts/battle/ArrowsSpellController.gd`）：3 波箭雨确定性编排控制器
+  - 发射点横线阵型（垂直于飞行方向均匀排列），落点向日葵黄金角均匀分布（无随机）
+  - 按各自飞行距离反推速度，全波同时到达（齐射落点）
+  - 波间半角错位，3 波落点不重合但各自均匀，统一弧高同步升降
+  - 每波 15 支箭，波次间隔 0.18s
+- **ArrowProjectile**（`scripts/entities/ArrowProjectile.gd`）：单根箭矢实体
+  - 抛物线飞行 + 切线朝向计算 + 白色细线 + 地面影子 + 淡色羽尾点缀
+  - 落地插地倾斜停留 + 渐隐消失
+- **万箭齐发卡牌数据**：3 费 / 3 波 × 122 单位伤害（总 366）/ 25 塔伤害（总 75）/ 3.5 格半径 / 18.33 格每秒
+
+### 变更
+- SpellManager.cast_spell 按 `spell_type` 分流：arrows → ArrowsSpellController / fireball → SpellProjectile / poison → PoisonField
+
+### 新增测试
+- **test_spell_system.gd** 新增 10 条万箭齐发数据校验（3 波/单波 122/塔 25/半径 3.5/速度 18.33/无击退/卡组包含）
+
+## [0.8.6] - 2026-07-08 — 毒药法术卡
+
+### 新增
+- **PoisonField**（`scripts/effects/PoisonField.gd`）：持续伤害区域实体（8 秒 / 每秒 1 跳 / 共 8 跳），脉冲绿圈视觉 + 末期淡出
+- **UnitBase.apply_slow()**：减速机制（slow_factor + slow_timer，取最强值、最长持续）
+- **UnitBase._get_effective_move_speed()**：移动速度乘减速系数
+- **毒药卡牌数据**：4 费 / 3.5 格半径 / 8 秒 8 跳 × 92 伤害（总 736）/ 21 塔伤害（总 168）/ 减速 15%
+
+### 变更
+- SpellManager.cast_spell 按 `spell_type` 分流：poison → 直接在目标位置创建 PoisonField（无弹道），不再走 SpellProjectile
+- SpellProjectile 清理毒药相关代码，仅保留 fireball 分支
+
+### 新增测试
+- **test_poison_spell.gd**（11 测试）：数据校验（DOT 字段/总伤害/减速/无击退）+ 单跳塔减伤 + 单跳单位伤害 + 塔与单位减伤对比
+
+## [0.8.5] - 2026-07-08 — 法术系统（火球法术卡）
+
+### 新增
+- **SpellManager**（`scripts/battle/SpellManager.gd`）：法术部署入口，从施法方国王塔位置发射
+- **SpellProjectile**（`scripts/entities/SpellProjectile.gd`）：法术飞行物，2.5D 抛物线弹道（红球 + 地面影子 + 弧高随距离自适应 + 爆炸扩散圆）
+  - 落地 `_on_impact()`：范围伤害 + 击退 → 爆炸视觉（0.3s）→ `queue_free()`
+- **DamageSystem.deal_area_damage()**：新增 `tower_damage` 参数（塔减伤），不填则与 spell_damage 相同
+- **CombatantBase.knockback()**：击退方法（mass=0 免疫）
+- **DeployPreview**：法术卡显示半径圆预览
+- **Arena.is_spell_deploy_position()**：法术卡全图可施放
+- **SimpleEnemyAI**：法术卡瞄准玩家半场
+- **BattleManager.try_play_card()**：按 `card_type` 分流（troop → SpawnManager / spell → SpellManager）
+- **火球卡牌数据**：4 费 / 688 范围伤害 / 172 塔伤害 / 2.5 格半径 / 击退 1 格 / 10 格每秒
+
+### 新增测试
+- **test_spell_system.gd**（18 断言）：火球数据校验 + 塔减伤（deal_area_damage tower_damage）+ 击退（CombatantBase.knockback）
+
+## [0.8.4] - 2026-07-08 — 卡牌卡面图片系统 + 帧动画 P2（朝向翻转 + 攻击动画）
 
 ### 新增
 - **卡牌卡面图片**：6 张手牌 + 1 张预告牌全部接入卡面素材渲染
@@ -33,6 +105,12 @@
 - **DataRegistry card_data**：新增 `icon` 字段（`res://assets/ui/cards/xxx.png`），数据驱动卡面路径
 - **CardSlot.gd**：`setup()` 末尾调用 `_load_icon()` 加载卡面纹理，内部 `_icon_cache` 字典缓存避免重复 load
 - **CardBar.gd**：`_on_hand_updated()` 中根据 next_card 的 `icon` 字段加载预告牌卡面
+- **帧动画 P2 — 朝向翻转 + 攻击动画**：
+  - **SpriteAnimator**：新增朝向系统（front/back + flip_h），攻击动画状态（is_firing 标记）
+  - **AttackComponent**：新增 `is_firing` 标记供 SpriteAnimator 轮询切换攻击动画
+  - **CombatantBase**：新增 `get_visual_state()` 支持 attack 状态返回
+  - **DataRegistry**：knight / hog_rider / giant 接入帧动画（walk_front / walk_back 朝向帧 + 攻击帧）
+  - 新增巨人 walk_front 序列帧、野猪骑士 walk_back 序列帧
 
 ### 设计说明
 - 卡面 TextureRect 位于 NameLabel/CostLabel 之下（最先绘制 = 最底层），选中高亮和能量不足变暗通过 Button `modulate` 自动作用于卡面
