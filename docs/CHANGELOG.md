@@ -1,5 +1,58 @@
 # CHANGELOG
 
+## [0.8.4] - 2026-07-08 — 卡牌卡面图片系统
+
+### 新增
+- **卡牌卡面图片**：6 张手牌 + 1 张预告牌全部接入卡面素材渲染
+  - `assets/ui/cards/` 目录：knight、hog_rider、musketeer、mini_pekka、balloon、archers、giant 共 7 张卡面 PNG
+  - **CardSlot.tscn**：新增 `CardIcon`（TextureRect）子节点，全填充 + STRETCH_SCALE 拉伸占满卡槽，texture_filter = LINEAR
+  - **CardBar.tscn**：NextCardPanel 新增 `NextCardIcon`（TextureRect），预告牌同样显示卡面
+- **DataRegistry card_data**：新增 `icon` 字段（`res://assets/ui/cards/xxx.png`），数据驱动卡面路径
+- **CardSlot.gd**：`setup()` 末尾调用 `_load_icon()` 加载卡面纹理，内部 `_icon_cache` 字典缓存避免重复 load
+- **CardBar.gd**：`_on_hand_updated()` 中根据 next_card 的 `icon` 字段加载预告牌卡面
+
+### 设计说明
+- 卡面 TextureRect 位于 NameLabel/CostLabel 之下（最先绘制 = 最底层），选中高亮和能量不足变暗通过 Button `modulate` 自动作用于卡面
+- `stretch_mode = SCALE`（非 KEEP_ASPECT）：不同原生分辨率的卡面统一拉伸填满卡槽，保证视觉一致
+
+## [0.8.3] - 2026-07-08 — 碰撞分离系统 + 射程公式修正 + 气球兵帧动画
+
+### 新增
+
+#### 碰撞分离系统
+- **CollisionSystem**（`scripts/systems/CollisionSystem.gd`）：单位碰撞分离，解决"单位可重叠"问题。`class_name` 全局类型，在 `BattleManager._process()` 末尾每帧调用
+  - **同层分离**：ground 单位只与 ground 单位碰撞，air 单位只与 air 单位碰撞（跳河期间临时 air 的单位也参与空中层）
+  - **质量反比推挤**：overlap 位移按 `1/mass` 反比分配，重单位推得少、轻单位推得多
+  - **不可移动实体**（mass=0 的塔）：碰撞时承担零修正，可移动单位承担全部分离位移
+  - **迭代分离**：每帧最多 3 次遍历，消除多体堆叠的残留重叠
+  - **河道回弹**：碰撞将地面单位推入非桥河道时，后处理拉回最近岸（留白 1px）
+  - **边界钳制**：所有实体位置钳制在 `[collision_radius, ARENA_WIDTH/HEIGHT - collision_radius]` 范围内
+- **CombatantBase 新增属性**：`collision_radius`（碰撞体半径）、`hurt_radius`（受击半径，默认=collision_radius）、`mass`（碰撞质量，塔=0 不可移动）
+- **DataRegistry**：所有 6 单位 + 2 塔配置 `collision_radius` / `hurt_radius` / `mass`，配置校验自动检查
+- **UnitBase.setup()**：从 unit_data 读取碰撞字段，格→像素转换
+
+#### 射程公式修正
+- **AttackComponent**：射程判定从纯 `attack_range` 改为 `attack_range + collision_radius + target.hurt_radius`（有效触及距离 = 攻击范围 + 自身碰撞半径 + 目标受击半径）
+- **UnitBase._get_primary_attack_range()**：推塔停步距离同样加入 `collision_radius + target.hurt_radius`
+- **TargetingSystem**：索敌距离排序考虑双方碰撞半径
+- **DamageSystem**：范围伤害命中判定考虑目标 `hurt_radius`（法术半径 + 目标受击半径 >= 距离 才命中）
+
+#### 气球兵帧动画
+- **balloon animation 字段**：单帧静态图（idle/walk 共用 balloon.png），1254×1254px，visual_scale 0.0792
+
+### 变更
+- AttackComponent `_update_targeting()` 和 `_can_fire()` 的 reach 计算统一改为 `attack_range + collision_radius + target_hurt_radius`
+- UnitBase `_check_attack_reach()` 和 `_move_toward_tower()` 停步距离加入碰撞半径修正
+- DamageSystem `deal_area_damage()` 空间查询考虑 `hurt_radius`
+- DataRegistry `_validate_all_data()` 新增 collision_radius / hurt_radius / mass 校验（单位和塔）
+
+### 新增测试
+- **test_collision_system.gd**（8 测试）：两体分离、无重叠不变、质量反比、不可移动塔、跨层不碰、同位置回退、河道回弹、边界钳制
+- **test_attack_targeting.gd** 新增 `test_reach_includes_collision_radius` / `test_large_hurt_radius_extends_reach`：射程含碰撞半径回归测试
+- **test_damage_system.gd** 新增 `test_area_damage_uses_hurt_radius`：范围伤害含受击半径
+- **test_targeting_system.gd** 新增 `test_collision_radius_extends_effective_sight`：索敌距离含碰撞半径
+- **test_data_registry.gd** 新增 collision_radius / hurt_radius / mass 配置校验（单位+塔）
+
 ## [0.8.2] - 2026-07-07 — 帧动画系统 + 弓箭手单位 + 血条样式重做
 
 ### 新增
