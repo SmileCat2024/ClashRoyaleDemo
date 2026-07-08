@@ -437,6 +437,21 @@ var card_data := {
 		"icon": "",
 		"description": "持续伤害法术，减速区域内敌方部队。8秒内每秒造成92伤害。",
 	},
+	"card_arrows": {
+		"id": "card_arrows",
+		"display_name": "万箭齐发",
+		"cost": 3,
+		"card_type": "spell",
+		"spell_type": "arrows",
+		"spell_radius": 3.5,       # 作用半径（格）
+		"spell_damage": 122,       # 单波对单位的范围伤害
+		"spell_waves": 3,          # 3波伤害（总 366）
+		"tower_damage": 25,        # 单波对皇家塔的伤害（总 75）
+		"projectile_speed": 18.33, # 飞行速度（格/秒，1100格/分钟）
+		"knockback": false,
+		"icon": "",
+		"description": "3波箭雨从天而降，覆盖目标区域。对空对地，无击退。",
+	},
 }
 
 # ==============================================================================
@@ -541,18 +556,14 @@ func get_building_data(building_id: String) -> Dictionary:
 	return {}
 
 
-## 返回玩家默认卡组（8张牌 id）。
+## 返回玩家默认卡组（卡牌 id 列表）。开发阶段包含全部卡牌。
 func get_default_player_deck() -> Array:
-	return [
-		"card_knight", "card_musketeer", "card_mini_pekka",
-		"card_hog_rider", "card_balloon", "card_archers",
-		"card_fireball", "card_poison",
-	]
+	return card_data.keys()
 
 
-## 返回敌方 AI 的默认卡组（卡牌 id 列表）。
+## 返回敌方 AI 的默认卡组（卡牌 id 列表）。开发阶段包含全部卡牌。
 func get_default_enemy_deck() -> Array:
-	return ["card_knight", "card_hog_rider", "card_musketeer", "card_mini_pekka", "card_archers", "card_fireball", "card_poison"]
+	return card_data.keys()
 
 
 # ==============================================================================

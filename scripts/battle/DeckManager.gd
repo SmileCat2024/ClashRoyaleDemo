@@ -1,7 +1,7 @@
 # 文件名：DeckManager.gd
-# 作用：管理玩家卡组轮转。8张牌循环：4张手牌 + 1张预告 + 3张在队列中等待。
+# 作用：管理玩家卡组轮转。卡牌循环：4张手牌 + 1张预告 + 剩余在队列中等待。
 #       打出一张手牌后：预告牌填补空位，队列头成为新预告，打出的牌回到队尾。
-#       这是皇室战争的核心卡牌循环机制。
+#       这是皇室战争的核心卡牌循环机制。支持任意数量的卡牌。
 # 挂载位置：BattleManager 动态创建并 add_child（不放在 tscn 里）。
 # 初学者阅读建议：先看 setup() 理解初始分配，再看 play_card() 理解轮转逻辑。
 
@@ -15,7 +15,7 @@ var _hand: Array[String] = []   ## 手牌（4张，索引 0-3 对应屏幕从左
 var _next: String = ""          ## 下一张预告
 
 
-## 初始化卡组。传入 8 张牌的 id 列表，打乱后分配到 hand/next/queue。
+## 初始化卡组。传入卡牌 id 列表（≥5张），打乱后分配到 hand/next/queue。
 func setup(deck_card_ids: Array) -> void:
 	_queue.clear()
 	_hand.clear()

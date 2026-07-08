@@ -156,9 +156,10 @@ func test_all_towers_have_zero_mass() -> void:
 #  默认卡组
 # ============================================================
 
-func test_player_deck_has_8_cards() -> void:
+func test_player_deck_has_all_cards() -> void:
 	var deck := DataRegistry.get_default_player_deck()
-	assert_eq(deck.size(), 8, "玩家默认卡组应8张")
+	assert_eq(deck.size(), DataRegistry.card_data.size(),
+		"玩家默认卡组应包含全部卡牌")
 
 
 func test_deck_cards_all_exist() -> void:
