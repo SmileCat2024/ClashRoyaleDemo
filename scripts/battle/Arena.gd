@@ -40,6 +40,13 @@ func is_enemy_deploy_position(pos: Vector2) -> bool:
 		and pos.x >= BattleConstants.px(0.5) and pos.x <= BattleConstants.ARENA_WIDTH - BattleConstants.px(0.5)
 
 
+## 判断一个位置是否在法术可施放区域内（整个竞技场）。
+## 法术不受半场限制，可以对竞技场任意位置施放。
+func is_spell_deploy_position(pos: Vector2) -> bool:
+	return pos.y >= 0.0 and pos.y <= BattleConstants.ARENA_HEIGHT \
+		and pos.x >= 0.0 and pos.x <= BattleConstants.ARENA_WIDTH
+
+
 ## 在敌方部署区域内随机选一个位置
 func get_random_enemy_deploy_position() -> Vector2:
 	var x = randf_range(BattleConstants.px(1.5), BattleConstants.ARENA_WIDTH - BattleConstants.px(1.5))

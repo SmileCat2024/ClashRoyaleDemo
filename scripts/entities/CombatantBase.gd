@@ -206,3 +206,16 @@ func die() -> void:
 		SignalBus.death_damage_triggered.emit(
 			global_position, death_damage, death_radius, death_fuse_time, team
 		)
+
+
+## 击退：沿 direction 方向瞬移 distance 像素。mass=0（塔/建筑）免疫。
+## 位置钳制到竞技场范围内，CollisionSystem 下一帧处理重叠/河道回弹。
+func knockback(direction: Vector2, distance: float) -> void:
+	if is_dead or mass == 0 or distance <= 0.0:
+		return
+	position += direction.normalized() * distance
+	# 钳制到竞技场边界（World 本地游戏空间）
+	position.x = clampf(position.x, BattleConstants.CELL_SIZE * 0.5,
+		BattleConstants.ARENA_WIDTH - BattleConstants.CELL_SIZE * 0.5)
+	position.y = clampf(position.y, BattleConstants.CELL_SIZE * 0.5,
+		BattleConstants.ARENA_HEIGHT - BattleConstants.CELL_SIZE * 0.5)

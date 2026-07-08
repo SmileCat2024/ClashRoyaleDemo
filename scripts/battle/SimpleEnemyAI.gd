@@ -48,7 +48,7 @@ func try_enemy_action() -> void:
 	var card_id = choose_random_card()
 	if card_id == "":
 		return
-	var pos = choose_spawn_position()
+	var pos = choose_spawn_position(card_id)
 	var success = battle_manager.try_play_card(card_id, "enemy", pos)
 	if success:
 		print("[SimpleEnemyAI] played:", card_id, "at", pos)
@@ -61,6 +61,15 @@ func choose_random_card() -> String:
 	return enemy_deck[randi() % enemy_deck.size()]
 
 
-## 在敌方部署区域随机选一个位置
-func choose_spawn_position() -> Vector2:
+## 选择部署位置。法术卡瞄准玩家半场，单位卡在敌方半场随机。
+func choose_spawn_position(card_id: String) -> Vector2:
+	var card := DataRegistry.get_card_data(card_id)
+	if card.get("card_type") == "spell":
+		# 法术：瞄准玩家半场（敌方想伤害玩家单位/塔）
+		var x = randf_range(BattleConstants.px(1.5), BattleConstants.ARENA_WIDTH - BattleConstants.px(1.5))
+		var y = randf_range(
+			BattleConstants.PLAYER_DEPLOY_Y_MIN + BattleConstants.CELL_SIZE,
+			BattleConstants.PLAYER_DEPLOY_Y_MAX - BattleConstants.CELL_SIZE
+		)
+		return Vector2(x, y)
 	return arena.get_random_enemy_deploy_position()

@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/battle/Arena.tscn" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/entities/towers/KingTower.tscn" id="2"]
@@ -10,6 +10,7 @@
 [ext_resource type="Script" path="res://scripts/battle/ProjectileManager.gd" id="8"]
 [ext_resource type="Script" path="res://scripts/battle/EffectManager.gd" id="9"]
 [ext_resource type="Script" path="res://scripts/battle/DeployPreview.gd" id="10"]
+[ext_resource type="Script" path="res://scripts/battle/SpellManager.gd" id="11"]
 
 [node name="BattleScene" type="Node2D"]
 position = Vector2(40, 0)
@@ -67,6 +68,9 @@ script = ExtResource("8")
 
 [node name="EffectManager" type="Node" parent="Managers"]
 script = ExtResource("9")
+
+[node name="SpellManager" type="Node" parent="Managers"]
+script = ExtResource("11")
 
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
 offset = Vector2(40, 0)

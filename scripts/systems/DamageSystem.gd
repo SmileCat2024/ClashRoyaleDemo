@@ -21,7 +21,8 @@ static func resolve_impact(target: Node, damage: int) -> void:
 ## 范围伤害结算。对 center 周围 radius 范围内的所有敌方实体造成全额伤害（无衰减）。
 ## 通过 EntityRegistry 查询，不遍历场景树。
 ## center 使用 World 本地游戏空间坐标。
-static func deal_area_damage(center: Vector2, radius: float, damage: int, attacker_team: String) -> void:
+## tower_damage >= 0 时，塔（有 tower_type 属性的实体）受 tower_damage 而非 damage（法术对塔减伤）。
+static func deal_area_damage(center: Vector2, radius: float, damage: int, attacker_team: String, tower_damage: int = -1) -> void:
 	var enemies = EntityRegistry.get_enemies_of(attacker_team)
 	for e in enemies:
 		# 受击半径偏移：大体积目标更容易被范围伤害命中
@@ -29,4 +30,7 @@ static func deal_area_damage(center: Vector2, radius: float, damage: int, attack
 		var hurt_r: float = float(hr) if hr != null else 0.0
 		if center.distance_to(BattlePathing.game_position_of(e)) <= radius + hurt_r:
 			if e.has_method("take_damage"):
-				e.take_damage(damage)
+				var dmg := damage
+				if tower_damage >= 0 and e.get("tower_type") != null:
+					dmg = tower_damage
+				e.take_damage(dmg)

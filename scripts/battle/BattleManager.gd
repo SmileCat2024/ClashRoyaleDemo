@@ -35,6 +35,7 @@ var selected_hand_index: int = -1  ## 当前选中的手牌索引（-1 = 未选�
 @onready var towers_root: Node2D = $"../../World/TowersRoot"
 @onready var units_root: Node2D = $"../../World/UnitsRoot"
 @onready var spawn_manager: Node = $"../SpawnManager"
+@onready var spell_manager: Node = $"../SpellManager"
 @onready var enemy_ai: Node = $"../SimpleEnemyAI"
 @onready var deploy_preview: Node2D = $"../../World/DeployPreview"
 
@@ -213,8 +214,15 @@ func try_play_card(card_id: String, team_name: String, world_position: Vector2) 
 	if not can_afford_card(team_name, card_id):
 		return false
 
-	# 检查部署位置是否合法
-	if team_name == "player":
+	var card := DataRegistry.get_card_data(card_id)
+	var card_type: String = card.get("card_type", "")
+
+	# 检查部署位置是否合法（法术可全图施放，单位受半场限制）
+	if card_type == "spell":
+		if not arena.is_spell_deploy_position(world_position):
+			print("[BattleManager] 无效法术位置:", world_position)
+			return false
+	elif team_name == "player":
 		if not arena.is_player_deploy_position(world_position):
 			print("[BattleManager] 无效部署位置:", world_position)
 			return false
@@ -222,13 +230,24 @@ func try_play_card(card_id: String, team_name: String, world_position: Vector2) 
 		if not arena.is_enemy_deploy_position(world_position):
 			return false
 
-	# 调用 SpawnManager 生成单位
-	var unit = spawn_manager.spawn_unit(card_id, team_name, world_position)
-	if unit == null:
-		return false
+	# 按卡牌类型分流
+	match card_type:
+		"troop":
+			var unit = spawn_manager.spawn_unit(card_id, team_name, world_position)
+			if unit == null:
+				return false
+		"spell":
+			if spell_manager:
+				spell_manager.cast_spell(card_id, team_name, world_position)
+			else:
+				push_error("[BattleManager] SpellManager not found")
+				return false
+		_:
+			push_error("[BattleManager] Unknown card_type: " + card_type)
+			return false
 
 	# 扣除能量
-	spend_energy(team_name, int(DataRegistry.get_card_data(card_id).get("cost", 0)))
+	spend_energy(team_name, int(card.get("cost", 0)))
 
 	SignalBus.card_played.emit(card_id, team_name, world_position)
 	print("[BattleManager] card played:", card_id, team_name, world_position)

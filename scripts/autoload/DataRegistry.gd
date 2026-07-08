@@ -395,6 +395,21 @@ var card_data := {
 		"icon": "res://assets/ui/cards/giant.png",
 		"description": "高血量的地面肉盾，只攻击建筑。",
 	},
+	"card_fireball": {
+		"id": "card_fireball",
+		"display_name": "火球",
+		"cost": 4,
+		"card_type": "spell",
+		"spell_type": "fireball",
+		"spell_radius": 2.5,       # 作用半径（格）
+		"spell_damage": 688,       # 对单位的范围伤害
+		"tower_damage": 172,       # 对皇家塔的伤害（约 25%）
+		"projectile_speed": 10.0,  # 飞行速度（格/秒，600格/分钟）
+		"knockback": true,         # 击退
+		"knockback_distance": 1.0, # 击退距离（格）
+		"icon": "",
+		"description": "范围伤害法术，可对空对地。击退被命中的单位。",
+	},
 }
 
 # ==============================================================================
@@ -500,18 +515,18 @@ func get_building_data(building_id: String) -> Dictionary:
 
 
 ## 返回玩家默认卡组（8张牌 id）。
-## 目前有7种卡牌，1张重复以凑满8张。
+## 目前有8种卡牌。
 func get_default_player_deck() -> Array:
 	return [
 		"card_knight", "card_musketeer", "card_mini_pekka",
 		"card_hog_rider", "card_balloon", "card_archers",
-		"card_giant", "card_knight",
+		"card_giant", "card_fireball",
 	]
 
 
 ## 返回敌方 AI 的默认卡组（卡牌 id 列表）。
 func get_default_enemy_deck() -> Array:
-	return ["card_knight", "card_hog_rider", "card_musketeer", "card_mini_pekka", "card_archers"]
+	return ["card_knight", "card_hog_rider", "card_musketeer", "card_mini_pekka", "card_archers", "card_fireball"]
 
 
 # ==============================================================================
@@ -556,6 +571,10 @@ func _validate_all_data() -> void:
 			"spell":
 				if not c.has("spell_type"):
 					errors.append("卡牌 '%s' (spell) 缺少 spell_type" % card_id)
+				if not c.has("spell_radius"):
+					errors.append("卡牌 '%s' (spell) 缺少 spell_radius" % card_id)
+				if not c.has("spell_damage"):
+					errors.append("卡牌 '%s' (spell) 缺少 spell_damage" % card_id)
 			"":
 				errors.append("卡牌 '%s' card_type 为空" % card_id)
 			_:
