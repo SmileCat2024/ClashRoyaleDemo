@@ -24,7 +24,9 @@ var _has_animation: bool = false
 
 # ---- 视觉配置 ----
 var _base_offset: Vector2 = Vector2.ZERO   ## 视觉偏移基准值（不含 altitude）
-var _current_state: String = ""            ## 当前播放的视觉状态名
+var _current_state: String = ""            ## 当前播放的动画名（调试用）
+var _attack_anim_playing: bool = false     ## 攻击动画播放中（不可打断，播完自动清除）
+var _jump_frame: int = 0                    ## 跳河时锁定的帧索引（0-based，从动画配置读取）
 
 
 ## 从单位数据初始化。由 CombatantBase._create_sprite_animator 在 add_child 后调用。
@@ -40,6 +42,7 @@ func setup(unit_data: Dictionary, entity: CombatantBase) -> void:
 		float(anim_data.get("visual_offset_x", 0.0)),
 		float(anim_data.get("visual_offset_y", 0.0))
 	)
+	_jump_frame = int(anim_data.get("jump_frame", 0))
 
 	# 从 SpriteRegistry 获取（或构建）SpriteFrames
 	var unit_id: String = unit_data.get("id", "")
@@ -96,28 +99,73 @@ func _process(_delta: float) -> void:
 
 ## 轮询实体视觉状态，按需切换动画。分层降级查找。
 func _update_animation() -> void:
-	var target_state: String = combatant.get_visual_state()
-	if target_state == _current_state:
-		return
-	_current_state = target_state
+	var state := combatant.get_visual_state()
 
-	var sf: SpriteFrames = _sprite.sprite_frames
-
-	# 1. 精确匹配（如 "walk_front"）
-	if sf.has_animation(target_state):
-		_sprite.play(target_state)
+	# 跳河状态：锁定到 walk 动画的指定帧，不更新翻转
+	if state == "jump":
+		if _current_state != "jump":
+			_enter_jump_state()
 		return
 
-	# 2. 去掉方向后缀再试（如 "walk_front" → "walk"）
-	var base_name: String = target_state.split("_")[0]
-	if sf.has_animation(base_name):
-		_sprite.play(base_name)
-		return
+	# 正常状态：每帧更新水平翻转
+	_sprite.flip_h = combatant.get_flip_h()
 
-	# 3. idle 兜底
-	if target_state != "idle" and sf.has_animation("idle"):
-		_sprite.play("idle")
-	# 4. 什么都没有 → 静止（不应发生，SpriteRegistry 已保证至少有内容）
+	# 从跳河退出时重置状态标记
+	if _current_state == "jump":
+		_current_state = ""
+
+	# 攻击动画播放中 → 不打断，等播完再恢复轮询
+	if _attack_anim_playing:
+		if _sprite.is_playing():
+			return
+		_attack_anim_playing = false
+
+	# 检查攻击触发（只有存在攻击动画时才进入不可打断模式）
+	var attack := combatant.get_primary_attack()
+	if attack and attack.is_firing():
+		var facing := combatant.get_facing()
+		var other := "back" if facing == "front" else "front"
+		if _play_if_exists("attack_" + facing) \
+				or _play_if_exists("attack_" + other) \
+				or _play_if_exists("attack"):
+			_attack_anim_playing = true
+			return
+		# 无攻击动画 → 正常走 walk/idle（伤害照算，只是没动画表现）
+
+	# 常规状态：walk / idle / death（带方向 + 跨方向降级）
+	_play_with_fallback(state)
+
+
+## 按降级链查找并播放动画。返回是否成功。
+## 链：state_当前朝向 → state_对侧朝向 → state（无方向）→ idle_当前朝向 → idle_对侧 → idle
+func _play_with_fallback(state: String) -> bool:
+	var facing: String = combatant.get_facing()
+	var other: String = "back" if facing == "front" else "front"
+
+	if _play_if_exists(state + "_" + facing):
+		return true
+	if _play_if_exists(state + "_" + other):
+		return true
+	if _play_if_exists(state):
+		return true
+	if state != "idle":
+		if _play_if_exists("idle_" + facing):
+			return true
+		if _play_if_exists("idle_" + other):
+			return true
+		if _play_if_exists("idle"):
+			return true
+	return false
+
+
+## 尝试播放指定动画名。已播放同名动画时不重启。返回是否找到并播放。
+func _play_if_exists(anim_name: String) -> bool:
+	if not _sprite.sprite_frames.has_animation(anim_name):
+		return false
+	if _sprite.animation != anim_name or not _sprite.is_playing():
+		_sprite.play(anim_name)
+	_current_state = anim_name
+	return true
 
 
 ## 传递 altitude 离地偏移。由宿主实体的 altitude 系统调用。
@@ -130,3 +178,11 @@ func apply_altitude_offset(dy: float) -> void:
 ## 帧变化回调（P2 扩展：帧事件 / hit frame 通知）。
 func _on_frame_changed() -> void:
 	pass
+
+
+## 进入跳河状态：切换到 walk 动画，暂停并锁定到指定帧。
+func _enter_jump_state() -> void:
+	_play_with_fallback("walk")
+	_sprite.pause()
+	_sprite.frame = _jump_frame
+	_current_state = "jump"

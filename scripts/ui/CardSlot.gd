@@ -16,6 +16,10 @@ var _affordable: bool = true
 
 @onready var name_label: Label = $NameLabel
 @onready var cost_label: Label = $CostLabel
+@onready var icon_rect: TextureRect = $CardIcon
+
+# 缓存已加载的卡面纹理，避免重复 load
+var _icon_cache: Dictionary = {}
 
 # 选中时的暖色高亮
 const SELECTED_TINT := Color(1.35, 1.15, 0.4)
@@ -37,9 +41,31 @@ func setup(p_card_id: String, p_hand_index: int) -> void:
 	var card := DataRegistry.get_card_data(p_card_id)
 	_card_cost = int(card.get("cost", 0))
 	if name_label:
+		# 已有模型动画的单位不显示名称
+		var unit_id: String = card.get("unit_id", "")
+		var has_model := false
+		if unit_id != "":
+			var unit := DataRegistry.get_unit_data(unit_id)
+			has_model = unit.has("animation") and not unit["animation"].is_empty()
+		name_label.visible = not has_model
 		name_label.text = card.get("display_name", p_card_id)
 	if cost_label:
 		cost_label.text = str(_card_cost)
+	_load_icon(card.get("icon", ""))
+
+
+## 加载卡面图片。无 icon 字段时清空图片。
+func _load_icon(icon_path: String) -> void:
+	if icon_path == "":
+		icon_rect.texture = null
+		return
+	if _icon_cache.has(icon_path):
+		icon_rect.texture = _icon_cache[icon_path]
+		return
+	var tex := load(icon_path) as Texture2D
+	if tex:
+		_icon_cache[icon_path] = tex
+		icon_rect.texture = tex
 
 
 ## 设置选中高亮

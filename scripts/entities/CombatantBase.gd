@@ -115,6 +115,17 @@ func get_visual_state() -> String:
 	return "idle"
 
 
+## 返回当前朝向（"front" = 面朝镜头/向下走，"back" = 背朝镜头/向上走）。
+## 供 SpriteAnimator 查找方向专用帧（如 walk_front / walk_back）。
+func get_facing() -> String:
+	return "front"
+
+
+## 返回是否需要水平翻转 sprite。美术素材默认面朝左，向右移动时翻转为 true。
+func get_flip_h() -> bool:
+	return false
+
+
 ## 按阵营设置血条样式：玩家浅蓝底+正蓝填充，敌方浅红底+正红填充。
 func _style_health_bar() -> void:
 	if health_bar == null:

@@ -16,6 +16,7 @@ var attack_air: bool = true
 var attack_range: float = 30.0          ## 攻击射程（在此距离内才能出手）
 var attack_interval: float = 1.0        ## 两次攻击之间的冷却时间（秒）
 var first_attack_delay: float = 0.0     ## 首次出手前摇（秒），进入射程后不会瞬间攻击
+var damage_delay: float = 0.0           ## 出手到造成伤害的延迟（秒），匹配攻击动画的抬手帧
 var delivery: String = "instant"        ## "instant" | "projectile"
 var damage: int = 10
 var projectile_speed: float = 250.0     ## 仅 delivery=projectile 时使用
@@ -23,6 +24,9 @@ var projectile_speed: float = 250.0     ## 仅 delivery=projectile 时使用
 # ---- 运行时状态 ----
 var current_target = null               ## 当前锁定的目标（CombatantBase 或 null）
 var cooldown: float = 0.0               ## 攻击冷却剩余时间（秒）
+var _is_firing: bool = false            ## 本帧是否出手（只读标记，供 SpriteAnimator 轮询）
+var _windup_timer: float = 0.0          ## 伤害延迟计时器（>0 时等待，到 0 才结算伤害）
+var _is_winding_up: bool = false        ## 是否处于抬手→命中延迟阶段
 
 # ---- owner 引用 ----
 var combatant: CombatantBase            ## 挂载本组件的实体，由 _init_combat_stats 设置
@@ -37,6 +41,7 @@ func setup(attack_data: Dictionary) -> void:
 	attack_range = BattleConstants.px(float(attack_data.get("attack_range", 1.5)))
 	attack_interval = float(attack_data.get("attack_interval", 1.0))
 	first_attack_delay = float(attack_data.get("first_attack_delay", 0.0))
+	damage_delay = float(attack_data.get("damage_delay", 0.0))
 	delivery = attack_data.get("delivery", "instant")
 	damage = int(attack_data.get("damage", 10))
 	projectile_speed = BattleConstants.px(float(attack_data.get("projectile_speed", 12.5)))
@@ -45,6 +50,16 @@ func setup(attack_data: Dictionary) -> void:
 
 
 func _process(delta: float) -> void:
+	_is_firing = false
+	# 抬手→命中延迟阶段：等待 damage_delay 到期才结算伤害
+	if _is_winding_up:
+		_windup_timer -= delta
+		if _windup_timer <= 0.0:
+			if has_valid_target():
+				_execute_attack()
+			_is_winding_up = false
+			cooldown = attack_interval
+		return
 	if combatant == null or not combatant.initialized or combatant.is_dead:
 		return
 	if combatant.get("is_jumping_river") == true:
@@ -63,13 +78,24 @@ func _process(delta: float) -> void:
 		)
 		var reach := attack_range + combatant.collision_radius + _get_target_hurt_radius(current_target)
 		if dist <= reach:
-			# 只有目标在射程内时冷却才递减——移动/追击期间不消耗冷却，
-			# 确保 first_attack_delay 是"进入射程后"的前摇而非"部署后"的计时
 			if cooldown > 0.0:
 				cooldown -= delta
 			if cooldown <= 0.0:
-				_execute_attack()
-				cooldown = attack_interval
+				_is_firing = true  # 触发攻击动画
+				if damage_delay > 0.0:
+					# 有抬手延迟：标记 firing（动画立即开始），延迟结算伤害
+					_is_winding_up = true
+					_windup_timer = damage_delay
+				else:
+					# 无延迟：立刻结算（向后兼容）
+					_execute_attack()
+					cooldown = attack_interval
+
+
+## 本帧是否出手（只读）。SpriteAnimator 轮询此标记触发攻击动画。
+## 每帧 _process 开头重置为 false，出手时置 true，下一帧自动清除。
+func is_firing() -> bool:
+	return _is_firing
 
 
 ## 当前目标是否有效（存在、未销毁、未死亡）

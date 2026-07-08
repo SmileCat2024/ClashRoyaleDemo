@@ -71,6 +71,24 @@ var unit_data := {
 			"impact_radius": 0.0,
 			"damage": 317,
 		}],
+		"animation": {
+			"visual_scale": 0.135,
+			"visual_offset_y": -15.0,
+			"health_bar_y": -90,
+			"jump_frame": 2,  # 跳河期间锁定显示第3帧（0-indexed）
+			"states": {
+				"walk_back": {
+					"frames": ["walk_back_01.png", "walk_back_02.png", "walk_back_03.png", "walk_back_04.png"],
+					"duration": [0.15, 0.15, 0.15, 0.15],
+					"mode": "loop",
+				},
+				"idle_back": {
+					"frames": ["walk_back_01.png"],
+					"duration": [1.0],
+					"mode": "loop",
+				},
+			},
+		},
 	},
 	"musketeer": {
 		"id": "musketeer",
@@ -207,21 +225,82 @@ var unit_data := {
 			"projectile_speed": 15.0,
 		}],
 		# ---- 帧动画配置 ----
-		# 原始 PNG 1254×1254px，缩放到约 83px（≈4格）显示
+		# 原始 PNG 473×517px，缩放到约 83px 宽（≈4格）
+		# 素材默认面朝左，向右移动时 flip_h 自动翻转
 		"animation": {
 			"visual_offset_x": 0.0,
-			"visual_offset_y": -5.0,     # 父坐标系像素（原 -65 经 offset×scale 换算 ≈ -5px）
-			"visual_scale": 0.066,      # 1254 × 0.066 ≈ 83px
-			"health_bar_y": -45.0,      # 血条在角色头顶上方
+			"visual_offset_y": -24.0,     # 进游戏后目测微调
+			"visual_scale": 0.075,       # 473 × 0.0875 ≈ 41px
+			"health_bar_y": -60.0,        # 血条在角色头顶上方
 			"states": {
-				"walk": {
-					"frames": ["walk_01.png", "walk_02.png"],
+				"walk_front": {
+					"frames": ["walk_front_01.png", "walk_front_02.png"],
 					"duration": [0.25, 0.25],
 					"mode": "loop",
 				},
-				"idle": {
-					"frames": ["walk_01.png"],  # 暂时用移动第1帧做待机
+				"walk_back": {
+					"frames": ["walk_back_01.png", "walk_back_02.png"],
+					"duration": [0.25, 0.25],
+					"mode": "loop",
+				},
+				"idle_front": {
+					"frames": ["walk_front_01.png"],  # 暂用移动第1帧做待机
 					"duration": [0.3],
+					"mode": "loop",
+				},
+				"idle_back": {
+					"frames": ["walk_back_01.png"],
+					"duration": [0.3],
+					"mode": "loop",
+				},
+			},
+		},
+	},
+	"giant": {
+		"id": "giant",
+		"display_name": "巨人",
+		"max_hp": 4090,
+		"shield": 0,
+		"move_speed": 0.75,  # 慢速（内部数值45 → 0.75格/秒）
+		"movement_type": "ground",
+		"sight_range": 6.0,
+		"movement_targeting": "building_only",
+		"collision_radius": 0.7,
+		"hurt_radius": 0.7,
+		"mass": 10,
+		"attacks": [{
+			"name": "fist_smash",
+			"targeting": "building_only",
+			"attack_ground": true,
+			"attack_air": false,
+			"attack_range": 1.2,
+			"attack_interval": 1.5,
+			"first_attack_delay": 0.5,
+			"damage_delay": 0.15,
+			"delivery": "instant",
+			"trajectory": "",
+			"impact_type": "single",
+			"impact_radius": 0.0,
+			"damage": 253,
+		}],
+		"animation": {
+			"visual_offset_y": -55.0,
+			"visual_scale": 0.096,
+			"health_bar_y": -120,
+			"states": {
+				"walk_front": {
+					"frames": ["walk_front_01.png", "walk_front_02.png"],
+					"duration": [0.5, 0.5],
+					"mode": "loop",
+				},
+				"attack_front": {
+					"frames": ["attack_front_01.png", "attack_front_02.png"],
+					"duration": [0.15, 0.25],
+					"mode": "once",
+				},
+				"idle_front": {
+					"frames": ["walk_front_01.png"],
+					"duration": [1.0],
 					"mode": "loop",
 				},
 			},
@@ -246,6 +325,7 @@ var card_data := {
 		"unit_id": "knight",
 		"spawn_count": 1,
 		"spawn_spread": 0.0,
+		"icon": "res://assets/ui/cards/knight.png",
 		"description": "一个坚韧的近战战士。",
 	},
 	"card_hog_rider": {
@@ -256,6 +336,7 @@ var card_data := {
 		"unit_id": "hog_rider",
 		"spawn_count": 1,
 		"spawn_spread": 0.0,
+		"icon": "res://assets/ui/cards/hog_rider.png",
 		"description": "极快的建筑杀手，只攻击建筑。",
 	},
 	"card_musketeer": {
@@ -266,6 +347,7 @@ var card_data := {
 		"unit_id": "musketeer",
 		"spawn_count": 1,
 		"spawn_spread": 0.0,
+		"icon": "res://assets/ui/cards/musketeer.png",
 		"description": "远程射手，可对空对地。",
 	},
 	"card_mini_pekka": {
@@ -276,6 +358,7 @@ var card_data := {
 		"unit_id": "mini_pekka",
 		"spawn_count": 1,
 		"spawn_spread": 0.0,
+		"icon": "res://assets/ui/cards/mini_pekka.png",
 		"description": "高伤害近战，快速移动。",
 	},
 	"card_balloon": {
@@ -286,6 +369,7 @@ var card_data := {
 		"unit_id": "balloon",
 		"spawn_count": 1,
 		"spawn_spread": 0.0,
+		"icon": "res://assets/ui/cards/balloon.png",
 		"description": "空中单位，只攻击建筑，伤害极高。",
 	},
 	"card_archers": {
@@ -297,7 +381,19 @@ var card_data := {
 		"spawn_count": 2,
 		"spawn_spread": 0.0,
 		"spawn_offsets": [Vector2(-1, 0), Vector2(1, 0)],  # 两只分居中心格左右各一格
+		"icon": "res://assets/ui/cards/archers.png",
 		"description": "两个远程射手，可对空对地。",
+	},
+	"card_giant": {
+		"id": "card_giant",
+		"display_name": "巨人",
+		"cost": 5,
+		"card_type": "troop",
+		"unit_id": "giant",
+		"spawn_count": 1,
+		"spawn_spread": 0.0,
+		"icon": "res://assets/ui/cards/giant.png",
+		"description": "高血量的地面肉盾，只攻击建筑。",
 	},
 }
 
@@ -404,12 +500,12 @@ func get_building_data(building_id: String) -> Dictionary:
 
 
 ## 返回玩家默认卡组（8张牌 id）。
-## 目前只有6种卡牌，部分重复以凑满8张。
+## 目前有7种卡牌，1张重复以凑满8张。
 func get_default_player_deck() -> Array:
 	return [
 		"card_knight", "card_musketeer", "card_mini_pekka",
 		"card_hog_rider", "card_balloon", "card_archers",
-		"card_knight", "card_musketeer",
+		"card_giant", "card_knight",
 	]
 
 

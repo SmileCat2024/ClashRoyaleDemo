@@ -51,6 +51,7 @@ var _player_energy_max: int = 10
 ]
 @onready var next_name_label: Label = $NextCardPanel/NextNameLabel
 @onready var next_card_panel: Panel = $NextCardPanel
+@onready var next_icon_rect: TextureRect = $NextCardPanel/NextCardIcon
 @onready var elixir_bar: Control = $ElixirBar
 @onready var elixir_fill: ColorRect = $ElixirBar/ElixirFill
 @onready var elixir_label: Label = $ElixirBar/ElixirLabel
@@ -90,9 +91,22 @@ func _on_hand_updated(hand: Array, next_card: String) -> void:
 		slots[i].setup(card_id, i)
 	if next_card == "":
 		next_name_label.text = "—"
+		next_name_label.visible = true
+		next_icon_rect.texture = null
 	else:
 		var card := DataRegistry.get_card_data(next_card)
+		var next_uid: String = card.get("unit_id", "")
+		var next_has_model := false
+		if next_uid != "":
+			var next_unit := DataRegistry.get_unit_data(next_uid)
+			next_has_model = next_unit.has("animation") and not next_unit["animation"].is_empty()
+		next_name_label.visible = not next_has_model
 		next_name_label.text = card.get("display_name", next_card)
+		var icon_path: String = card.get("icon", "")
+		if icon_path != "":
+			next_icon_rect.texture = load(icon_path) as Texture2D
+		else:
+			next_icon_rect.texture = null
 	_refresh_affordability()
 
 

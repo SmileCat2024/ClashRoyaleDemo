@@ -83,9 +83,11 @@ func setup(unit_data: Dictionary, team_name: String) -> void:
 	health_bar.size = Vector2(hb_w, 4)
 	health_bar.position = Vector2(-hb_w / 2.0, hb_y)
 
-	# 调试标签
+	# 调试标签（有动画模型的单位隐藏）
 	debug_label.text = display_name
 	debug_label.position = Vector2(-15, size / 2.0 + 2)
+	if sprite_animator and sprite_animator._has_animation:
+		debug_label.visible = false
 	_store_visual_base_positions()
 
 	# 飞行单位设置离地高度（仅视觉，不影响逻辑坐标和索敌）
@@ -252,9 +254,41 @@ func _get_primary_attack_range() -> float:
 func get_visual_state() -> String:
 	if is_dead:
 		return "death"
+	if is_jumping_river:
+		return "jump"
 	if _is_moving:
 		return "walk"
 	return "idle"
+
+
+## 覆写朝向：根据当前目标 Y 坐标判定 front（面朝下/镜头）或 back（面朝上/背身）。
+func get_facing() -> String:
+	return "front" if _get_target_y() >= position.y else "back"
+
+
+## 覆写水平翻转：目标在右侧时翻转为 true（素材默认面朝左）。
+func get_flip_h() -> bool:
+	return _get_target_x() > position.x
+
+
+## 当前关注目标的 X 坐标（攻击目标优先，其次移动目标，无目标返回自身）。
+func _get_target_x() -> float:
+	var attack = get_primary_attack()
+	if attack and attack.has_valid_target():
+		return BattlePathing.game_position_of(attack.current_target).x
+	if _move_target:
+		return BattlePathing.game_position_of(_move_target).x
+	return position.x
+
+
+## 当前关注目标的 Y 坐标（攻击目标优先，其次移动目标，无目标返回自身）。
+func _get_target_y() -> float:
+	var attack = get_primary_attack()
+	if attack and attack.has_valid_target():
+		return BattlePathing.game_position_of(attack.current_target).y
+	if _move_target:
+		return BattlePathing.game_position_of(_move_target).y
+	return position.y
 
 
 ## 找最近的敌方塔（用于无攻击目标时的推进方向）
