@@ -10,6 +10,7 @@ class_name CollisionSystem
 const MAX_ITERATIONS := 3        ## 每帧碰撞分离迭代次数
 const ZERO_DIST_THRESHOLD := 1.0 ## 距离小于此值视为同位置，使用回退方向
 const RIVER_BOUNCE_MARGIN := 1.0 ## 河道回弹时离岸边的留白（px）
+const TANGENTIAL_SLIDE := 0.3   ## 切向滑动系数：碰撞推挤时叠加的切向分量比例（0=纯径向，1=切向=径向）
 
 
 ## 对所有活跃实体执行碰撞分离。在 BattleManager._process() 末尾调用（所有单位已移动完毕）。
@@ -77,8 +78,20 @@ static func _resolve_pair(a: Node2D, b: Node2D) -> void:
 	var inv_a := 1.0 / float(mass_a)
 	var inv_b := 1.0 / float(mass_b)
 	var total_inv := inv_a + inv_b
-	a.position -= direction * (overlap * inv_a / total_inv)
-	b.position += direction * (overlap * inv_b / total_inv)
+	var push_a := overlap * inv_a / total_inv
+	var push_b := overlap * inv_b / total_inv
+	a.position -= direction * push_a
+	b.position += direction * push_b
+
+	# 切向滑动：沿碰撞法线的垂直方向叠加推力，帮助单位侧滑绕过彼此。
+	# 仅当至少一方在移动时生效，静止实体碰撞保持纯径向推挤。
+	var tangent := Vector2(-direction.y, direction.x)
+	var combined := _get_move_direction(a) + _get_move_direction(b)
+	if combined.length() > 0.01:
+		if tangent.dot(combined) < 0.0:
+			tangent = -tangent
+		a.position += tangent * push_a * TANGENTIAL_SLIDE
+		b.position -= tangent * push_b * TANGENTIAL_SLIDE
 
 
 ## 后处理：河道回弹 + 边界钳制。对所有实体执行，保证不会出现卡河道或飞出地图的情况。
@@ -122,3 +135,9 @@ static func _get_mass(entity: Node2D) -> int:
 	if m == null:
 		return 5
 	return int(m)
+
+
+static func _get_move_direction(entity: Node2D) -> Vector2:
+	if entity.has_method("get_move_direction"):
+		return entity.get_move_direction()
+	return Vector2.ZERO

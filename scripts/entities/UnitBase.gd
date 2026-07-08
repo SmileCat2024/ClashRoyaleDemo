@@ -23,6 +23,7 @@ var movement_targeting: String = "any"     ## "any" | "building_only"
 # ---- 运行时 ----
 var _move_target = null    ## 当前移动目标（CombatantBase 或 null）
 var _is_moving: bool = false  ## 本帧是否在移动（供 SpriteAnimator 轮询）
+var _last_move_dir: Vector2 = Vector2.ZERO  ## 上一帧实际移动方向（供 CollisionSystem 切向滑动）
 var _slow_factor: float = 1.0   ## 减速乘数（1.0=正常，0.85=减速15%）
 var _slow_timer: float = 0.0    ## 减速剩余时间（秒）
 var is_jumping_river: bool = false
@@ -37,6 +38,8 @@ var _debug_label_base_position: Vector2 = Vector2.ZERO
 const RIVER_JUMP_ARC_HEIGHT := 1.25
 const RIVER_JUMP_SPEED_MULTIPLIER := 1.25
 const RIVER_JUMP_BANK_OFFSET := 1.0
+const OBSTACLE_LOOK_AHEAD_CELLS := 1.5  ## 前方避障探测距离（格），超出此距离的障碍物不触发避让
+const SEPARATION_RADIUS_CELLS := 0.5   ## 单位间分离探测余量（格），碰撞半径之外额外保持的距离
 
 ## 影子椭圆纵向压缩比。把正圆按此值压扁成椭圆。
 const SHADOW_SQUASH := 0.35
@@ -107,6 +110,7 @@ func setup(unit_data: Dictionary, team_name: String) -> void:
 	_set_visual_altitude(altitude)
 
 	initialized = true
+	queue_redraw()
 	print("[UnitBase] setup:", unit_id, team, "hp:", max_hp)
 
 
@@ -180,16 +184,163 @@ func _process(delta: float) -> void:
 
 
 ## 按单位能力移动：普通地面单位走桥；可跳河单位仅在跳河路线更短时起跳。
+## 地面单位额外叠加障碍物避让转向（steering），主动绕开前方塔/建筑而非硬撞后被推。
 func _move_towards_position(target_pos: Vector2, delta: float) -> void:
 	if _try_move_for_river_jump(target_pos, delta):
 		return
 
-	position = BattlePathing.advance_position(
-		position,
-		target_pos,
-		_get_effective_move_speed() * delta,
-		movement_type
-	)
+	var step := _get_effective_move_speed() * delta
+	# 先通过路径系统计算桥/河路由方向
+	var next_pos := BattlePathing.advance_position(position, target_pos, step, movement_type)
+	var move_vec := next_pos - position
+	if move_vec.length() < 0.01:
+		return
+
+	var move_dir := move_vec.normalized()
+
+	# 障碍物避让转向：叠加到移动方向上，使单位主动绕开前方静态障碍物
+	var avoidance := _compute_obstacle_avoidance(move_dir)
+	if avoidance.length() > 0.01:
+		move_dir = (move_dir + avoidance).normalized()
+
+	# 同类分离：与附近同层单位保持距离，投影到切向实现侧滑绕过
+	var separation := _compute_unit_separation(move_dir)
+	if separation.length() > 0.01:
+		move_dir = (move_dir + separation).normalized()
+
+	position += move_dir * step
+	_last_move_dir = move_dir
+
+
+## 计算静态障碍物（塔/建筑）的避让转向向量。
+## 算法：对前方探测范围内的每个 mass=0 实体，生成垂直于移动方向的推力，
+##       强度随横向距离和前方距离衰减。跳过当前攻击/移动目标（单位需要接近它们）。
+## 空中单位返回零向量（飞行不受地面障碍物影响）。
+func _compute_obstacle_avoidance(move_dir: Vector2) -> Vector2:
+	if movement_type == "air":
+		return Vector2.ZERO
+
+	var look_ahead := collision_radius + BattleConstants.px(OBSTACLE_LOOK_AHEAD_CELLS)
+	var steering := Vector2.ZERO
+	var obstacles := EntityRegistry.get_static_obstacles()
+
+	for obs in obstacles:
+		# 跳过当前攻击目标——单位需要接近正在攻击的塔
+		var attack = get_primary_attack()
+		if attack and attack.current_target == obs:
+			continue
+		# 跳过当前移动目标（无攻击目标时向最近的塔推进）
+		if _move_target == obs:
+			continue
+
+		var obs_pos := BattlePathing.game_position_of(obs)
+		var obs_r_raw = obs.get("collision_radius")
+		var obs_r: float = float(obs_r_raw) if obs_r_raw != null else 10.0
+
+		var to_obs := obs_pos - position
+		var dist := to_obs.length()
+		if dist > look_ahead + obs_r:
+			continue  # 超出探测范围
+
+		# 前方距离：障碍物在移动方向上的投影
+		var forward_dist := move_dir.dot(to_obs)
+		if forward_dist < -collision_radius:
+			continue  # 障碍物在身后
+
+		# 横向距离：障碍物到移动路径的垂直距离（2D 叉积标量）
+		var cross_z := move_dir.x * to_obs.y - move_dir.y * to_obs.x
+		var lateral_dist := absf(cross_z)
+		var total_radius := collision_radius + obs_r
+		if lateral_dist >= total_radius:
+			continue  # 障碍物在路径侧面之外，不会碰撞
+
+		# 确定避让方向：始终从障碍物同一侧绕过（叉积符号决定），减少抖动
+		var perp: Vector2
+		if cross_z >= 0:
+			# 障碍物偏右 → 向左偏转
+			perp = Vector2(move_dir.y, -move_dir.x)
+		else:
+			# 障碍物偏左 → 向右偏转
+			perp = Vector2(-move_dir.y, move_dir.x)
+
+		# 强度：横向越近越强 × 前方越近越强
+		var lateral_factor := 1.0 - lateral_dist / total_radius
+		var forward_factor := 1.0 - clampf(forward_dist / look_ahead, 0.0, 1.0)
+		steering += perp * (lateral_factor * forward_factor)
+
+	return steering
+
+
+## 计算与附近同层单位的分离转向向量。
+## 与静态障碍物避让不同，单位间分离力度更柔和，且投影到移动方向的切平面上，
+## 创造"侧滑绕过"效果而非"停下互推"。空中单位返回零向量。
+func _compute_unit_separation(move_dir: Vector2) -> Vector2:
+	if movement_type == "air":
+		return Vector2.ZERO
+
+	var margin := BattleConstants.px(SEPARATION_RADIUS_CELLS)
+	var steering := Vector2.ZERO
+	var all_entities := EntityRegistry.get_all_combatants()
+
+	for other in all_entities:
+		if other == self:
+			continue
+		if not is_instance_valid(other):
+			continue
+		if other.get("is_dead") == true:
+			continue
+		# 同层检查
+		var other_mt = other.get("movement_type")
+		if other_mt != movement_type:
+			continue
+		# 跳过静态障碍物（由 _compute_obstacle_avoidance 处理）
+		var other_mass = other.get("mass")
+		if other_mass != null and int(other_mass) <= 0:
+			continue
+
+		var to_other: Vector2 = other.position - position
+		var dist := to_other.length()
+		if dist < 0.01:
+			dist = 0.01
+			to_other = Vector2(1.0, 0.0)
+
+		var other_cr = other.get("collision_radius")
+		var other_cr_val: float = float(other_cr) if other_cr != null else 10.0
+		var trigger_range := collision_radius + other_cr_val + margin
+		if dist >= trigger_range:
+			continue
+
+		# 前方过滤：只对移动方向前方的单位产生分离（身后的不触发）
+		var forward_dist := move_dir.dot(to_other)
+		if forward_dist < -collision_radius:
+			continue
+
+		# 推力强度：越近越强
+		var strength := 1.0 - dist / trigger_range
+		steering += (-to_other / dist) * strength
+
+	if steering.length() < 0.01:
+		return Vector2.ZERO
+
+	# 限制最大强度
+	if steering.length() > 1.0:
+		steering = steering.normalized()
+
+	# 关键：投影到切平面（垂直于移动方向），保留少量径向分量
+	# 这样单位侧滑绕过同伴而非被推回原地
+	if move_dir.length() > 0.01:
+		var perp := Vector2(-move_dir.y, move_dir.x)
+		var tangential := perp * steering.dot(perp)
+		var radial := steering - tangential
+		steering = tangential + radial * 0.2
+
+	return steering * 0.5
+
+
+## 返回当前移动方向（归一化向量）。供 CollisionSystem 切向滑动推挤使用。
+## 非移动状态返回零向量。
+func get_move_direction() -> Vector2:
+	return _last_move_dir if _is_moving else Vector2.ZERO
 
 
 func _try_move_for_river_jump(target_pos: Vector2, delta: float) -> bool:

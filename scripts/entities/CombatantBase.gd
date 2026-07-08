@@ -126,6 +126,12 @@ func get_flip_h() -> bool:
 	return false
 
 
+## 返回当前移动方向（归一化向量）。基类返回零向量（非移动实体）。
+## CollisionSystem 用于切向滑动推挤优化。
+func get_move_direction() -> Vector2:
+	return Vector2.ZERO
+
+
 ## 按阵营设置血条样式：玩家浅蓝底+正蓝填充，敌方浅红底+正红填充。
 func _style_health_bar() -> void:
 	if health_bar == null:

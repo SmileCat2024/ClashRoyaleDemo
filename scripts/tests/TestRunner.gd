@@ -22,6 +22,8 @@ const SUITES := [
 	preload("res://scripts/tests/test_collision_system.gd"),
 	preload("res://scripts/tests/test_spell_system.gd"),
 	preload("res://scripts/tests/test_poison_spell.gd"),
+	preload("res://scripts/tests/test_obstacle_avoidance.gd"),
+	preload("res://scripts/tests/test_unit_separation.gd"),
 ]
 
 

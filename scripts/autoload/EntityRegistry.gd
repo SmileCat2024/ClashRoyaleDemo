@@ -57,6 +57,18 @@ func get_all() -> Array:
 	return all
 
 
+## 获取所有静态障碍物（mass=0 的活跃实体：塔、未来建筑）。供寻路避障使用。
+func get_static_obstacles() -> Array:
+	var obstacles: Array = []
+	for t in _entities_by_team:
+		for e in _entities_by_team[t]:
+			if is_instance_valid(e) and not e.is_dead:
+				var m = e.get("mass")
+				if m != null and int(m) <= 0:
+					obstacles.append(e)
+	return obstacles
+
+
 ## 获取所有活跃战斗实体（含友军和塔），供碰撞分离系统使用。
 func get_all_combatants() -> Array:
 	var all: Array = []
