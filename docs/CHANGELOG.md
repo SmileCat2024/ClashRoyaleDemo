@@ -1,5 +1,28 @@
 # CHANGELOG
 
+## [0.8.6] - 2026-07-08 — 通用单位影子系统
+
+### 新增
+- **UnitBase._draw()**：所有单位（地面 + 飞行）统一绘制半透明黑色椭圆影子，替代旧版仅飞行单位的小矩形影子
+  - 椭圆实现：`draw_set_transform` 将正圆 Y 轴压缩 `SHADOW_SQUASH`（0.35）变成扁平椭圆，绘制后复位 transform
+  - 渲染层级保证：`_draw()` 先于子节点（Body/HealthBar/SpriteAnimator）执行，影子是单位内部最底层
+  - 影子始终在地面位置（origin），不受 altitude 离地偏移影响
+  - 地面单位 alpha 0.28；飞行单位（altitude>0）alpha 0.18 更淡
+  - setup() 末尾新增 `queue_redraw()` 确保首次渲染
+- **DataRegistry unit_data**：所有 7 个单位新增 `shadow_size` 字段（格）
+  - knight 0.5 | hog_rider 0.55 | musketeer 0.5 | mini_pekka 0.45 | balloon 0.7 | archers 0.35 | giant 0.8
+  - 未配置时退化为 `collision_radius`
+
+### 变更
+- UnitBase._draw()：从仅 `altitude > 0` 时画矩形影子，改为所有单位画椭圆影子
+- UnitBase 新增常量 `SHADOW_SQUASH := 0.35` 和属性 `_shadow_radius`
+- 气球兵影子从 ~10px 宽矩形升级到 28px 宽椭圆（约 3 倍）
+
+### 设计说明
+- 影子用 `_draw()` 而非子节点实现，因为 `_draw()` 天然在子节点之前绘制，保证影子在 Body/Sprite 之下
+- `shadow_size` 单位是格，setup 时通过 `BattleConstants.px()` 转像素，遵循格系统规范
+- 跳河期间临时 altitude>0，影子自动变淡，落地恢复，无需额外代码
+
 ## [0.8.4] - 2026-07-08 — 卡牌卡面图片系统
 
 ### 新增

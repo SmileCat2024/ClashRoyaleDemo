@@ -28,6 +28,7 @@ var unit_data := {
 		"collision_radius": 0.5,
 		"hurt_radius": 0.5,
 		"mass": 6,
+		"shadow_size": 0.5,
 		"attacks": [
 			{
 				"name": "sword",
@@ -57,6 +58,7 @@ var unit_data := {
 		"collision_radius": 0.6,
 		"hurt_radius": 0.6,
 		"mass": 4,
+		"shadow_size": 0.55,
 		"attacks": [{
 			"name": "hammer_smash",
 			"targeting": "building_only",
@@ -102,6 +104,7 @@ var unit_data := {
 		"collision_radius": 0.5,
 		"hurt_radius": 0.5,
 		"mass": 5,
+		"shadow_size": 0.5,
 		"attacks": [{
 			"name": "musket_shot",
 			"targeting": "any",
@@ -130,6 +133,7 @@ var unit_data := {
 		"collision_radius": 0.45,
 		"hurt_radius": 0.45,
 		"mass": 4,
+		"shadow_size": 0.45,
 		"attacks": [{
 			"name": "blade_slash",
 			"targeting": "any",
@@ -157,6 +161,7 @@ var unit_data := {
 		"collision_radius": 0.3,
 		"hurt_radius": 0.3,
 		"mass": 6,
+		"shadow_size": 0.7,
 		"death_damage": 240,    # 死亡时范围伤害
 		"death_radius": 2.0,    # 死亡伤害半径（格）
 		"death_fuse_time": 3.0, # 死亡炸弹引信时间（秒）
@@ -209,6 +214,7 @@ var unit_data := {
 		"collision_radius": 0.35,
 		"hurt_radius": 0.35,
 		"mass": 3,
+		"shadow_size": 0.35,
 		"attacks": [{
 			"name": "bow_shot",
 			"targeting": "any",
@@ -268,6 +274,7 @@ var unit_data := {
 		"collision_radius": 0.7,
 		"hurt_radius": 0.7,
 		"mass": 10,
+		"shadow_size": 0.8,
 		"attacks": [{
 			"name": "fist_smash",
 			"targeting": "building_only",
