@@ -54,6 +54,7 @@ var _player_energy_max: int = 10
 @onready var next_icon_rect: TextureRect = $NextCardPanel/NextCardIcon
 @onready var elixir_bar: Control = $ElixirBar
 @onready var elixir_fill: ColorRect = $ElixirBar/ElixirFill
+@onready var elixir_pending: ColorRect = $ElixirBar/ElixirPending
 @onready var elixir_label: Label = $ElixirBar/ElixirLabel
 
 
@@ -82,6 +83,13 @@ func _ready() -> void:
 	# 定位圣水条
 	elixir_bar.position = Vector2(ELIXIR_X, ELIXIR_Y)
 	elixir_bar.size = Vector2(ELIXIR_W, ELIXIR_H)
+
+	# 初始化圣水条显示（start_battle 的 energy_changed 信号可能在 _ready 之前已发出）
+	_update_elixir_bar()
+
+
+func _process(_delta: float) -> void:
+	_update_elixir_pending()
 
 
 ## 手牌更新：刷新 4 张卡牌 + 预告牌 + 可负担状态
@@ -138,3 +146,12 @@ func _update_elixir_bar() -> void:
 	var ratio := float(_player_energy) / float(max(_player_energy_max, 1))
 	elixir_fill.size = Vector2(ELIXIR_W * ratio, ELIXIR_H)
 	elixir_label.text = "%d/%d" % [_player_energy, _player_energy_max]
+	_update_elixir_pending()
+
+## 更新正在积累的那一滴圣水的半透明填充
+func _update_elixir_pending() -> void:
+	var solid_w := ELIXIR_W * float(_player_energy) / float(max(_player_energy_max, 1))
+	var seg_w := ELIXIR_W / float(_player_energy_max)
+	var pending_w := seg_w * SignalBus.player_energy_progress
+	elixir_pending.position.x = solid_w
+	elixir_pending.size = Vector2(pending_w, ELIXIR_H)

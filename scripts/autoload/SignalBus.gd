@@ -38,6 +38,10 @@ signal selection_changed(hand_index: int)
 ## 某一方能量发生变化
 signal energy_changed(team: String, current: int, max_value: int)
 
+## 玩家圣水当前正在积累的那一滴的完成度（0.0 ~ 1.0）。
+## BattleManager 每帧更新，CardBar._process() 读取用于平滑过渡动画。
+var player_energy_progress: float = 0.0
+
 # ---- 实体相关 ----
 
 ## 一个单位被生成到战场上

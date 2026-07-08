@@ -136,6 +136,8 @@ func update_energy(delta: float) -> void:
 		if enemy_energy < max_energy:
 			enemy_energy += 1
 			SignalBus.energy_changed.emit("enemy", enemy_energy, max_energy)
+	# 更新当前正在积累的那一滴圣水的完成度（供 UI 平滑显示）
+	SignalBus.player_energy_progress = (energy_timer / energy_interval) if player_energy < max_energy else 0.0
 
 
 # ==============================================================================
