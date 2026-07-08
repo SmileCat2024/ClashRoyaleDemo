@@ -410,6 +410,26 @@ var card_data := {
 		"icon": "",
 		"description": "范围伤害法术，可对空对地。击退被命中的单位。",
 	},
+	"card_poison": {
+		"id": "card_poison",
+		"display_name": "毒药",
+		"cost": 4,
+		"card_type": "spell",
+		"spell_type": "poison",
+		"spell_radius": 3.5,       # 作用半径（格）
+		"spell_damage": 92,        # 单跳范围伤害（兼容即时伤害校验）
+		"tower_damage": 21,        # 兼容塔减伤校验
+		# DOT 专属
+		"duration": 8.0,           # 持续时间（秒）
+		"tick_interval": 1.0,      # 伤害间隔（秒），共 8 跳
+		"tick_damage": 92,         # 每跳对单位的伤害
+		"tick_tower_damage": 21,   # 每跳对皇家塔的伤害（总 168）
+		"slow_factor": 0.85,       # 减速 15%
+		"projectile_speed": 10.0,  # 飞行速度（格/秒）
+		"knockback": false,
+		"icon": "",
+		"description": "持续伤害法术，减速区域内敌方部队。8秒内每秒造成92伤害。",
+	},
 }
 
 # ==============================================================================
@@ -515,18 +535,17 @@ func get_building_data(building_id: String) -> Dictionary:
 
 
 ## 返回玩家默认卡组（8张牌 id）。
-## 目前有8种卡牌。
 func get_default_player_deck() -> Array:
 	return [
 		"card_knight", "card_musketeer", "card_mini_pekka",
 		"card_hog_rider", "card_balloon", "card_archers",
-		"card_giant", "card_fireball",
+		"card_fireball", "card_poison",
 	]
 
 
 ## 返回敌方 AI 的默认卡组（卡牌 id 列表）。
 func get_default_enemy_deck() -> Array:
-	return ["card_knight", "card_hog_rider", "card_musketeer", "card_mini_pekka", "card_archers", "card_fireball"]
+	return ["card_knight", "card_hog_rider", "card_musketeer", "card_mini_pekka", "card_archers", "card_fireball", "card_poison"]
 
 
 # ==============================================================================

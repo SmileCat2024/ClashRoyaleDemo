@@ -1,6 +1,7 @@
 # 文件名：SpellProjectile.gd
-# 作用：法术飞行物——从发射点沿抛物线弧飞向目标位置，落地后造成范围伤害 + 击退。
-#       与 ProjectileBase 的区别：目标是一个固定位置（不是追踪节点），有塔减伤、击退和爆炸视觉。
+# 作用：法术飞行物——从发射点沿抛物线弧飞向目标位置，落地后按 spell_type 分流：
+#       fireball（即时型）：范围伤害 + 击退 + 爆炸扩散圆视觉
+#       poison（DOT 型）：在目标位置创建 PoisonField 持续伤害区域
 #
 #       2.5D 实现：
 #         节点 position 在 World 本地游戏空间中线性移动（Y 方向被 World 的 Y_COMPRESS 压缩）。
@@ -12,13 +13,24 @@
 
 extends Node2D
 
+## 毒药区域场景（毒药法术落地时创建）
+const POISON_FIELD_SCENE := preload("res://scenes/effects/PoisonField.tscn")
+
 # ---- 法术参数（setup 时从 card_data 填充）----
-var _damage: int = 0              ## 对单位的伤害
+var _spell_type: String = "fireball"  ## 法术类型标识（决定落地行为）
+var _damage: int = 0              ## 对单位的伤害（即时法术）
 var _tower_damage: int = -1       ## 对塔的伤害（-1 = 无减伤，与 _damage 相同）
 var _radius: float = 0.0          ## 爆炸半径（像素）
 var _speed: float = 200.0         ## 飞行速度（像素/秒）
 var _knockback_distance: float = 0.0  ## 击退距离（像素，0 = 无击退）
 var team: String = "player"
+
+# ---- DOT 参数（毒药等持续伤害法术）----
+var _dot_duration: float = 0.0        ## 持续时间（秒）
+var _dot_interval: float = 0.0        ## 伤害间隔（秒）
+var _dot_tick_damage: int = 0         ## 每跳对单位的伤害
+var _dot_tick_tower_damage: int = -1  ## 每跳对塔的伤害
+var _slow_factor: float = 1.0         ## 减速乘数（1.0 = 无减速）
 
 # ---- 飞行状态 ----
 var _origin: Vector2 = Vector2.ZERO
@@ -55,6 +67,22 @@ func setup(origin: Vector2, target_pos: Vector2, spell_data: Dictionary, team_na
 	_radius = BattleConstants.px(float(spell_data.get("spell_radius", 0)))
 	_speed = BattleConstants.px(float(spell_data.get("projectile_speed", 10.0)))
 	_knockback_distance = BattleConstants.px(float(spell_data.get("knockback_distance", 0)))
+	_spell_type = spell_data.get("spell_type", "fireball")
+
+	# DOT 参数（毒药等持续伤害法术）
+	_dot_duration = float(spell_data.get("duration", 0.0))
+	_dot_interval = float(spell_data.get("tick_interval", 0.0))
+	_dot_tick_damage = int(spell_data.get("tick_damage", _damage))
+	var ttd = spell_data.get("tick_tower_damage", null)
+	_dot_tick_tower_damage = int(ttd) if ttd != null else -1
+	_slow_factor = float(spell_data.get("slow_factor", 1.0))
+
+	# 按法术类型设置飞行物颜色
+	match _spell_type:
+		"poison":
+			body_rect.color = Color(0.3, 0.85, 0.2)  # 绿球
+		_:
+			body_rect.color = Color(0.95, 0.25, 0.1)  # 红球（火球/默认）
 
 	_flight_dist = origin.distance_to(target_pos)
 	# 弧高随飞行距离自适应（格），上限 4 格
@@ -106,20 +134,36 @@ func _process_explode(delta: float) -> void:
 		queue_free()
 
 
-## 落地：范围伤害 + 击退 + 切换到爆炸视觉
+## 落地：根据法术类型分流
 func _on_impact() -> void:
-	_state = "exploding"
-	_explode_timer = 0.0
-	body_rect.visible = false
-
-	# 范围伤害（含塔减伤）
-	DamageSystem.deal_area_damage(_target, _radius, _damage, team, _tower_damage)
-
-	# 击退
-	if _knockback_distance > 0.0:
-		_apply_knockback()
-
 	SignalBus.projectile_hit.emit(_target, team)
+
+	match _spell_type:
+		"poison":
+			_create_poison_field()
+			queue_free()
+		_:
+			# 默认（火球）：即时范围伤害 + 击退 + 爆炸视觉
+			_state = "exploding"
+			_explode_timer = 0.0
+			body_rect.visible = false
+			DamageSystem.deal_area_damage(_target, _radius, _damage, team, _tower_damage)
+			if _knockback_distance > 0.0:
+				_apply_knockback()
+
+
+## 毒药落地：在目标位置创建持续伤害区域
+func _create_poison_field() -> void:
+	var field = POISON_FIELD_SCENE.instantiate()
+	# 导航到 EffectsRoot：self → ProjectilesRoot → World → EffectsRoot
+	var effects_root = get_parent().get_parent().get_node_or_null("EffectsRoot")
+	if effects_root == null:
+		push_error("[SpellProjectile] EffectsRoot not found, cannot create PoisonField")
+		field.queue_free()
+		return
+	effects_root.add_child(field)
+	field.setup(_target, _radius, _dot_tick_damage, _dot_tick_tower_damage,
+			team, _dot_duration, _dot_interval, _slow_factor)
 
 
 ## 对爆炸范围内所有敌方单位施加击退（塔免疫，由 knockback 内部判定）

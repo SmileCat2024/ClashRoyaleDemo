@@ -23,6 +23,8 @@ var movement_targeting: String = "any"     ## "any" | "building_only"
 # ---- 运行时 ----
 var _move_target = null    ## 当前移动目标（CombatantBase 或 null）
 var _is_moving: bool = false  ## 本帧是否在移动（供 SpriteAnimator 轮询）
+var _slow_factor: float = 1.0   ## 减速乘数（1.0=正常，0.85=减速15%）
+var _slow_timer: float = 0.0    ## 减速剩余时间（秒）
 var is_jumping_river: bool = false
 var _jump_start: Vector2 = Vector2.ZERO
 var _jump_end: Vector2 = Vector2.ZERO
@@ -35,6 +37,12 @@ var _debug_label_base_position: Vector2 = Vector2.ZERO
 const RIVER_JUMP_ARC_HEIGHT := 1.25
 const RIVER_JUMP_SPEED_MULTIPLIER := 1.25
 const RIVER_JUMP_BANK_OFFSET := 1.0
+
+## 影子椭圆纵向压缩比。把正圆按此值压扁成椭圆。
+const SHADOW_SQUASH := 0.35
+
+## 影子椭圆水平半径（px）。setup 时从 shadow_size（格）转换。0 = 不画影子。
+var _shadow_radius: float = 0.0
 
 
 ## 初始化单位属性。由 SpawnManager 在生成单位后调用。
@@ -61,6 +69,9 @@ func setup(unit_data: Dictionary, team_name: String) -> void:
 	collision_radius = BattleConstants.px(float(unit_data.get("collision_radius", 0.5)))
 	hurt_radius = BattleConstants.px(float(unit_data.get("hurt_radius", 0.5)))
 	mass = int(unit_data.get("mass", 5))
+
+	# 影子大小（格 → 像素）。未配置时退化为 collision_radius。
+	_shadow_radius = BattleConstants.px(float(unit_data.get("shadow_size", unit_data.get("collision_radius", 0.5))))
 
 	# 视觉设置：统一方块大小，颜色按阵营区分
 	var size: int = 16
@@ -99,19 +110,43 @@ func setup(unit_data: Dictionary, team_name: String) -> void:
 	print("[UnitBase] setup:", unit_id, team, "hp:", max_hp)
 
 
-## _draw()：飞行单位在地面位置绘制影子（位置 = 实体 origin，不受 altitude 偏移影响）
+## _draw()：在单位脚底（origin）绘制半透明黑色椭圆影子。
+## 影子始终在地面位置，不受 altitude 离地偏移影响。
+## _draw() 先于子节点（Body/HealthBar/Sprite）绘制，保证影子在最底层。
 func _draw() -> void:
 	if not initialized or is_dead:
 		return
-	if altitude > 0.0:
-		var sw := body_rect.size.x * 0.6
-		var sh := sw * 0.35
-		draw_rect(Rect2(-sw / 2.0, -sh / 2.0, sw, sh), Color(0, 0, 0, 0.25))
+	if _shadow_radius <= 0.0:
+		return
+	# 飞行单位影子更淡（离地越远越散）
+	var alpha := 0.18 if altitude > 0.0 else 0.28
+	# 用 Y 压缩把正圆变成扁平椭圆
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, SHADOW_SQUASH))
+	draw_circle(Vector2.ZERO, _shadow_radius, Color(0, 0, 0, alpha))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## 施加减速效果。多个减速取最强值，持续时间取最长。
+## factor: 移动速度乘数（如 0.85 = 减速 15%）
+## duration: 持续时间（秒）
+func apply_slow(factor: float, duration: float) -> void:
+	_slow_factor = minf(_slow_factor, factor)
+	_slow_timer = maxf(_slow_timer, duration)
+
+
+## 当前实际移动速度（基础速度 × 减速乘数）
+func _get_effective_move_speed() -> float:
+	return move_speed * _slow_factor
 
 
 func _process(delta: float) -> void:
 	if not initialized or is_dead:
 		return
+	# 减速计时器
+	if _slow_timer > 0.0:
+		_slow_timer -= delta
+		if _slow_timer <= 0.0:
+			_slow_factor = 1.0
 	_is_moving = false
 	if is_jumping_river:
 		_is_moving = true
@@ -152,7 +187,7 @@ func _move_towards_position(target_pos: Vector2, delta: float) -> void:
 	position = BattlePathing.advance_position(
 		position,
 		target_pos,
-		move_speed * delta,
+		_get_effective_move_speed() * delta,
 		movement_type
 	)
 
@@ -171,7 +206,7 @@ func _try_move_for_river_jump(target_pos: Vector2, delta: float) -> bool:
 	var jump_y := _get_jump_start_y(from_side)
 	var jump_start := Vector2(position.x, jump_y)
 	var to_start := jump_start - position
-	var max_distance := move_speed * delta
+	var max_distance := _get_effective_move_speed() * delta
 
 	if to_start.length() > BattlePathing.ARRIVAL_EPSILON:
 		if to_start.length() <= max_distance:
@@ -191,7 +226,7 @@ func _start_river_jump(from_side: int) -> void:
 	_jump_start = Vector2(position.x, start_y)
 	_jump_end = Vector2(position.x, end_y)
 	_jump_elapsed = 0.0
-	_jump_duration = max(0.15, _jump_start.distance_to(_jump_end) / max(move_speed * RIVER_JUMP_SPEED_MULTIPLIER, 1.0))
+	_jump_duration = max(0.15, _jump_start.distance_to(_jump_end) / max(_get_effective_move_speed() * RIVER_JUMP_SPEED_MULTIPLIER, 1.0))
 	position = _jump_start
 	is_jumping_river = true
 	movement_type = "air"
