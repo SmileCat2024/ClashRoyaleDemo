@@ -74,6 +74,15 @@
 - [x] **血条样式重做（0.8.2）**
   - 玩家方浅蓝底+正蓝填充，敌方浅红底+正红填充，fill 不盖住 border
   - 血条位置支持逐单位 health_bar_y 配置
+- [x] **碰撞分离系统（0.8.3）**
+  - CollisionSystem：同层（ground/air）圆形碰撞体分离，质量反比推挤
+  - 不可移动实体（mass=0 的塔）承担零修正
+  - 河道回弹 + 边界钳制
+  - CombatantBase 新增 collision_radius / hurt_radius / mass 属性，所有单位和塔已配置
+  - 射程公式修正：attack_range + collision_radius + target.hurt_radius
+  - DamageSystem / TargetingSystem 均已接入碰撞/受击半径
+- [x] **气球兵帧动画（0.8.3）**
+  - 单帧静态图（idle/walk 共用 balloon.png）
 
 ## 必须完成
 
@@ -107,12 +116,11 @@
 
 ## 已知问题
 
-1. **数据有 6 单位 6 卡**：knight、hog_rider、musketeer、mini_pekka、balloon、archers
-2. **帧动画系统仅 P1 骨架**：当前仅支持 idle/walk，无攻击/朝向/死亡/受击动画。仅弓箭手接入
-3. **单位可重叠**：没有物理碰撞，多个单位会叠在一起
-4. **无复杂寻路/碰撞**：桥与跳河已实现，但没有 A*、障碍绕行和单位碰撞挤压
-5. **无暂停**：战斗开始后无法暂停
-6. **altitude 离地高度仅视觉**：不影响索敌距离计算，飞行单位和地面单位仍按 2D 平面距离判定
-7. **弹道弧线 arc_height 数据未填入**：ProjectileBase 已支持 arc_height，但当前单位/塔数据中未设置此值（默认 0.0 = 直线飞行）
-8. **AttackComponent._fire_projectile 直接 instantiate**：未走 ProjectileManager 统一入口
-9. **DebugBattle.tscn 无 EffectManager**：该场景主要用于单位移动调试，死亡炸弹仅在 BattleScene 中生效
+1. **数据有 7 单位 7 卡**：knight、hog_rider、musketeer、mini_pekka、balloon、archers、giant
+2. **帧动画系统仅 P1 骨架**：当前仅支持 idle/walk，无攻击/朝向/死亡/受击动画。仅弓箭手接入移动帧、气球兵接入静态图
+3. **碰撞分离非物理引擎**：CollisionSystem 每帧迭代分离，无连续碰撞检测、无冲量/弹力/摩擦。大规模堆叠时可能有轻微抖动
+4. **无暂停**：战斗开始后无法暂停
+5. **altitude 离地高度仅视觉**：不影响索敌距离计算，飞行单位和地面单位仍按 2D 平面距离判定
+6. **弹道弧线 arc_height 数据未填入**：ProjectileBase 已支持 arc_height，但当前单位/塔数据中未设置此值（默认 0.0 = 直线飞行）
+7. **AttackComponent._fire_projectile 直接 instantiate**：未走 ProjectileManager 统一入口
+8. **DebugBattle.tscn 无 EffectManager**：该场景主要用于单位移动调试，死亡炸弹仅在 BattleScene 中生效

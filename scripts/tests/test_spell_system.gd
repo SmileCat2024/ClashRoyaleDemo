@@ -193,3 +193,61 @@ func test_knockback_zero_distance_noop() -> void:
 	unit.position = Vector2(100, 100)
 	unit.knockback(Vector2(1, 0), 0.0)
 	assert_eq(unit.position, Vector2(100, 100), "零距离击退不应移动")
+
+
+# ============================================================
+#  万箭齐发卡牌数据校验
+# ============================================================
+
+func test_arrows_card_exists() -> void:
+	var card := DataRegistry.get_card_data("card_arrows")
+	assert_eq(card.get("id", ""), "card_arrows", "万箭齐发卡牌应存在")
+
+
+func test_arrows_cost() -> void:
+	var card := DataRegistry.get_card_data("card_arrows")
+	assert_eq(int(card.get("cost", 0)), 3, "万箭齐发消耗应为3")
+
+
+func test_arrows_spell_type() -> void:
+	var card := DataRegistry.get_card_data("card_arrows")
+	assert_eq(card.get("spell_type", ""), "arrows", "spell_type应为arrows")
+
+
+func test_arrows_damage_values() -> void:
+	var card := DataRegistry.get_card_data("card_arrows")
+	assert_eq(int(card.get("spell_damage", 0)), 122, "单波单位伤害应为122")
+	assert_eq(int(card.get("tower_damage", 0)), 25, "单波塔伤害应为25")
+
+
+func test_arrows_waves() -> void:
+	var card := DataRegistry.get_card_data("card_arrows")
+	assert_eq(int(card.get("spell_waves", 0)), 3, "应有3波")
+	# 总伤害
+	assert_eq(int(card.get("spell_damage", 0)) * int(card.get("spell_waves", 0)), 366, "总单位伤害应为366")
+	assert_eq(int(card.get("tower_damage", 0)) * int(card.get("spell_waves", 0)), 75, "总塔伤害应为75")
+
+
+func test_arrows_radius() -> void:
+	var card := DataRegistry.get_card_data("card_arrows")
+	assert_eq(float(card.get("spell_radius", 0)), 3.5, "作用半径应为3.5格")
+
+
+func test_arrows_speed() -> void:
+	var card := DataRegistry.get_card_data("card_arrows")
+	assert_approx(float(card.get("projectile_speed", 0)), 18.33, 0.01, "飞行速度应≈18.33格/秒")
+
+
+func test_arrows_no_knockback() -> void:
+	var card := DataRegistry.get_card_data("card_arrows")
+	assert_false(bool(card.get("knockback", true)), "万箭齐发不应有击退")
+
+
+func test_arrows_in_player_deck() -> void:
+	var deck := DataRegistry.get_default_player_deck()
+	assert_true(deck.has("card_arrows"), "玩家卡组应包含万箭齐发")
+
+
+func test_arrows_in_enemy_deck() -> void:
+	var deck := DataRegistry.get_default_enemy_deck()
+	assert_true(deck.has("card_arrows"), "敌方卡组应包含万箭齐发")

@@ -47,7 +47,7 @@
 ### 明确不做
 
 - 联网/回放/确定性同步
-- 单位碰撞挤压（接受重叠）
+- ~~单位碰撞挤压（接受重叠）~~ ✅ 已实现（0.8.3：CollisionSystem 碰撞分离，非物理引擎方案）
 - 卡牌养成/商店
 - 精确数值复刻
 
@@ -92,6 +92,9 @@
 │                                                              │
 │  BattlefieldEffect (Node2D) 战场效果基类（生命周期+_on_expire） │
 │  └── DelayedDamageEffect   延迟范围伤害炸弹（引信→爆炸）       │
+│                                                              │
+│  CollisionSystem     碰撞分离（0.8.3+，静态工具，BattleManager  │
+│                      _process() 末尾调用）                    │
 └─────────────────────────────────────────────────────────────┘
                            │
 ┌─────────────────────────────────────────────────────────────┐
@@ -199,6 +202,9 @@ var is_ai: bool = false
     "can_jump_river": false,        # 可选。true=地面单位可跳河（当前仅野猪骑士）
     "sight_range": 120.0,           # 视野范围（发现敌人的距离）
     "movement_targeting": "any",    # "any" | "building_only"
+    "collision_radius": 0.5,        # 碰撞体半径（格，setup 后转像素）。碰撞分离 + 射程扩展用
+    "hurt_radius": 0.5,             # 受击半径（格）。法术/溅射/投射物命中判定
+    "mass": 6,                      # 碰撞质量。越大被推得越少，0=不可移动（塔）
     "attacks": [{
         "name": "sword_slash",
         "targeting": "any",         # "any" | "building_only"
@@ -228,6 +234,9 @@ var is_ai: bool = false
     "tower_type": "guard",
     "max_hp": 1400,
     "shield": 0,
+    "collision_radius": 1.5,        # 碰撞体半径（格）。塔内切圆半径 = 占地格数 / 2
+    "hurt_radius": 1.5,             # 受击半径（格）
+    "mass": 0,                      # 塔不可移动，碰撞时承担零修正
     "attacks": [{
         "name": "arrow_shot",
         "targeting": "any",
@@ -340,6 +349,52 @@ func _process(delta):
 当前只有 `hog_rider` 配置 `can_jump_river = true`。后续单位复用该能力，只需要在 `unit_data` 增加同名字段；如果单位已经在桥线上跨河，会正常走桥，不进入跳跃状态。
 
 **不用 NavigationRegion2D**：地图只有两桥和一种跳河能力，条件判断足够，更可控更省性能。
+
+### 6.4.1 碰撞分离系统（0.8.3，已实现）
+
+**CollisionSystem**（`scripts/systems/CollisionSystem.gd`）在 `BattleManager._process()` 末尾调用，所有单位移动完毕后统一解析碰撞。
+
+**不是物理引擎**：无刚体、无冲量、无摩擦、无连续碰撞检测。每帧做迭代位置分离（位置修正），让重叠的实体互推开。
+
+#### 核心流程
+
+```
+resolve_overlaps(entities)
+  ├─ ×3 迭代: _resolve_one_pass()
+  │    └─ 两两检查 _resolve_pair(a, b):
+  │         ├─ 分层检查：ground↔ground, air↔air（跳河临时 air 的单位参与空中层）
+  │         ├─ 重叠判定：dist < collision_radius_a + collision_radius_b
+  │         └─ 质量反比分配：
+  │              overlap × (1/mass_a) / (1/mass_a + 1/mass_b)  → a 被推
+  │              overlap × (1/mass_b) / (1/mass_a + 1/mass_b)  → b 被推
+  │              mass=0 的实体不移动（塔），可移动方承担全部修正
+  └─ _post_process(): 河道回弹 + 边界钳制
+```
+
+#### 关键设计决策
+
+- **同层分离**：ground 和 air 互不碰撞（飞行单位从地面单位头顶飞过）
+- **质量反比**：骑士 mass=6 推得少，弓箭手 mass=3 推得多。近似皇室战争中重单位推轻单位的效果
+- **不可移动实体（mass=0）**：塔不参与位移修正。单位撞塔时全部被推开，塔纹丝不动
+- **迭代 3 次**：多体堆叠时单次分离可能引入新的重叠，多次迭代消除残留
+- **河道回弹**：分离后处理检查是否有地面单位被推入非桥河道，拉回最近岸（留白 1px）
+- **边界钳制**：所有实体 clamp 到 `[collision_radius, ARENA_WIDTH/HEIGHT - collision_radius]`
+- **同位置回退**：两个实体完全重叠时 `dist≈0`，方向向量退化。用 x 坐标比较确定确定性分离方向
+
+#### 射程公式变更
+
+碰撞系统引入后，攻击/索敌/范围伤害的距离判定统一扩展：
+
+```
+有效触及距离 = attack_range + attacker.collision_radius + target.hurt_radius
+```
+
+- **AttackComponent**：锁定判定和开火判定用此公式
+- **UnitBase**：推塔停步距离用此公式
+- **TargetingSystem**：索敌距离排序考虑双方碰撞半径
+- **DamageSystem**：范围伤害命中判定 = `spell_radius + target.hurt_radius >= distance`
+
+`hurt_radius` 与 `collision_radius` 分开：可以单独调节法术蹭塔、建筑受击等细节，而不影响碰撞体大小。
 
 ### 6.5 2.5D 渲染系统（已实现）
 
@@ -731,13 +786,13 @@ DataRegistry._ready() 时自动运行 `_validate_all_data()`：
 3. **溅射无衰减**：范围内全额伤害
 4. **数据用字典硬编码**：未用 Godot Resource (.tres)
 5. **无对象池**：飞行物每次 instantiate + queue_free
-6. **无物理碰撞分离**：单位可重叠
+6. **碰撞分离非物理引擎**：CollisionSystem 每帧迭代位置分离，无连续碰撞检测、无冲量/弹力/摩擦。大规模堆叠时可能有轻微抖动
 7. **法术用延迟伤害而非真实弹道**（P0/P1）：P2 才加弧线弹道
 8. **多攻击 P2 才做**：P0 只读 attacks[0]，创建一个 AttackComponent
 9. **altitude 离地高度仅视觉**：不影响逻辑，飞行单位和地面单位在索敌时仍按 2D 距离计算
 10. **死亡炸弹爆炸无独立动画**：引信期间有脉冲指示圈，但到期瞬间 queue_free，无爆炸闪帧
 11. **DebugBattle.tscn 无 EffectManager**：该场景主要用于单位移动调试，死亡炸弹仅在 BattleScene 中生效
-12. **帧动画系统仅 P1 骨架**：仅支持 idle/walk 状态轮询，无攻击/朝向/死亡/受击动画。仅弓箭手接入移动帧
+12. **帧动画系统仅 P1 骨架**：仅支持 idle/walk 状态轮询，无攻击/朝向/死亡/受击动画。仅弓箭手接入移动帧、气球兵接入静态图
 
 ---
 

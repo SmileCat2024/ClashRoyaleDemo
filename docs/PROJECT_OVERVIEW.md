@@ -2,135 +2,137 @@
 
 ## 项目简介
 
-**Pixel Lane Battle**（像素双线对战）是一个 2D 像素风卡牌塔防对战游戏原型，用于课程作业。
+**Pixel Lane Battle**（像素双线对战）是一个 2.5D 像素风卡牌塔防对战游戏（类皇室战争），用于课程作业。
 
-核心玩法：玩家和敌人分别位于战场两端，各有 3 座塔。玩家通过消耗能量在己方半场召唤单位，单位自动向敌方移动并攻击。摧毁对方主塔即获胜。
+核心玩法：玩家和敌人分别位于战场两端，各有 3 座塔（2 公主塔 + 1 国王塔）。通过消耗圣水召唤单位，单位自动行进、索敌、攻击。摧毁对方国王塔即获胜。
 
 ## 如何运行
 
-### 方法一：用 Godot 编辑器运行（推荐）
+### 用 Godot 编辑器运行（推荐）
 
-1. 打开 **Godot 4.7**（或 4.x 版本）。
-2. 选择"导入"，找到项目根目录下的 `project.godot` 文件。
-3. 导入后，点击右上角的 **▶ 运行** 按钮。
-4. 游戏将启动并显示主菜单。
+1. 打开 **Godot 4.7**
+2. 选择"导入"，找到项目根目录下的 `project.godot` 文件
+3. 导入后，点击右上角的 **▶ 运行** 按钮
 
-### 方法二：命令行运行
+### 运行测试
 
 ```bash
-# 假设 Godot 可执行文件在 PATH 中
-godot --path ./
+# 命令行 headless 模式
+cd clash-royale
+"<Godot路径>/Godot_v4.7-stable_win64_console.exe" --headless res://scenes/test/TestRunner.tscn
 ```
+
+退出码 0 = 全部通过，1 = 有失败。当前有 13 个测试套件覆盖格系统、寻路、索敌、伤害、卡组、数据配置、攻击锁定、跳河、塔攻击、死亡炸弹、国王塔激活和碰撞分离。
 
 ### 运行后应该看到什么
 
-1. **主菜单**：标题 "Pixel Lane Battle"，"开始战斗" 和 "退出游戏" 按钮。
-2. 点击"开始战斗" → 进入 **战斗场景**。
+1. **主菜单**：标题 "Pixel Lane Battle"，"开始战斗" 和 "退出游戏" 按钮
+2. 点击"开始战斗" → 进入 **战斗场景**（BattleScene）
 3. 战斗场景中可以看到：
-   - 深色战场背景
-   - 上方红色半透明区域（敌方部署区）
-   - 下方蓝色半透明区域（玩家部署区）
-   - 中央灰色分界线
+   - 地图底板 + Y 轴透视压缩的 2.5D 战场
+   - 河道分隔上下两方，左右各一座桥
    - **6 座塔**（蓝色=玩家方，红色=敌方方），各有血条
-   - 顶部显示时间、能量、敌方能量
-   - 底部显示场上单位数量
-4. **敌方 AI 会自动出牌**：等待几秒后会看到红色方块（敌方单位）出现并向下移动。
-5. 按 **K** 在鼠标位置生成一个玩家单位（蓝色方块），它会自动向上移动攻击敌方。
-6. 按 **E** / **W** 给玩家/敌方加能量。
-7. 按 **R** 重开战斗。
+   - 底部 **4 张手牌 + 1 张预告牌**（圣水条在左侧）
+   - 顶部显示战斗时间
+4. **敌方 AI 自动出牌**，双方单位自动行进、过桥、索敌、攻击
+5. **玩家操作**：点击卡牌选中 | 左键点击战场部署 | 右键取消 | 1-4 键也可选牌 | G/H 加玩家/敌方能量（调试）| R 重开
+6. 摧毁对方国王塔即获胜，或时间到按塔数/血量判定
 
 ## 目录结构
 
 ```
 res://
-  scenes/                    ← 场景文件（.tscn）
-    main/
-      MainMenu.tscn          ← 主菜单
-    battle/
-      Arena.tscn             ← 战场背景
-      BattleScene.tscn       ← 战斗主场景（组装所有东西）
-    ui/
-      BattleHUD.tscn         ← 战斗界面（HUD）
+  scenes/
+    main/             MainMenu.tscn
+    battle/           Arena.tscn, BattleScene.tscn
+    debug/            DebugBattle.tscn
+    ui/               BattleHUD.tscn, CardBar.tscn, CardSlot.tscn
     entities/
-      units/
-        UnitBase.tscn        ← 单位基础场景
-        MeleeUnit.tscn       ← 近战兵（继承 UnitBase）
-        RangedUnit.tscn      ← 远程兵
-        TankUnit.tscn        ← 重甲兵
-      towers/
-        TowerBase.tscn       ← 塔基础场景
-        KingTower.tscn       ← 主塔（继承 TowerBase）
-        GuardTower.tscn      ← 防御塔
-
-  scripts/                   ← 脚本文件（.gd）
-    autoload/                ← 全局单例（自动加载）
-      Game.gd                ← 游戏状态管理
-      SceneLoader.gd         ← 场景切换
-      DataRegistry.gd        ← 数据中心（单位/卡牌/塔属性）
-      SignalBus.gd           ← 全局信号总线
-    battle/                  ← 战斗逻辑
-      BattleManager.gd       ← 战斗总指挥
-      Arena.gd               ← 战场/部署区域
-      SpawnManager.gd        ← 单位生成器
-      TargetingSystem.gd     ← 目标选择工具
-      SimpleEnemyAI.gd       ← 敌方 AI
-      BattleConstants.gd     ← 常量定义
-    entities/                ← 实体行为
-      UnitBase.gd            ← 单位行为（移动/攻击/死亡）
-      TowerBase.gd           ← 塔行为（寻敌/攻击/死亡）
-    main/
-      MainMenu.gd            ← 主菜单逻辑
-    ui/
-      BattleHUD.gd           ← 战斗 HUD 逻辑
-
-  docs/                      ← 文档
-  project.godot              ← Godot 项目配置
+      units/          UnitBase.tscn（唯一通用单位场景）
+      towers/         TowerBase.tscn → KingTower / GuardTower (场景继承)
+      Projectile.tscn
+    test/             TestRunner.tscn
+  scripts/
+    autoload/         Game, SceneLoader, DataRegistry, SignalBus, EntityRegistry, SpriteRegistry
+    battle/           BattleManager, SpawnManager, ProjectileManager, EffectManager, SimpleEnemyAI,
+                      DeployPreview, Arena, BattleConstants, TargetingSystem, BattlePathing
+    entities/         CombatantBase, UnitBase, TowerBase, ProjectileBase
+    effects/          BattlefieldEffect, DelayedDamageEffect
+    components/       AttackComponent, SpriteAnimator
+    systems/          DamageSystem, CollisionSystem
+    debug/            DebugBattle
+    main/             MainMenu
+    ui/               BattleHUD, CardBar, CardSlot
+    tests/            TestBase, TestRunner, MockCombatant, test_*.gd（13 个测试套件）
+  assets/
+    sprites/          序列帧 PNG（按单位 ID 分目录，如 archers/、balloon/）
+  docs/               SYSTEM_DESIGN, ARCHITECTURE, PROJECT_OVERVIEW, TODO, CHANGELOG
+  project.godot
 ```
-
-## 关键概念速查
-
-| 概念 | 说明 |
-|------|------|
-| **Autoload** | 全局单例脚本，在任何场景中都能直接用名字访问。本项目有 4 个：Game、SceneLoader、DataRegistry、SignalBus |
-| **Scene（.tscn）** | 可复用的节点组合，类似"预制体"。可以嵌套实例化 |
-| **Script（.gd）** | GDScript 脚本，挂在节点上添加行为 |
-| **Signal（信号）** | 事件通知机制。发出方 `emit`，接收方 `connect` |
-| **@onready** | 节点就绪时自动获取子节点引用的特殊注解 |
-| **class_name** | 给脚本注册全局类型名，其他脚本可以直接用名字引用 |
 
 ## 当前已完成的功能
 
-- [x] 主菜单（标题 + 开始/退出按钮）
-- [x] 场景切换（主菜单 ↔ 战斗场景）
-- [x] 战场背景（部署区域、中央线、路线标记）
-- [x] 6 座塔（玩家方 3 座 + 敌方方 3 座），带血条
-- [x] 塔的攻击行为（自动攻击范围内的敌方单位）
-- [x] 单位系统（近战兵/远程兵/重甲兵）
-- [x] 单位移动、寻敌、攻击、死亡
-- [x] 能量系统（每秒自动恢复）
+### 核心
+- [x] 主菜单 + 场景切换（主菜单 ↔ 战斗场景）
+- [x] 战场背景（部署区域、河道、桥梁、中央线、路线标记）
+- [x] 6 座塔（玩家方 3 + 敌方 3），带血条
+- [x] 国王塔激活机制（受击/公主塔被毁后激活）
+- [x] 单位系统（6 种单位共用一个场景，数据驱动）
+- [x] 单位移动、过桥寻路、跳河（野猪骑士）
+- [x] 索敌+攻击系统（AttackComponent + DamageSystem）
+- [x] 投射物系统（projectile + 弹道）
+- [x] 圣水系统 + 圣水条 UI
+- [x] 卡牌 UI（点击选牌→点击部署，能量不足变暗禁用）
+- [x] 卡组轮转（8 牌循环：4 手牌 + 1 预告 + 3 队列）
+- [x] 部署位置预览（半透明圆 + 多单位精确落点）
 - [x] 敌方 AI（自动出牌）
-- [x] 胜负判定（主塔被摧毁时结束）
-- [x] 调试快捷键（E/W/K/R）
-- [x] 战斗 HUD（时间、能量、单位数量显示）
+- [x] 胜负判定（国王塔摧毁 + 时间限制 + 加时赛 + 三级判定）
+- [x] 死亡延迟伤害（气球兵死亡炸弹：引信 + 脉冲指示 + 范围伤害）
+
+### 渲染与视觉
+- [x] 2.5D 渲染（Y_COMPRESS 透视压缩 + altitude 离地高度 + 飞行单位影子）
+- [x] y_sort 深度排序
+- [x] 弹道弧线（ProjectileBase arc_height sin 抛物线，数据未启用）
+- [x] 帧动画系统 P1（SpriteAnimator + SpriteRegistry，数据驱动序列帧动画）
+- [x] 弓箭手移动帧动画 + 气球兵静态图
+- [x] 血条样式重做（玩家方蓝/敌方红，统一 _style_health_bar）
+
+### 物理
+- [x] 碰撞分离系统（CollisionSystem：同层分离 + 质量反比推挤 + 河道回弹 + 边界钳制）
+- [x] 射程/索敌/范围伤害公式接入碰撞半径
+
+### 测试
+- [x] 13 个测试套件（格系统、寻路、索敌、伤害、卡组、数据配置、攻击锁定、跳河、塔攻击、死亡炸弹、国王塔激活、碰撞分离）
+
+### 调试
+- [x] 调试快捷键（G/H 加能量、K 生成骑士、D 打印状态、R 重开、1-4 选牌）
 
 ## 当前缺少的功能
 
-- [ ] 卡牌 UI（底部卡牌栏，点击选择卡牌部署单位）
-- [ ] 投射物系统（目前攻击是直接扣血）
-- [ ] 调试面板（Tab 切换的详细面板）
-- [ ] 完整卡组轮换机制
+- [ ] 法术卡系统（SpellManager + 火球/电击/箭雨）
+- [ ] 帧动画 P2（攻击动画 + 朝向系统 front/back + flip_h）
+- [ ] 暂停功能
+- [ ] 调试面板（DebugPanel）
+- [ ] 更多单位帧动画接入（等待美术素材）
 - [ ] 音效和粒子特效
 
 ## 已知问题
 
-1. **没有卡牌 UI**：目前玩家无法通过正常方式部署单位，只能用 K 在鼠标位置生成单位。
-2. **攻击是瞬时扣血**：没有投射物动画，远程兵的攻击看起来和近战兵一样。
-3. **单位可能重叠**：没有物理碰撞，多个单位会叠在一起。
+1. **数据有 7 单位 7 卡**：knight、hog_rider、musketeer、mini_pekka、balloon、archers、giant
+2. **帧动画系统仅 P1 骨架**：当前仅支持 idle/walk，无攻击/朝向/死亡/受击动画
+3. **碰撞分离非物理引擎**：每帧迭代分离，无连续碰撞检测、无冲量/弹力/摩擦
+4. **无暂停**：战斗开始后无法暂停
+5. **altitude 离地高度仅视觉**：不影响索敌距离计算
+6. **弹道弧线 arc_height 数据未填入**：ProjectileBase 已支持，但当前数据中默认 0.0
 
-## 下一步最重要的 5 件事
+## 技术栈
 
-1. 添加卡牌 UI（CardBar + CardSlot），让玩家能选择卡牌部署单位
-2. 添加调试面板，方便课程演示
-3. 优化单位外观（区分不同单位类型）
-4. 添加投射物系统
-5. 添加更多卡牌和单位类型
+| 项目 | 值 |
+|------|-----|
+| 引擎 | Godot 4.7 (Forward+) |
+| 脚本语言 | GDScript（无 C# / GDExtension） |
+| 逻辑分辨率 | 440 × 780 |
+| 窗口分辨率 | 880 × 1560 |
+| 2.5D 透视 | Y_COMPRESS = 0.7863 |
+| 纹理过滤 | Nearest（像素风） |
+| 主场景 | `res://scenes/battle/BattleScene.tscn` |
