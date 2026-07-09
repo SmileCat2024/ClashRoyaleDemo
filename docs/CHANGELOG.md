@@ -1,5 +1,52 @@
 # CHANGELOG
 
+## [0.13.1] - 2026-07-09 — 修复同向友军碰撞左右震荡
+
+### 修复
+- **碰撞切向滑动对同向友军产生交叉震荡**：两个同方单位并排同向前进、略有重叠时，旧逻辑会沿连线切向把两单位一前一后错开，下一帧连线方向翻号、切向选择反转，形成画面上"左右闪"的震荡。
+  - 根因：切向滑动（`TANGENTIAL_SLIDE`）对"两个同向同速移动"的友军施加了反向切向推力。同向友军只需径向分离保持间距，无需互相绕过；施加反向切向推力反而制造交叉。
+  - 修复：`CollisionSystem._resolve_pair()` 新增同向判定（双方移动方向点积 > `SAME_DIRECTION_DOT=0.5`，即夹角 < 60°）时跳过切向滑动，仅做纯径向分离。一方静止 / 双方异向时保留原侧滑绕过功能。
+
+### 测试
+- test_collision_system.gd：新增同向震荡回归测试（同向不产生切向位移）+ 切向滑动对照测试（一方移动一方静止仍生效）
+- MockCombatant.gd：新增 `set_move_direction()` / `get_move_direction()`，供碰撞系统切向滑动测试模拟移动方向
+
+### 涉及文件
+- 修改：`scripts/systems/CollisionSystem.gd`、`scripts/tests/MockCombatant.gd`、`scripts/tests/test_collision_system.gd`
+
+## [0.13.0] - 2026-07-09 — 王子/迫击炮/重甲亡灵三卡完善 + 冲锋机制 + 迫击炮高抛盲区炮弹
+
+### 新增
+- **王子冲锋机制**：UnitBase 新增数据驱动的冲锋状态机
+  - 持续移动累计距离达到阈值（2.5格）后进入冲锋，移速翻倍（1.0→2.0格/秒），命中伤害变为 charge_damage（783）
+  - 攻击命中或受到伤害时退出冲锋并重置累计距离
+  - 配置字段：unit_data.`charge` = { min_charge_distance, charge_move_speed, charge_damage }
+- **迫击炮盲区（min_attack_range）**：AttackComponent 新增最小射程字段
+  - TargetingSystem.find_best_target 新增 p_min_range 参数，索敌时排除盲区内目标
+  - AttackComponent 索敌锁定与出手判定均检查盲区，盲区内待命不攻击
+- **迫击炮高抛炮弹（MortarShell）**：新建高抛溅射飞行物
+  - MortarShell.gd（继承 ProjectileBase）：圆形石块（半径8px+高光）+ sin 抛物线弧高（随距离自适应，最大射程处7格/近处~2格）+ 椭圆地面影子 + 落地尘土爆炸扩散圆
+  - ProjectileManager 新增 spawn_mortar_shell()；spawn_projectile() 新增 arc_height_grids 参数
+  - AttackComponent._fire_projectile 按 trajectory=ballistic 分流发射炮弹；impact_type=splash 走非锁定溅射
+- **新单位/卡牌数据完善**：
+  - 王子：HP1920 / 伤害391（冲锋783）/ 射程1.6格 / 中速（1.0格/秒）/ 5费
+  - 迫击炮：HP1369 / 范围266 / 射程3.5-11.5格盲区 / 间隔5s / 范围2格 / 4费 / 建筑(mass=0)
+  - 重甲亡灵：HP837 / 伤害312 / 射程1.6格 / 中速 / 对空对地 / 3费 / 飞行
+
+### 变更
+- AttackComponent 新增字段：min_attack_range / trajectory / impact_type / impact_radius / arc_height
+- AttackComponent._execute_attack 支持冲锋伤害覆盖（读取 owner.is_charging + charge_damage，命中后调 _end_charge）
+- TargetingSystem.find_best_target 签名新增可选参数 p_min_range（默认0，向后兼容）
+- UnitBase 冲锋机制：攻击命中后退出冲锋（不受伤害打断，确保突进不被远程塔射停）
+
+### 测试
+- test_targeting_system.gd：新增盲区过滤测试（排除近处目标/全盲区返回null/无盲区保持默认）
+- test_data_registry.gd：新增王子 charge 配置校验 + 迫击炮 min_attack_range 校验
+
+### 涉及文件
+- 修改：`DataRegistry.gd`、`AttackComponent.gd`、`TargetingSystem.gd`、`UnitBase.gd`、`ProjectileManager.gd`、`docs/兵种数据.md`、`test_targeting_system.gd`、`test_data_registry.gd`
+- 新增：`scripts/entities/MortarShell.gd`、`scenes/entities/MortarShell.tscn`
+
 ## [0.12.0] - 2026-07-09 — 野猪骑士攻击动画 + 移动美术更新
 
 ### 新增

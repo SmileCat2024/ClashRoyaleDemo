@@ -74,7 +74,8 @@ static func find_best_target(
 	p_attack_ground: bool,
 	p_attack_air: bool,
 	mover_movement_type: String = "ground",
-	mover_can_jump_river: bool = false
+	mover_can_jump_river: bool = false,
+	p_min_range: float = 0.0
 ) -> Node2D:
 	var enemies = EntityRegistry.get_enemies_of(self_team)
 	var nearest: Node2D = null
@@ -109,6 +110,9 @@ static func find_best_target(
 			mover_movement_type,
 			mover_can_jump_river
 		)
+		# 盲区过滤（如迫击炮最小射程）：目标中心在盲区内直接跳过
+		if p_min_range > 0.0 and d < p_min_range:
+			continue
 		# 碰撞半径偏移：大目标的边缘比中心更早进入索敌范围
 		var cr = e.get("collision_radius")
 		if cr != null:

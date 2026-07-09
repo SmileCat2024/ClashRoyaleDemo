@@ -25,6 +25,13 @@ var _move_target = null    ## 当前移动目标（CombatantBase 或 null）
 var _is_moving: bool = false  ## 本帧是否在移动（供 SpriteAnimator 轮询）
 var _last_move_dir: Vector2 = Vector2.ZERO  ## 上一帧实际移动方向（供 CollisionSystem 切向滑动）
 var is_jumping_river: bool = false
+# ---- 冲锋（王子专属，数据驱动；无 charge 配置时 _charge_enabled=false）----
+var is_charging: bool = false           ## 是否处于冲锋状态（AttackComponent 命中时读取此标记 + charge_damage）
+var charge_damage: int = 0              ## 冲锋命中伤害（AttackComponent 命中时使用）
+var _charge_enabled: bool = false
+var _charge_min_distance: float = 0.0   ## 进入冲锋所需持续移动距离（像素）
+var _charge_move_speed: float = 0.0     ## 冲锋移速（像素/秒）
+var _charge_distance_accum: float = 0.0 ## 当前持续移动累计距离（像素）
 var _jump_start: Vector2 = Vector2.ZERO
 var _jump_end: Vector2 = Vector2.ZERO
 var _jump_elapsed: float = 0.0
@@ -60,6 +67,14 @@ func setup(unit_data: Dictionary, team_name: String) -> void:
 
 	# 初始化战斗属性（基类方法）
 	_init_combat_stats(unit_data)
+
+	# 冲锋机制配置（王子专属，无 charge 字段则禁用）
+	var charge_cfg: Dictionary = unit_data.get("charge", {})
+	_charge_enabled = not charge_cfg.is_empty()
+	if _charge_enabled:
+		_charge_min_distance = BattleConstants.px(float(charge_cfg.get("min_charge_distance", 2.5)))
+		_charge_move_speed = BattleConstants.px(float(charge_cfg.get("charge_move_speed", 2.0)))
+		charge_damage = int(charge_cfg.get("charge_damage", 0))
 
 	# 死亡范围伤害配置（如气球兵的死亡掉落）
 	death_damage = int(unit_data.get("death_damage", 0))
@@ -137,14 +152,38 @@ func apply_slow(factor: float, duration: float) -> void:
 	apply_status_effect(effect)
 
 
-## 当前实际移动速度（基础速度 × 状态效果乘数）
+## 当前实际移动速度（冲锋态用 charge_move_speed，否则基础速度；再 × 状态效果乘数）
 func _get_effective_move_speed() -> float:
-	return move_speed * get_move_speed_mult()
+	var base := _charge_move_speed if is_charging else move_speed
+	return base * get_move_speed_mult()
+
+
+## 累计持续移动距离，达到阈值后进入冲锋状态（王子专属）。
+func _accumulate_charge(moved: float) -> void:
+	if not _charge_enabled or is_charging:
+		return
+	_charge_distance_accum += moved
+	if _charge_distance_accum >= _charge_min_distance:
+		is_charging = true
+		queue_redraw()
+
+
+## 退出冲锋状态并重置累计距离。
+## 由 AttackComponent._execute_attack（命中后）和 take_damage（受伤打断）调用。
+func _end_charge() -> void:
+	if not _charge_enabled:
+		return
+	is_charging = false
+	_charge_distance_accum = 0.0
+	queue_redraw()
 
 
 func _process(delta: float) -> void:
 	if not initialized or is_dead:
 		return
+	# 冲锋累计：上一帧未持续移动则清零（已进入冲锋态的等攻击命中退出）
+	if _charge_enabled and not _is_moving:
+		_charge_distance_accum = 0.0
 	_process_status_effects(delta)
 	_is_moving = false
 	if is_jumping_river:
@@ -203,6 +242,7 @@ func _move_towards_position(target_pos: Vector2, delta: float) -> void:
 
 	position += move_dir * step
 	_last_move_dir = move_dir
+	_accumulate_charge(step)
 
 
 ## 计算静态障碍物（塔/建筑）的避让转向向量。

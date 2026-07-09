@@ -36,14 +36,57 @@ var unit_data := {
 				"attack_ground": true,
 				"attack_air": false,
 				"attack_range": 1.2,
-			"attack_interval": 1.2,
-			"first_attack_delay": 0.5,
-			"delivery": "instant",
-			"trajectory": "",
-			"impact_type": "single",
-			"impact_radius": 0.0,
-			"damage": 202,
-		}],
+		"attack_interval": 1.2,
+		"first_attack_delay": 0.5,
+		"damage_delay": 0.2,  # 对齐攻击动画第3帧（劈下）瞬间
+		"delivery": "instant",
+		"trajectory": "",
+		"impact_type": "single",
+		"impact_radius": 0.0,
+		"damage": 202,
+	}],
+		# ---- 帧动画配置（首次接入）----
+		# 素材为高清调色板图：walk 1501×1460 / attack 1755×1579
+		# visual_scale 0.028（再缩小约22%）：walk帧视觉约51px
+		"animation": {
+			"visual_offset_x": 0.0,
+			"visual_offset_y": -25.0,
+			"visual_scale": 0.028,
+			"health_bar_y": -75.0,
+			"texture_filter": "linear",
+			"states": {
+				"walk_front": {
+					"frames": ["walk_front_01.png", "walk_front_02.png"],
+					"duration": [0.25, 0.25],
+					"mode": "loop",
+				},
+				"walk_back": {
+					"frames": ["walk_back_01.png", "walk_back_02.png"],
+					"duration": [0.25, 0.25],
+					"mode": "loop",
+				},
+				"idle_front": {
+					"frames": ["walk_front_01.png"],  # 暂用移动第1帧做待机
+					"duration": [1.0],
+					"mode": "loop",
+				},
+				"idle_back": {
+					"frames": ["walk_back_01.png"],  # 暂用移动第1帧做待机
+					"duration": [1.0],
+					"mode": "loop",
+				},
+				"attack_front": {
+					"frames": ["attack_front_01.png", "attack_front_02.png", "attack_front_03.png"],
+					"duration": [0.1, 0.1, 0.15],  # 举剑→挥→劈下，第3帧对齐 damage_delay
+					"mode": "once",
+				},
+				"attack_back": {
+					"frames": ["attack_back_01.png", "attack_back_02.png", "attack_back_03.png"],
+					"duration": [0.1, 0.1, 0.15],
+					"mode": "once",
+				},
+			},
+		},
 	},
 	"hog_rider": {
 		"id": "hog_rider",
@@ -242,7 +285,7 @@ var unit_data := {
 		"animation": {
 			"visual_offset_x": 0.0,
 			"visual_offset_y": -24.0,
-			"visual_scale": 0.085,
+			"visual_scale": 0.065,
 			"health_bar_y": -60.0,
 			"texture_filter": "linear",
 			"states": {
@@ -329,6 +372,21 @@ var unit_data := {
 					"duration": [1.0],
 					"mode": "loop",
 				},
+				"walk_back": {
+					"frames": ["walk_back_01.png", "walk_back_02.png"],
+					"duration": [0.5, 0.5],
+					"mode": "loop",
+				},
+				"attack_back": {
+					"frames": ["attack_back_01.png", "attack_back_02.png"],
+					"duration": [0.15, 0.25],
+					"mode": "once",
+				},
+				"idle_back": {
+					"frames": ["walk_back_01.png"],
+					"duration": [1.0],
+					"mode": "loop",
+				},
 			},
 		},
 	},
@@ -396,7 +454,7 @@ var unit_data := {
 			"impact_radius": 2.0,        # 范围伤害半径（格）
 			"damage": 266,
 			"projectile_speed": 6.0,     # 飞行速度（格/秒）
-			"arc_height": 4.5,           # 高抛弧线峰值（格）
+			"arc_height": 7.0,           # 最大射程处弧高（格），近处按距离比例自动降低
 		}],
 	},
 	"mega_minion": {
@@ -427,6 +485,75 @@ var unit_data := {
 			"damage": 312,
 			"projectile_speed": 14.0,
 		}],
+	},
+	"goblins": {
+		"id": "goblins",
+		"display_name": "哥布林",
+		"max_hp": 202,
+		"shield": 0,
+		"move_speed": 1.5,  # 快速（Fast 120）
+		"movement_type": "ground",
+		"sight_range": 5.5,
+		"movement_targeting": "any",
+		"collision_radius": 0.3,
+		"hurt_radius": 0.3,
+		"mass": 3,
+		"shadow_size": 0.3,
+		"attacks": [{
+			"name": "stab",
+			"targeting": "any",
+			"attack_ground": true,
+			"attack_air": false,  # 只攻击地面
+			"attack_range": 0.5,  # 近战短
+			"attack_interval": 1.1,
+			"first_attack_delay": 0.6,
+			"damage_delay": 0.15,  # 对齐第2帧挥砍
+			"delivery": "instant",
+			"impact_type": "single",
+			"impact_radius": 0.0,
+			"damage": 120,
+		}],
+		# ---- 帧动画配置 ----
+		# 素材 3000x2500，已右移510px校正居中
+		"animation": {
+			"visual_offset_x": 0.0,
+			"visual_offset_y": -8.0,
+			"visual_scale": 0.0135,
+			"health_bar_y": -34.0,
+			"texture_filter": "linear",
+			"states": {
+				"walk_front": {
+					"frames": ["walk_front_01.png", "walk_front_02.png", "walk_front_03.png"],
+					"duration": [0.2, 0.2, 0.2],
+					"mode": "loop",
+				},
+				"walk_back": {
+					"frames": ["walk_back_01.png", "walk_back_02.png", "walk_back_03.png"],
+					"duration": [0.2, 0.2, 0.2],
+					"mode": "loop",
+				},
+				"idle_front": {
+					"frames": ["walk_front_01.png"],
+					"duration": [0.3],
+					"mode": "loop",
+				},
+				"idle_back": {
+					"frames": ["walk_back_01.png"],
+					"duration": [0.3],
+					"mode": "loop",
+				},
+				"attack_front": {
+					"frames": ["attack_front_01.png", "attack_front_02.png"],
+					"duration": [0.12, 0.12],
+					"mode": "once",
+				},
+				"attack_back": {
+					"frames": ["attack_back_01.png", "attack_back_02.png", "attack_back_03.png"],
+					"duration": [0.1, 0.1, 0.12],
+					"mode": "once",
+				},
+			},
+		},
 	},
 }
 
@@ -599,6 +726,18 @@ var card_data := {
 		"spawn_spread": 0.0,
 		"icon": "",
 		"description": "飞行单位，对空对地，中等射程。",
+	},
+	"card_goblins": {
+		"id": "card_goblins",
+		"display_name": "哥布林",
+		"cost": 3,
+		"card_type": "troop",
+		"unit_id": "goblins",
+		"spawn_count": 4,
+		"spawn_spread": 0.0,
+		"spawn_offsets": [Vector2(-0.8, -0.8), Vector2(0.8, -0.8), Vector2(-0.8, 0.8), Vector2(0.8, 0.8)],  # 左前/右前/左下/右下 2x2方阵
+		"icon": "",
+		"description": "四只快速近战哥布林，围成方阵部署。",
 	},
 }
 

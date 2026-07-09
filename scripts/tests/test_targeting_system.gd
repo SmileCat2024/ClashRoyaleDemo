@@ -187,3 +187,37 @@ func test_collision_radius_extends_effective_sight() -> void:
 		Vector2.ZERO, "player", 120.0, "any", true, false)
 	assert_not_null(target, "应找到大半径目标")
 	assert_eq(target, big, "大半径目标在有效视野内，小半径目标不在")
+
+
+# ============================================================
+#  find_best_target — 盲区过滤（min_range，迫击炮最小射程）
+# ============================================================
+
+func test_dead_zone_excludes_close_target() -> void:
+	# 近处敌人(30px)在盲区内，远处敌人(100px)在有效区
+	_make_enemy(Vector2(30, 0))
+	_make_enemy(Vector2(100, 0))
+	var target = TargetingSystem.find_best_target(
+		Vector2.ZERO, "player", 300.0, "any", true, false,
+		"ground", false, 50.0)  # min_range=50px
+	assert_not_null(target, "盲区内应跳过近处目标")
+	assert_eq(target.global_position, Vector2(100, 0), "应选中盲区外的远处目标")
+
+
+func test_dead_zone_all_in_zone_returns_null() -> void:
+	_make_enemy(Vector2(30, 0))
+	_make_enemy(Vector2(40, 0))
+	var target = TargetingSystem.find_best_target(
+		Vector2.ZERO, "player", 300.0, "any", true, false,
+		"ground", false, 50.0)
+	assert_null(target, "所有目标都在盲区内时返回 null")
+
+
+func test_no_dead_zone_keeps_default_behavior() -> void:
+	_make_enemy(Vector2(30, 0))
+	_make_enemy(Vector2(100, 0))
+	var target = TargetingSystem.find_best_target(
+		Vector2.ZERO, "player", 300.0, "any", true, false,
+		"ground", false, 0.0)  # min_range=0 = 无盲区
+	assert_not_null(target, "无盲区时正常索敌")
+	assert_eq(target.global_position, Vector2(30, 0), "应选中最近的")

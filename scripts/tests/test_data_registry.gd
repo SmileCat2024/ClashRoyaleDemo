@@ -167,3 +167,32 @@ func test_deck_cards_all_exist() -> void:
 	for cid in deck:
 		assert_true(DataRegistry.card_data.has(cid),
 			"默认卡组引用了不存在的卡牌: " + cid)
+
+
+# ============================================================
+#  新卡牌专项校验（王子冲锋 / 迫击炮盲区）
+# ============================================================
+
+func test_prince_has_charge_config() -> void:
+	var prince: Dictionary = DataRegistry.unit_data.get("prince", {})
+	assert_false(prince.is_empty(), "王子数据应存在")
+	var charge: Dictionary = prince.get("charge", {})
+	assert_false(charge.is_empty(), "王子应有 charge 配置")
+	assert_true(float(charge.get("min_charge_distance", 0)) > 0,
+		"charge min_charge_distance 应 > 0")
+	assert_true(float(charge.get("charge_move_speed", 0)) > 0,
+		"charge_move_speed 应 > 0")
+	assert_true(int(charge.get("charge_damage", 0)) > 0,
+		"charge_damage 应 > 0")
+
+
+func test_mortar_min_range_less_than_max() -> void:
+	var mortar: Dictionary = DataRegistry.unit_data.get("mortar", {})
+	assert_false(mortar.is_empty(), "迫击炮数据应存在")
+	var attacks: Array = mortar.get("attacks", [])
+	assert_false(attacks.is_empty(), "迫击炮应有攻击配置")
+	var a: Dictionary = attacks[0]
+	var min_r := float(a.get("min_attack_range", 0))
+	var max_r := float(a.get("attack_range", 0))
+	assert_true(min_r > 0, "迫击炮应有 min_attack_range（盲区）")
+	assert_true(min_r < max_r, "迫击炮 min_attack_range 应小于 attack_range")
