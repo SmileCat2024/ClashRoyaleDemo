@@ -154,3 +154,50 @@ func test_boundary_clamp() -> void:
 	assert_true(b.position.x >= 15.0 - 0.01, "单位 B 应被钳制在左边界内（x >= collision_radius）")
 	a.free()
 	b.free()
+
+
+# 回归：两个同向同速前进的友军重叠时，只做径向分离，不施加切向推力。
+# 旧逻辑会沿连线切向把两单位一前一后错开，导致下一帧连线方向翻号、形成左右震荡。
+func test_same_direction_no_tangential_slide() -> void:
+	var a := MockScript.new()
+	var b := MockScript.new()
+	a.collision_radius = 10.0
+	b.collision_radius = 10.0
+	a.position = Vector2(100, 200)
+	b.position = Vector2(110, 200)  # dist=10, radius_sum=20, overlap=10
+	# 双方都向上前进（同向）
+	a.set_move_direction(Vector2(0, -1))
+	b.set_move_direction(Vector2(0, -1))
+
+	CollisionSystem.resolve_overlaps([a, b])
+
+	# 切向 = 此处的 y 方向。同向时不应有切向位移，两单位 y 应保持 200
+	assert_approx(a.position.y, 200.0, 0.01, "同向前进时 A 不应产生切向（y）位移")
+	assert_approx(b.position.y, 200.0, 0.01, "同向前进时 B 不应产生切向（y）位移")
+	# 径向分离仍应生效：最终间距 ≈ radius_sum
+	var dist := a.position.distance_to(b.position)
+	assert_approx(dist, 20.0, 0.5, "同向前进时径向分离仍应将两单位推开到 radius_sum")
+	a.free()
+	b.free()
+
+
+# 对照：一方移动、一方静止时，切向滑动仍生效（移动方沿前进方向轻推，静止方反向轻推）。
+# 确认同向跳过修复没有破坏原有的"侧滑绕过静止单位"功能。
+func test_one_moving_tangential_slide_applies() -> void:
+	var a := MockScript.new()
+	var b := MockScript.new()
+	a.collision_radius = 10.0
+	b.collision_radius = 10.0
+	a.position = Vector2(100, 200)
+	b.position = Vector2(110, 200)  # dist=10, radius_sum=20, overlap=10
+	# A 向上移动，B 静止
+	a.set_move_direction(Vector2(0, -1))
+	# direction(A→B)=(1,0)，tangent 翻成 (0,-1)：A 沿前进方向轻推，B 反向
+
+	CollisionSystem.resolve_overlaps([a, b])
+
+	# 切向滑动生效：A 的 y 应减小（向上），B 的 y 应增大（向下）
+	assert_true(a.position.y < 200.0, "移动方 A 应被沿前进方向（切向）轻推，y 减小")
+	assert_true(b.position.y > 200.0, "静止方 B 应被反向（切向）轻推，y 增大")
+	a.free()
+	b.free()

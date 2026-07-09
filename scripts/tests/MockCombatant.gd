@@ -14,6 +14,14 @@ var tower_type = null                 ## null = 非塔；"king"/"guard" = 塔
 
 # ---- 测试追踪 ----
 var damage_taken_total: int = 0       ## 累计实际受伤（扣盾+扣血）
+var _mock_move_dir: Vector2 = Vector2.ZERO  ## 模拟移动方向（供 CollisionSystem 切向滑动测试）
+
+## 设置模拟移动方向。CollisionSystem._get_move_direction() 会通过 has_method 调用它。
+func set_move_direction(dir: Vector2) -> void:
+	_mock_move_dir = dir
+
+func get_move_direction() -> Vector2:
+	return _mock_move_dir
 
 ## 重写 take_damage 以追踪实际伤害量
 func take_damage(amount: int) -> void:

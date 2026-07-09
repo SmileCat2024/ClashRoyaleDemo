@@ -11,6 +11,7 @@ const MAX_ITERATIONS := 3        ## 每帧碰撞分离迭代次数
 const ZERO_DIST_THRESHOLD := 1.0 ## 距离小于此值视为同位置，使用回退方向
 const RIVER_BOUNCE_MARGIN := 1.0 ## 河道回弹时离岸边的留白（px）
 const TANGENTIAL_SLIDE := 0.3   ## 切向滑动系数：碰撞推挤时叠加的切向分量比例（0=纯径向，1=切向=径向）
+const SAME_DIRECTION_DOT := 0.5 ## 同向判定阈值（点积）：双方移动方向夹角余弦大于此值（约60°内）视为同向
 
 
 ## 对所有活跃实体执行碰撞分离。在 BattleManager._process() 末尾调用（所有单位已移动完毕）。
@@ -85,9 +86,16 @@ static func _resolve_pair(a: Node2D, b: Node2D) -> void:
 
 	# 切向滑动：沿碰撞法线的垂直方向叠加推力，帮助单位侧滑绕过彼此。
 	# 仅当至少一方在移动时生效，静止实体碰撞保持纯径向推挤。
-	var tangent := Vector2(-direction.y, direction.x)
-	var combined := _get_move_direction(a) + _get_move_direction(b)
-	if combined.length() > 0.01:
+	# 特例：双方同向同速前进时跳过——它们只需径向分离保持间距；
+	#       若施加反向切向推力，会让两单位在前进方向上一前一后错开，
+	#       下一帧连线方向翻号、切向选择反转，形成左右位置震荡。
+	var move_a := _get_move_direction(a)
+	var move_b := _get_move_direction(b)
+	var combined := move_a + move_b
+	var same_direction := move_a.length() > 0.01 and move_b.length() > 0.01 \
+			and move_a.dot(move_b) > SAME_DIRECTION_DOT
+	if combined.length() > 0.01 and not same_direction:
+		var tangent := Vector2(-direction.y, direction.x)
 		if tangent.dot(combined) < 0.0:
 			tangent = -tangent
 		a.position += tangent * push_a * TANGENTIAL_SLIDE
