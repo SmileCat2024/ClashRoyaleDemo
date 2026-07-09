@@ -788,6 +788,12 @@ var tower_data := {
 		"collision_radius": 2.0,  # 内切圆半径 = 4格 / 2
 		"hurt_radius": 2.0,
 		"mass": 0,  # 塔不可移动
+		"sprite": {
+			"player_texture": "res://assets/sprites/towers/king_tower_player.png",
+			"enemy_texture": "res://assets/sprites/towers/king_tower_enemy.png",
+			"visual_scale": 0.072,     # 4格塔 vs 公主塔3格，按每格渲染高 ~20px 推算（图高1110→80px）
+			"visual_offset_y": 35.0,   # 精灵底部对齐碰撞框底部（半径2格=40px，留5px间距）
+		},
 		"attacks": [{
 			"name": "cannon_shot",
 			"targeting": "any",

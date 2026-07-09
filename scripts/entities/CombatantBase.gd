@@ -58,8 +58,8 @@ var sprite_animator: SpriteAnimator = null
 var _status_effects: Array = []
 
 # ---- 子节点引用 ----
-# UnitBase.tscn / TowerBase.tscn 均有这三个子节点。
-@onready var body_rect: ColorRect = $Body
+# UnitBase.tscn 有 Body 子节点；TowerBase.tscn 无（塔用 sprite 贴图，不再有占位方块）。
+@onready var body_rect: ColorRect = get_node_or_null("Body")
 @onready var health_bar: ProgressBar = $HealthBar
 @onready var debug_label: Label = $DebugLabel
 
@@ -186,7 +186,8 @@ func _apply_altitude_offset() -> void:
 	if altitude <= 0.0:
 		return
 	var dy := -altitude * BattleConstants.CELL_SIZE
-	body_rect.position.y += dy
+	if body_rect:
+		body_rect.position.y += dy
 	if health_bar:
 		health_bar.position.y += dy
 	if debug_label:

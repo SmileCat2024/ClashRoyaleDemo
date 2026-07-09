@@ -1,5 +1,45 @@
 # CHANGELOG
 
+## [0.15.0] - 2026-07-09 — 国王塔贴图接入 + 塔占位方块移除 + 血条比例化
+
+### 新增
+- **国王塔精灵贴图接入**：king_tower 新增 `sprite` 配置（队伍差异化 PNG：king_tower_player.png / king_tower_enemy.png）。此前国王塔用 ColorRect 占位，现与公主塔统一用 Sprite2D 贴图渲染。
+  - 数值：visual_scale 0.072（4格塔，按公主塔每格~20px渲染高推算）、visual_offset_y 35.0（碰撞框底部40px，留5px间距）
+  - 未激活暗化：国王塔初始未激活时 sprite modulate ×0.55 暗化（此前暗化仅作用于被隐藏的 ColorRect，sprite 模式下暗化丢失），activate_king() 恢复为 Color.WHITE
+- **公主塔贴图统一更新**：guard_tower_player.png / guard_tower_enemy.png 替换为新版美术资源
+- **塔血条比例化定位**：`_create_tower_sprite()` 血条 Y 位置从"距精灵顶部固定像素偏移（玩家50px/敌方30px）"改为"按精灵高度比例（玩家0.63/敌方0.38）"，保证公主塔(3格)和国王塔(4格)等不同高度塔的血条视觉位置一致
+
+### 变更
+- **移除塔的 Body ColorRect 占位方块**：TowerBase.tscn 删除 Body 子节点（此前代表塔占据格子范围的彩色方块），塔彻底改为纯 sprite 渲染。
+  - CombatantBase.body_rect 声明从 `$Body` 改为 `get_node_or_null("Body")`（塔为 null，单位不受影响），`_apply_altitude_offset()` 增加判空
+  - TowerBase setup/activate_king/die 移除所有 body_rect 颜色操作，暗化/死亡变灰逻辑统一由 sprite modulate 承载
+  - BattleConstants.COLOR_PLAYER_TOWER / COLOR_ENEMY_TOWER 常量不再被生产代码引用（保留定义）
+
+### 测试
+- `test_king_tower_activation.gd`：`test_king_tower_body_darkened` → `test_king_tower_sprite_darkened`、`test_king_tower_color_restored_on_activation` → `test_king_tower_sprite_restored_on_activation`，改为检查 `_tower_sprite.modulate`，无贴图环境自动跳过视觉检查
+
+### 涉及文件
+- 修改：`scripts/autoload/DataRegistry.gd`、`scripts/entities/CombatantBase.gd`、`scripts/entities/TowerBase.gd`、`scenes/entities/towers/TowerBase.tscn`、`scripts/tests/test_king_tower_activation.gd`
+- 新增：`assets/sprites/towers/king_tower_player.png`、`assets/sprites/towers/king_tower_enemy.png`
+- 替换：`assets/sprites/towers/guard_tower_player.png`、`assets/sprites/towers/guard_tower_enemy.png`
+
+## [0.14.1] - 2026-07-09 — 修复王子冲锋首击起手延迟
+
+### 修复
+- **冲锋首击无视起手延迟**：王子处于冲锋状态接近目标、停下进入射程的那一刻，此前仍要等 `first_attack_delay`（0.5s）才出手，破坏冲锋的"冲刺爆发"手感。
+  - 根因：`AttackComponent.setup()` 将 `cooldown` 初始化为 `first_attack_delay`，冲锋单位进入射程后同样走 cooldown 倒计时，未区分冲锋态。
+  - 修复：`AttackComponent._process()` 在目标进入射程时优先检测 `is_charging`——冲锋态下立即执行 `_execute_attack()`（内部用 `charge_damage` 并调用 `_end_charge()`），随后 `cooldown = attack_interval` 进入正常节奏，**跳过** `first_attack_delay` 与 `damage_delay`。非冲锋态保持原 `first_attack_delay` 逻辑不变。
+  - 语义明确：`first_attack_delay` 仅作为非冲锋状态下的首次攻击起手延迟；冲锋首击是零帧爆发，停下即刻触发，随后才进入正常攻击序列。
+- **MockCombatant 缺失 class_name 导致 test_status_combatant 编译失败**：`test_status_combatant.gd` 以全局类型 `MockCombatant` 引用（`-> MockCombatant` / `MockCombatant.new()`），但 MockCombatant.gd 缺少 `class_name` 声明，该套件一直无法编译（因环境此前无法运行测试而未暴露）。恢复 `class_name MockCombatant` 并刷新 class 缓存后修复。
+
+### 测试
+- 新增 `test_charge_attack.gd`（13 断言）：冲锋首击零延迟 / 使用 charge_damage / 退出冲锋 / cooldown 重置为 attack_interval / 触发 firing 标记 / 非冲锋态仍受 first_attack_delay 约束 / 冲锋退出后恢复普通 damage / 冷却期间不重复出手
+- MockCombatant.gd：新增 `is_charging` / `charge_damage` / `end_charge_call_count` / `_end_charge()` 支持冲锋测试模拟
+
+### 涉及文件
+- 修改：`scripts/components/AttackComponent.gd`、`scripts/tests/MockCombatant.gd`、`scripts/tests/TestRunner.gd`
+- 新增：`scripts/tests/test_charge_attack.gd`
+
 ## [0.14.0] - 2026-07-09 — 哥布林新卡牌 + 骑士帧动画 + 巨人back方向 + 单位缩放微调
 
 ### 新增

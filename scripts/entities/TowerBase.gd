@@ -40,22 +40,9 @@ func setup(tower_data: Dictionary, team_name: String, tower_name: String) -> voi
 	else:
 		body_size = BattleConstants.GUARD_TOWER_SIZE
 
-	# 颜色按阵营区分
-	var base_color: Color
-	if team == "player":
-		base_color = BattleConstants.COLOR_PLAYER_TOWER
-	else:
-		base_color = BattleConstants.COLOR_ENEMY_TOWER
-
-	# 国王塔初始未激活：暗化外观 + 禁用攻击组件
+	# 国王塔初始未激活（禁用攻击组件，外观暗化由 _create_tower_sprite 处理）
 	if tower_type == "king":
 		king_activated = false
-		base_color = base_color * 0.55
-
-	body_rect.color = base_color
-
-	body_rect.size = body_size
-	body_rect.position = Vector2(-body_size.x / 2.0, -body_size.y / 2.0)
 
 	health_bar.max_value = max_hp
 	health_bar.value = current_hp
@@ -117,24 +104,24 @@ func _create_tower_sprite(sprite_data: Dictionary) -> void:
 	)
 	add_child(_tower_sprite)
 
-	# 隐藏 ColorRect 占位格，精灵替代渲染
-	body_rect.visible = false
-
-	# 血条：宽度缩减30% + 厚度增加（6→8px）+ 队伍差异化 Y 位置
+	# 血条：宽度缩减30% + 厚度增加（6→8px）+ 按精灵高度比例定位 Y
+	# 距精灵顶部固定比例（玩家0.63 / 敌方0.38），保证公主塔/国王塔等不同高度塔的血条视觉位置一致
 	var bar_w: float = health_bar.size.x * 0.7
 	var bar_h: float = 8.0
 	health_bar.size = Vector2(bar_w, bar_h)
-	var base_bar_y: float = base_offset_y * 2.0 - 10.0
-	if team == "player":
-		health_bar.position = Vector2(-bar_w / 2.0, base_bar_y + 60.0)  # 下移3格
-	else:
-		health_bar.position = Vector2(-bar_w / 2.0, base_bar_y + 40.0)  # 下移2格
+	var sprite_render_h: float = tex_h * scale_y
+	var top_ratio: float = 0.63 if team == "player" else 0.38
+	health_bar.position = Vector2(-bar_w / 2.0, -sprite_render_h + sprite_render_h * top_ratio)
 
 	# 血条数值标签
 	_create_hp_label()
 
 	# 血条和数值层级置顶（精灵盖不住）
 	health_bar.z_index = 10
+
+	# 国王塔未激活时暗化精灵（塔无 ColorRect 占位，暗化状态由 sprite modulate 承载）
+	if tower_type == "king" and not king_activated:
+		_tower_sprite.modulate = Color(0.55, 0.55, 0.55, 1.0)
 
 	print("[TowerBase] sprite loaded:", tex_path, "scale:", vs)
 
@@ -201,11 +188,9 @@ func activate_king() -> void:
 	if king_activated:
 		return
 	king_activated = true
-	# 恢复正常颜色
-	if team == "player":
-		body_rect.color = BattleConstants.COLOR_PLAYER_TOWER
-	else:
-		body_rect.color = BattleConstants.COLOR_ENEMY_TOWER
+	# 恢复精灵亮度（未激活时被暗化）
+	if _tower_sprite:
+		_tower_sprite.modulate = Color.WHITE
 	# 启用攻击组件
 	for comp in attack_components:
 		comp.set_process(true)
@@ -251,8 +236,6 @@ func die() -> void:
 	EntityRegistry.unregister(self)
 	if _tower_sprite:
 		_tower_sprite.modulate = Color(0.3, 0.3, 0.3, 0.5)
-	elif body_rect:
-		body_rect.color = Color(0.3, 0.3, 0.3, 0.5)
 	if health_bar:
 		health_bar.visible = false
 	if _hp_label:

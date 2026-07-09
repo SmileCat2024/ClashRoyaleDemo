@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bnbihdc0m6bke"
-path="res://.godot/imported/guard_tower_player.png-51020e9b2f8a67720471e00e56ca2aa2.ctex"
+uid="uid://crfoooyel38gd"
+path="res://.godot/imported/king_tower_player.png-d481398878dc574f95705c1fec4aefc4.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/sprites/towers/guard_tower_player.png"
-dest_files=["res://.godot/imported/guard_tower_player.png-51020e9b2f8a67720471e00e56ca2aa2.ctex"]
+source_file="res://assets/sprites/towers/king_tower_player.png"
+dest_files=["res://.godot/imported/king_tower_player.png-d481398878dc574f95705c1fec4aefc4.ctex"]
 
 [params]
 
