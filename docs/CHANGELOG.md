@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## [0.14.0] - 2026-07-09 — 哥布林新卡牌 + 骑士帧动画 + 巨人back方向 + 单位缩放微调
+
+### 新增
+- **哥布林新卡牌**：4 只快速近战地面单位，方阵部署（左前/右前/左下/右下，各 ±0.8 格）
+  - 数值（11级）：HP 202 / 伤害 120 / 快速（1.5格/秒）/ 射程 0.5 近战短 / 攻击间隔 1.1s / 起手 0.6s / 只攻击地面 / 3费
+  - 14 帧美术素材（walk/attack × front/back + attack_side 备用），素材统一右移 510px 校正居中
+- **骑士首次接入帧动画**：knight 此前为 ColorRect 兜底，现新增 walk/attack × front/back 动画配置 + damage_delay 对齐劈砍
+
+### 变更
+- **巨人补全 back（向上）方向**：新增 walk_back/attack_back/idle_back 素材与动画配置（不覆盖现有 front 帧）
+- **单位缩放微调**：弓箭手 visual_scale 0.085→0.065；骑士 visual_scale 0.045→0.028；骑士血条下移（health_bar_y -75→-65）
+
+### 涉及文件
+- 修改：`scripts/autoload/DataRegistry.gd`
+- 新增：`assets/sprites/goblins/`（14帧）、`assets/sprites/knight/`（10帧）、`assets/sprites/giant/` 巨人 back 方向 4 帧
+
 ## [0.13.1] - 2026-07-09 — 修复同向友军碰撞左右震荡
 
 ### 修复
