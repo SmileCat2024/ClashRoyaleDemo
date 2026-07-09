@@ -231,13 +231,14 @@ var unit_data := {
 			"projectile_speed": 15.0,
 		}],
 		# ---- 帧动画配置 ----
-		# 原始 PNG 473×517px，缩放到约 83px 宽（≈4格）
+		# 新素材 move_down/up（2帧行走）+ attack_down/up（4帧攻击拉弓→释放）
 		# 素材默认面朝左，向右移动时 flip_h 自动翻转
 		"animation": {
 			"visual_offset_x": 0.0,
-			"visual_offset_y": -24.0,     # 进游戏后目测微调
-			"visual_scale": 0.075,       # 473 × 0.0875 ≈ 41px
-			"health_bar_y": -60.0,        # 血条在角色头顶上方
+			"visual_offset_y": -24.0,
+			"visual_scale": 0.085,
+			"health_bar_y": -60.0,
+			"texture_filter": "linear",
 			"states": {
 				"walk_front": {
 					"frames": ["walk_front_01.png", "walk_front_02.png"],
@@ -255,9 +256,21 @@ var unit_data := {
 					"mode": "loop",
 				},
 				"idle_back": {
-					"frames": ["walk_back_01.png"],
+					"frames": ["walk_back_01.png"],  # 暂用移动第1帧做待机
 					"duration": [0.3],
 					"mode": "loop",
+				},
+				"attack_front": {
+					"frames": ["attack_front_01.png", "attack_front_02.png",
+							   "attack_front_03.png", "attack_front_04.png"],
+					"duration": [0.08, 0.08, 0.08, 0.16],
+					"mode": "once",
+				},
+				"attack_back": {
+					"frames": ["attack_back_01.png", "attack_back_02.png",
+							   "attack_back_03.png", "attack_back_04.png"],
+					"duration": [0.08, 0.08, 0.08, 0.16],
+					"mode": "once",
 				},
 			},
 		},
