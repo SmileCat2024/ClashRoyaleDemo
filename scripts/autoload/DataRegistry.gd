@@ -52,7 +52,7 @@ var unit_data := {
 			"visual_offset_x": 0.0,
 			"visual_offset_y": -25.0,
 			"visual_scale": 0.028,
-			"health_bar_y": -75.0,
+			"health_bar_y": -65.0,
 			"texture_filter": "linear",
 			"states": {
 				"walk_front": {
@@ -518,7 +518,7 @@ var unit_data := {
 		"animation": {
 			"visual_offset_x": 0.0,
 			"visual_offset_y": -8.0,
-			"visual_scale": 0.0135,
+			"visual_scale": 0.016,
 			"health_bar_y": -34.0,
 			"texture_filter": "linear",
 			"states": {
