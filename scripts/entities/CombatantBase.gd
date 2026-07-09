@@ -169,6 +169,13 @@ func _style_health_bar() -> void:
 		bg.bg_color = Color(1.0, 0.62, 0.58, 0.5)    # 浅红底
 		fill.bg_color = Color(0.88, 0.12, 0.08)       # 正红
 
+	# fill 自带描边（与 bg 同色），确保血量填充区域始终有可见边框
+	fill.border_width_left = 1
+	fill.border_width_right = 1
+	fill.border_width_top = 1
+	fill.border_width_bottom = 1
+	fill.border_color = Color(0, 0, 0, 0.6)
+
 	health_bar.add_theme_stylebox_override("background", bg)
 	health_bar.add_theme_stylebox_override("fill", fill)
 

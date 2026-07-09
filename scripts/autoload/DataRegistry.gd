@@ -602,6 +602,12 @@ var tower_data := {
 		"collision_radius": 1.5,  # 内切圆半径 = 3格 / 2
 		"hurt_radius": 1.5,
 		"mass": 0,  # 塔不可移动
+		"sprite": {
+			"player_texture": "res://assets/sprites/towers/guard_tower_player.png",
+			"enemy_texture": "res://assets/sprites/towers/guard_tower_enemy.png",
+			"visual_scale": 0.06375,    # 统一缩放（基于原始大图，缩小25%）
+			"visual_offset_y": 25.0,    # 精细微调（正=下移，负=上移），底部对齐由代码自动计算
+		},
 		"attacks": [{
 			"name": "arrow_shot",
 			"targeting": "any",

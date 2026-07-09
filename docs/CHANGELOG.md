@@ -1,5 +1,25 @@
 # CHANGELOG
 
+## [0.11.0] - 2026-07-09 — 公主塔精灵贴图 + 塔/单位统一 y-sort 深度排序
+
+### 新增
+- **公主塔精灵渲染**：guard_tower 新增 `sprite` 配置，按队伍加载不同 PNG 贴图（我方/敌方公主塔）
+  - TowerBase `_create_tower_sprite()`：创建 Sprite2D，含 Y_COMPRESS 反向补偿、底部对齐塔逻辑位置
+  - 精灵底部对齐设计：`offset_y = -tex_h * scale_y / 2`，使精灵视觉上"站"在塔的 position 上
+  - 血条自动重定位到精灵顶部上方
+  - 塔死亡时精灵变灰（modulate），国王塔暂无贴图保持 ColorRect
+
+### 变更
+- **TowersRoot 合并入 UnitsRoot**：塔和单位现在在同一个 `y_sort_enabled` 父节点下，按 Y 坐标统一深度排序
+  - BattleScene.tscn / DebugBattle.tscn：移除 TowersRoot 节点，塔实例移入 UnitsRoot
+  - BattleManager：移除 `towers_root` 引用，新增 `_towers` 缓存数组（从 UnitsRoot 筛选 TowerBase 实例）
+  - DebugBattle：同步更新塔遍历路径
+  - **核心效果**：大体积塔模型与单位的前后层级关系正确——单位在塔下方（y更大）时画在塔前面，在塔上方（y更小）时画在塔后面
+
+### 涉及文件
+- 修改：`BattleScene.tscn`、`DebugBattle.tscn`、`BattleManager.gd`、`DebugBattle.gd`、`TowerBase.gd`、`DataRegistry.gd`
+- 新增：`assets/sprites/towers/guard_tower_player.png`、`assets/sprites/towers/guard_tower_enemy.png`
+
 ## [0.10.0] - 2026-07-09 — 投射物共享基类重构 + StatusEffect 框架增强（freeze/rage）
 
 ### 新增

@@ -17,18 +17,19 @@ func _ready() -> void:
 	print("[DebugBattle] ready | K=player knight | J=enemy knight | D=dump | 1-5=spawn units")
 
 
-## 遍历 TowersRoot 下的所有塔，根据节点名称推断阵营和类型，初始化并注册
+## 遍历 UnitsRoot 下的所有塔（TowerBase 实例），根据节点名称推断阵营和类型，初始化并注册
 func _setup_towers() -> void:
-	for tower in $World/TowersRoot.get_children():
-		var name_lower = tower.name.to_lower()
-		var team_name = "player" if "player" in name_lower else "enemy"
-		var type_name = "king" if "king" in name_lower else "guard"
-		var data_key = type_name + "_tower"
-		var data = DataRegistry.get_tower_data(data_key)
-		if BattleConstants.TOWER_PIXEL_POSITIONS.has(tower.name):
-			tower.position = BattleConstants.TOWER_PIXEL_POSITIONS[tower.name]
-		tower.setup(data, team_name, tower.name)
-		EntityRegistry.register(tower)
+	for tower in $World/UnitsRoot.get_children():
+		if tower is TowerBase:
+			var name_lower = tower.name.to_lower()
+			var team_name = "player" if "player" in name_lower else "enemy"
+			var type_name = "king" if "king" in name_lower else "guard"
+			var data_key = type_name + "_tower"
+			var data = DataRegistry.get_tower_data(data_key)
+			if BattleConstants.TOWER_PIXEL_POSITIONS.has(tower.name):
+				tower.position = BattleConstants.TOWER_PIXEL_POSITIONS[tower.name]
+			tower.setup(data, team_name, tower.name)
+			EntityRegistry.register(tower)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed:
