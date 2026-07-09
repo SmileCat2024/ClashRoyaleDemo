@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [0.12.0] - 2026-07-09 — 野猪骑士攻击动画 + 移动美术更新
+
+### 新增
+- **野猪骑士攻击动画**：hog_rider 新增 `attack_back` 状态（2 帧挥锤，`once` 模式）
+  - attack 数据新增 `damage_delay: 0.12`，使伤害结算对齐第 2 帧（锤子砸下瞬间）
+  - 向下攻击自动降级复用 `attack_back`（SpriteAnimator 降级链，无需额外美术）
+- **攻击间隔定格优化**：攻击冷却期间 idle 定格改为跑步第 2 帧（`idle_back` 引用 `walk_back_02.png`），不再停在跑步第 1 帧
+
+### 变更
+- 移动美术资源更新（walk_back 部分帧重绘）
+
+### 涉及文件
+- 修改：`scripts/autoload/DataRegistry.gd`、`assets/sprites/hog_rider/walk_back_03.png`
+- 新增：`assets/sprites/hog_rider/attack_back_01.png`、`assets/sprites/hog_rider/attack_back_02.png`
+
 ## [0.11.0] - 2026-07-09 — 公主塔精灵贴图 + 塔/单位统一 y-sort 深度排序
 
 ### 新增

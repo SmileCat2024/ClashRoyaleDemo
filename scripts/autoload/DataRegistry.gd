@@ -67,6 +67,7 @@ var unit_data := {
 			"attack_range": 0.8,
 			"attack_interval": 1.6,
 			"first_attack_delay": 0.6,
+			"damage_delay": 0.12,  # 伤害对齐攻击动画第2帧（砸下瞬间）
 			"delivery": "instant",
 			"trajectory": "",
 			"impact_type": "single",
@@ -85,9 +86,14 @@ var unit_data := {
 					"mode": "loop",
 				},
 				"idle_back": {
-					"frames": ["walk_back_01.png"],
+					"frames": ["walk_back_02.png"],  # 待机/攻击间隔定格在移动第2帧
 					"duration": [1.0],
 					"mode": "loop",
+				},
+				"attack_back": {
+					"frames": ["attack_back_01.png", "attack_back_02.png"],
+					"duration": [0.12, 0.18],  # 挥锤：举起快，砸下有停顿
+					"mode": "once",
 				},
 			},
 		},
@@ -329,9 +335,9 @@ var unit_data := {
 	"prince": {
 		"id": "prince",
 		"display_name": "王子",
-		"max_hp": 2530,
+		"max_hp": 1920,
 		"shield": 0,
-		"move_speed": 1.5,  # 快速
+		"move_speed": 1.0,  # 中速（Medium 60）
 		"movement_type": "ground",
 		"sight_range": 6.0,
 		"movement_targeting": "any",
@@ -339,29 +345,37 @@ var unit_data := {
 		"hurt_radius": 0.55,
 		"mass": 7,
 		"shadow_size": 0.6,
+		# 冲锋机制：持续直线移动 min_charge_distance 格后进入冲锋，
+		# 移速提升至 charge_move_speed，命中伤害变为 charge_damage。
+		# 攻击出手或受到伤害时退出冲锋并重置累计距离。
+		"charge": {
+			"min_charge_distance": 2.5,  # 进入冲锋所需持续移动距离（格）
+			"charge_move_speed": 2.0,    # 冲锋移速（格/秒，Very Fast 120）
+			"charge_damage": 783,        # 冲锋状态命中伤害
+		},
 		"attacks": [{
 			"name": "spear_thrust",
 			"targeting": "any",
 			"attack_ground": true,
 			"attack_air": false,
-			"attack_range": 1.0,
+			"attack_range": 1.6,  # 长近战
 			"attack_interval": 1.4,
 			"first_attack_delay": 0.5,
 			"delivery": "instant",
 			"trajectory": "",
 			"impact_type": "single",
 			"impact_radius": 0.0,
-			"damage": 590,
+			"damage": 391,
 		}],
 	},
 	"mortar": {
 		"id": "mortar",
 		"display_name": "迫击炮",
-		"max_hp": 650,
+		"max_hp": 1369,
 		"shield": 0,
 		"move_speed": 0.0,  # 不可移动（建筑）
 		"movement_type": "ground",
-		"sight_range": 10.0,
+		"sight_range": 12.0,  # 视野覆盖最大射程
 		"movement_targeting": "any",
 		"collision_radius": 0.8,
 		"hurt_radius": 0.8,
@@ -372,25 +386,27 @@ var unit_data := {
 			"targeting": "any",
 			"attack_ground": true,
 			"attack_air": false,
-			"attack_range": 9.0,
-			"attack_interval": 3.0,
+			"attack_range": 11.5,        # 最大射程（格）
+			"min_attack_range": 3.5,     # 最小射程（近距离盲区，格）
+			"attack_interval": 5.0,
 			"first_attack_delay": 1.0,
 			"delivery": "projectile",
-			"trajectory": "ballistic",
+			"trajectory": "ballistic",   # 高抛弹道
 			"impact_type": "splash",
-			"impact_radius": 1.5,
-			"damage": 230,
-			"projectile_speed": 8.0,
+			"impact_radius": 2.0,        # 范围伤害半径（格）
+			"damage": 266,
+			"projectile_speed": 6.0,     # 飞行速度（格/秒）
+			"arc_height": 4.5,           # 高抛弧线峰值（格）
 		}],
 	},
 	"mega_minion": {
 		"id": "mega_minion",
 		"display_name": "重甲亡灵",
-		"max_hp": 460,
+		"max_hp": 837,
 		"shield": 0,
-		"move_speed": 1.5,  # 快速
+		"move_speed": 1.0,  # 中速（Medium 60）
 		"movement_type": "air",
-		"sight_range": 5.0,
+		"sight_range": 6.0,
 		"movement_targeting": "any",
 		"collision_radius": 0.4,
 		"hurt_radius": 0.4,
@@ -401,14 +417,14 @@ var unit_data := {
 			"targeting": "any",
 			"attack_ground": true,
 			"attack_air": true,
-			"attack_range": 2.0,
-			"attack_interval": 1.3,
-			"first_attack_delay": 0.5,
+			"attack_range": 1.6,  # 长近战
+			"attack_interval": 1.5,
+			"first_attack_delay": 0.4,
 			"delivery": "projectile",
 			"trajectory": "linear",
 			"impact_type": "single",
 			"impact_radius": 0.0,
-			"damage": 170,
+			"damage": 312,
 			"projectile_speed": 14.0,
 		}],
 	},
@@ -560,7 +576,7 @@ var card_data := {
 		"spawn_count": 1,
 		"spawn_spread": 0.0,
 		"icon": "",
-		"description": "高速冲锋的近战单位，单发伤害极高。",
+		"description": "持续移动进入冲锋状态，移速翻倍且命中伤害大幅提升。中速近战，只打地面。",
 	},
 	"card_mortar": {
 		"id": "card_mortar",
