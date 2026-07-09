@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## [0.15.1] - 2026-07-09 — 修复 building_only 索敌忽略建筑卡牌
+
+### 修复
+- **building_only 单位无法锁定建筑卡牌**：`targeting="building_only"` 的单位（如巨人）此前只能锁定公主塔/国王塔，完全无视迫击炮等 `mass=0` 的可部署建筑卡牌。
+  - 根因：`TargetingSystem.find_best_target()` 的 building_only 过滤只检查 `tower_type != null`，而建筑单位（UnitBase，mass=0）没有 `tower_type` 字段，被错误跳过。
+  - 修复：建筑判定从「只认塔」改为「认所有建筑」——`tower_type != null` **或** `mass == 0`。塔和建筑卡牌均为 mass=0，与 `EntityRegistry.get_static_obstacles()` 的建筑判定语义一致。
+  - 同步修复 `UnitBase._find_nearest_enemy_tower()`：无攻击目标时的推进方向，building_only 单位现在会朝最近的敌方建筑（含建筑卡牌）推进、可被建筑拉扯；`any` 单位仍只认塔，不偏离主路线。
+
+### 测试
+- `test_targeting_system.gd` 新增 2 个回归测试：
+  - `test_building_only_targets_building_unit`：building_only 能锁定 mass=0 建筑单位，忽略更近的普通单位
+  - `test_building_only_picks_nearest_among_tower_and_building`：塔与建筑单位均纳入索敌，选最近者
+
+### 涉及文件
+- 修改：`scripts/battle/TargetingSystem.gd`、`scripts/entities/UnitBase.gd`、`scripts/tests/test_targeting_system.gd`
+
 ## [0.15.0] - 2026-07-09 — 国王塔贴图接入 + 塔占位方块移除 + 血条比例化
 
 ### 新增

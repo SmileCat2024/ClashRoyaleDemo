@@ -157,6 +157,29 @@ func test_building_only_no_towers_returns_null() -> void:
 	assert_null(target, "building_only 无塔时返回 null")
 
 
+func test_building_only_targets_building_unit() -> void:
+	# 建筑单位（mass=0，无 tower_type，如迫击炮）
+	var building := _make_enemy(Vector2(80, 0))
+	building.mass = 0
+	# 普通单位（应被忽略，即便更近）
+	_make_enemy(Vector2(30, 0))
+	var target = TargetingSystem.find_best_target(
+		Vector2.ZERO, "player", 300.0, "building_only", true, true)
+	assert_not_null(target, "building_only 应能锁定建筑单位（mass=0）")
+	assert_eq(target, building, "应锁定建筑单位而非普通单位")
+
+
+func test_building_only_picks_nearest_among_tower_and_building() -> void:
+	# 塔（远）+ 建筑单位（近），building_only 应选最近的建筑单位
+	_make_enemy(Vector2(200, 0), "ground", true)  # 塔
+	var building := _make_enemy(Vector2(50, 0))    # 建筑单位
+	building.mass = 0
+	var target = TargetingSystem.find_best_target(
+		Vector2.ZERO, "player", 300.0, "building_only", true, true)
+	assert_not_null(target, "塔和建筑单位都应被纳入索敌")
+	assert_eq(target, building, "应选最近的建筑（此处为建筑单位）")
+
+
 # ============================================================
 #  find_best_target — 死亡过滤
 # ============================================================

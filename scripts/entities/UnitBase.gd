@@ -510,15 +510,23 @@ func _get_target_y() -> float:
 	return position.y
 
 
-## 找最近的敌方塔（用于无攻击目标时的推进方向）
+## 找无攻击目标时的推进方向（最近的敌方建筑）。
+## "any" 单位只认塔（不偏离主路线）；
+## "building_only" 单位认所有建筑（塔 + 建筑卡牌，如迫击炮），可被建筑拉扯。
 func _find_nearest_enemy_tower():
 	var enemies = EntityRegistry.get_enemies_of(team)
 	var nearest = null
 	var nearest_dist = 999999.0
 	for e in enemies:
-		# 只找塔（有 tower_type 属性的实体）
-		if e.get("tower_type") == null:
-			continue
+		# building_only 单位认所有建筑（mass=0，含塔和建筑卡牌）；
+		# any 单位只认塔，避免被敌方建筑带偏主推进路线
+		if movement_targeting == "building_only":
+			var m = e.get("mass")
+			if m == null or int(m) > 0:
+				continue
+		else:
+			if e.get("tower_type") == null:
+				continue
 		var d = BattlePathing.path_distance(
 			position,
 			BattlePathing.game_position_of(e),

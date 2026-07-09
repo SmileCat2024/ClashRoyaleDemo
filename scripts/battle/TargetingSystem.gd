@@ -63,7 +63,7 @@ static func find_nearest_enemy_target(from_position: Vector2, self_team: String,
 
 ## 统一索敌入口。三重过滤：阵营 → targeting规则 → ground/air → 可达距离。
 ## 从 EntityRegistry 查询敌方列表，返回 max_range 内最近的合法目标。
-## targeting_mode: "any" = 单位+塔都找 | "building_only" = 只找塔。
+## targeting_mode: "any" = 单位+塔都找 | "building_only" = 只找建筑（塔 + 建筑卡牌，如迫击炮）。
 ## attack_ground/attack_air: 能否攻击地面/空中目标。
 ## 塔没有 movement_type，默认视为 ground 目标。
 static func find_best_target(
@@ -89,8 +89,12 @@ static func find_best_target(
 			continue
 
 		# targeting 规则过滤
+		# building_only 只攻击建筑：塔（tower_type）或建筑单位（mass=0，如迫击炮）
 		if targeting_mode == "building_only":
-			if e.get("tower_type") == null:
+			var is_tower := e.get("tower_type") != null
+			var e_mass = e.get("mass")
+			var is_building := is_tower or (e_mass != null and int(e_mass) <= 0)
+			if not is_building:
 				continue
 
 		# ground/air 过滤
