@@ -2,40 +2,33 @@
 # 作用：法术飞行物——从发射点沿抛物线弧飞向目标位置，落地即时范围伤害 + 击退 + 爆炸扩散圆视觉。
 #       当前用于火球法术（spell_type=fireball）。毒药法术不走飞行物，由 SpellManager 直接部署 PoisonField。
 #
+#       继承 ProjectileBase：飞行+弧高逻辑由基类 _fly_toward / _apply_arc_offset 统一处理，
+#       本类仅保留法术参数（伤害/半径/击退）和爆炸状态机。
+#
 #       2.5D 实现：
 #         节点 position 在 World 本地游戏空间中线性移动（Y 方向被 World 的 Y_COMPRESS 压缩）。
 #         body_rect（红球）获得基于 sin(progress * PI) 的视觉高度偏移，模拟抛物线弧。
 #         地面影子在 _draw() 中绘制于逻辑位置（Vector2.ZERO），与飞行高度形成视觉纵深。
 #         弧高按飞行距离自适应：距离越远弧越高（上限 4 格），符合 2.5D 透视。
 # 挂载位置：SpellProjectile.tscn 的根节点
-# 初学者阅读建议：先看 setup() 了解初始化，再看 _process() 了解飞行和弧高，最后看 _on_impact() 了解伤害结算。
+# 初学者阅读建议：先看 setup() 了解初始化，再看 _process() 了解飞行和爆炸状态，最后看 _on_impact() 了解伤害结算。
 
-extends Node2D
+extends ProjectileBase
 
 # ---- 法术参数（setup 时从 card_data 填充）----
 var _damage: int = 0              ## 对单位的伤害
 var _tower_damage: int = -1       ## 对塔的伤害（-1 = 无减伤，与 _damage 相同）
 var _radius: float = 0.0          ## 爆炸半径（像素）
-var _speed: float = 200.0         ## 飞行速度（像素/秒）
 var _knockback_distance: float = 0.0  ## 击退距离（像素，0 = 无击退）
-var team: String = "player"
-
-# ---- 飞行状态 ----
-var _origin: Vector2 = Vector2.ZERO
-var _target: Vector2 = Vector2.ZERO
-var _flight_dist: float = 0.0     ## 总飞行距离（像素）
-var _arc_height: float = 0.0      ## 弧高（格）
+# speed / arc_height / _start_pos / _total_dist / _body_base_y 继承自 ProjectileBase
+# team 继承自 ProjectileBase
 
 # ---- 爆炸状态 ----
 var _state: String = "flying"     ## "flying" | "exploding"
 var _explode_timer: float = 0.0
 const EXPLODE_DURATION := 0.3
 
-# ---- 视觉基础值 ----
-var _body_base_y: float = 0.0
-
-# ---- 子节点引用 ----
-@onready var body_rect: ColorRect = $Body
+# body_rect 继承自 ProjectileBase（SpellProjectile.tscn 有 Body 子节点）
 
 
 ## 初始化法术飞行物。由 SpellManager.cast_spell() 调用。
@@ -43,23 +36,24 @@ var _body_base_y: float = 0.0
 ## target_pos: 目标位置（World 本地游戏空间坐标）
 ## spell_data: 卡牌数据字典（含 spell_damage, tower_damage, spell_radius 等）
 ## team_name: "player" 或 "enemy"
-func setup(origin: Vector2, target_pos: Vector2, spell_data: Dictionary, team_name: String) -> void:
+## 注意：父类 ProjectileBase.setup 签名不同，此处用 setup_spell 避免冲突
+func setup_spell(origin: Vector2, target_pos: Vector2, spell_data: Dictionary, team_name: String) -> void:
 	position = origin
-	_origin = origin
-	_target = target_pos
+	_start_pos = origin
+	_last_target_pos = target_pos
 	team = team_name
 
 	_damage = int(spell_data.get("spell_damage", 0))
 	var td = spell_data.get("tower_damage", null)
 	_tower_damage = int(td) if td != null else -1
 	_radius = BattleConstants.px(float(spell_data.get("spell_radius", 0)))
-	_speed = BattleConstants.px(float(spell_data.get("projectile_speed", 10.0)))
+	speed = BattleConstants.px(float(spell_data.get("projectile_speed", 10.0)))
 	_knockback_distance = BattleConstants.px(float(spell_data.get("knockback_distance", 0)))
 
-	_flight_dist = origin.distance_to(target_pos)
+	_total_dist = origin.distance_to(target_pos)
 	# 弧高随飞行距离自适应（格），上限 4 格
-	var dist_grids := _flight_dist / BattleConstants.CELL_SIZE
-	_arc_height = minf(dist_grids * 0.3, 4.0)
+	var dist_grids := _total_dist / BattleConstants.CELL_SIZE
+	arc_height = minf(dist_grids * 0.3, 4.0)
 
 	_body_base_y = body_rect.position.y
 	_state = "flying"
@@ -75,26 +69,11 @@ func _process(delta: float) -> void:
 		_process_explode(delta)
 
 
-## 飞行阶段：线性移动 + 抛物线弧高偏移
+## 飞行阶段：使用基类 _fly_toward 统一定点飞行 + 弧高视觉偏移
 func _process_flight(delta: float) -> void:
-	var to_target := _target - position
-	var dist := to_target.length()
-
-	if dist <= _speed * delta:
-		# 本帧到达 → 命中
-		position = _target
+	if _fly_toward(_last_target_pos, delta):
 		_on_impact()
 		return
-
-	position += to_target.normalized() * _speed * delta
-
-	# 抛物线弧高视觉偏移（World 本地像素，会被 World Y_COMPRESS 压缩）
-	if _flight_dist > 0.0 and _arc_height > 0.0:
-		var traveled := _origin.distance_to(position)
-		var progress: float = clampf(traveled / _flight_dist, 0.0, 1.0)
-		var arc := _arc_height * sin(progress * PI) * BattleConstants.CELL_SIZE
-		body_rect.position.y = _body_base_y - arc
-
 	queue_redraw()
 
 
@@ -108,12 +87,12 @@ func _process_explode(delta: float) -> void:
 
 ## 落地：即时范围伤害 + 击退 + 爆炸视觉
 func _on_impact() -> void:
-	SignalBus.projectile_hit.emit(_target, team)
+	SignalBus.projectile_hit.emit(_last_target_pos, team)
 
 	_state = "exploding"
 	_explode_timer = 0.0
 	body_rect.visible = false
-	DamageSystem.deal_area_damage(_target, _radius, _damage, team, _tower_damage)
+	DamageSystem.deal_area_damage(_last_target_pos, _radius, _damage, team, _tower_damage)
 	if _knockback_distance > 0.0:
 		_apply_knockback()
 
@@ -127,8 +106,8 @@ func _apply_knockback() -> void:
 		var e_pos := BattlePathing.game_position_of(e)
 		var hr = e.get("hurt_radius")
 		var hurt_r: float = float(hr) if hr != null else 0.0
-		if _target.distance_to(e_pos) <= _radius + hurt_r:
-			var dir := (e_pos - _target).normalized()
+		if _last_target_pos.distance_to(e_pos) <= _radius + hurt_r:
+			var dir := (e_pos - _last_target_pos).normalized()
 			e.knockback(dir, _knockback_distance)
 
 

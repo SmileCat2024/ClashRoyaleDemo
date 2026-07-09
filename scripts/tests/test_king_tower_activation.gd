@@ -88,7 +88,7 @@ func test_king_tower_color_restored_on_activation() -> void:
 func test_king_tower_cooldown_after_activation() -> void:
 	var tower := _make_king_tower()
 	var comp := tower.get_primary_attack()
-	tower._activate()
+	tower.activate_king()
 	# first_attack_delay = 0.5（DataRegistry king_tower），未激活期间未递减
 	assert_approx(comp.cooldown, 0.5, 0.01, "激活后冷却应保持 first_attack_delay=0.5")
 
@@ -99,8 +99,8 @@ func test_king_tower_cooldown_after_activation() -> void:
 
 func test_activate_is_idempotent() -> void:
 	var tower := _make_king_tower()
-	tower._activate()
-	tower._activate()
+	tower.activate_king()
+	tower.activate_king()
 	assert_true(tower.king_activated, "多次激活不应出错")
 	var comp := tower.get_primary_attack()
 	assert_true(comp.is_processing(), "多次激活后攻击组件仍应启用")

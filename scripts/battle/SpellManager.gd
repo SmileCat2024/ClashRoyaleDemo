@@ -45,7 +45,7 @@ func cast_spell(card_id: String, team_name: String, target_pos: Vector2) -> void
 			var origin2 := _get_king_tower_position(team_name)
 			var projectile = SPELL_PROJECTILE_SCENE.instantiate()
 			projectiles_root.add_child(projectile)
-			projectile.setup(origin2, target_pos, card, team_name)
+			projectile.setup_spell(origin2, target_pos, card, team_name)
 
 	print("[SpellManager] cast %s (%s) → %s" % [card_id, team_name, target_pos])
 
@@ -57,7 +57,7 @@ func _create_poison_field(target_pos: Vector2, card: Dictionary, team_name: Stri
 	var tick_dmg := int(card.get("tick_damage", card.get("spell_damage", 0)))
 	var ttd = card.get("tick_tower_damage", null)
 	var tick_tower_dmg := int(ttd) if ttd != null else -1
-	field.setup(
+	field.setup_field(
 		target_pos,
 		BattleConstants.px(float(card.get("spell_radius", 0))),
 		tick_dmg,

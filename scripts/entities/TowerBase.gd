@@ -60,7 +60,7 @@ func setup(tower_data: Dictionary, team_name: String, tower_name: String) -> voi
 	debug_label.text = ""
 	debug_label.visible = false
 
-	# 国王塔未激活时禁用攻击组件（受击或公主塔被毁后由 _activate 启用）
+	# 国王塔未激活时禁用攻击组件（受击或公主塔被毁后由 activate_king 启用）
 	if tower_type == "king":
 		for comp in attack_components:
 			comp.set_process(false)
@@ -74,11 +74,11 @@ func setup(tower_data: Dictionary, team_name: String, tower_name: String) -> voi
 func take_damage(amount: int) -> void:
 	super.take_damage(amount)
 	if tower_type == "king" and not king_activated and not is_dead:
-		_activate()
+		activate_king()
 
 
 ## 激活国王塔：恢复外观亮度，启用攻击组件。
-func _activate() -> void:
+func activate_king() -> void:
 	if king_activated:
 		return
 	king_activated = true
@@ -118,9 +118,10 @@ func _draw() -> void:
 	draw_arc(Vector2.ZERO, range_val, 0, TAU, 64, ring_color, 1.0)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if not initialized or is_dead:
 		return
+	_process_status_effects(delta)
 	# 塔的攻击逻辑由子节点 AttackComponent 独立处理（_init_combat_stats 时自动创建），
 	# TowerBase._process 无需额外操作。
 

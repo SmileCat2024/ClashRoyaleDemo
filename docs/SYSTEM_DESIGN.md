@@ -127,7 +127,7 @@
 
 ---
 
-## 四、PlayerBattleState
+## 四、PlayerBattleState（0.9.0，已实现）
 
 ```gdscript
 class_name PlayerBattleState
@@ -136,17 +136,18 @@ extends RefCounted
 var team: String = "player"
 var energy: int = 5
 var max_energy: int = 10
-var deck: Array = []          # 完整8张牌的id队列
-var hand: Array = []          # 当前4张手牌的id
-var next_card: String = ""    # 下一张预告
-var towers: Array = []        # TowerBase 引用列表
-var is_ai: bool = false
+var energy_progress: float = 0.0  # 当前积累的圣水完成度，供 UI 平滑显示
+
+func can_spend(cost: int) -> bool
+func spend(cost: int) -> void
+func gain_energy() -> bool          # +1 不超上限
+func reset() -> void                # 重置到初始状态
 ```
 
 - 圣水放在 PlayerBattleState，不在 BattleManager 里放散装变量。
-- BattleManager 持有两个 PlayerBattleState 实例。
-- DeckManager 一个实例管双方，方法都带 team 参数。
-- SimpleEnemyAI 调 `BattleManager.try_play_card()`，和玩家走完全相同路径。
+- BattleManager 持有两个 PlayerBattleState 实例（`_player_state` / `_enemy_state`），通过 `_get_state(team)` 获取。
+- DeckManager 当前只管玩家方；敌方 AI 的出牌直接调 `BattleManager.try_play_card()`，能量从 `_enemy_state` 扣除。
+- 未来 2v2 / 回放 / 旁观者只需扩展 `_get_state()` 返回逻辑。
 
 ---
 
@@ -330,7 +331,7 @@ func _process(delta):
             attack_cooldown = attack_interval
 ```
 
-**目标锁定规则**：锁定后持续攻击，直到目标离开 `sight_range`（不是 attack_range）才重新评估。
+**目标锁定规则**：锁定后持续攻击，直到目标离开 `attack_range`（含双方碰撞/受击半径的 reach 判定）才重新评估。reach 公式统一走 `AttackComponent.compute_reach()`，UnitBase 和 AttackComponent 共用。
 
 **D1 过渡方案**：D1 没有 AttackComponent，UnitBase 直接从 `attacks_data[0]` 读 attack_range 决定何时停下，从 EntityRegistry 找最近敌方塔作为移动目标。
 
@@ -491,7 +492,7 @@ SpellManager.cast_spell() 按 `card_data.spell_type` 三分支分流：
 
 **fireball 流程**：SpellManager 获取施法方国王塔位置 → 在 ProjectilesRoot 下创建 SpellProjectile → setup(origin, target, card, team) → 飞行（线性移动 + sin 抛物线弧高）→ 落地 `_on_impact()`：`DamageSystem.deal_area_damage()`（tower_damage 塔减伤）+ `CombatantBase.knockback()` → 爆炸视觉 → queue_free
 
-**poison 流程**：SpellManager 获取目标位置 → 在 EffectsRoot 下直接创建 PoisonField → setup(card, pos, team) → 首跳立即伤害 → 每 tick_interval 秒一跳 `deal_area_damage` → 每帧对区域内敌方 `UnitBase.apply_slow()`（取最强减速值、最长持续时间）→ duration 到期 queue_free
+**poison 流程**：SpellManager 获取目标位置 → 在 EffectsRoot 下直接创建 PoisonField（继承 BattlefieldEffect）→ setup(center, radius, tick_dmg, tower_dmg, team, duration, interval, slow) → 首跳立即伤害 → 每 tick_interval 秒一跳 `deal_area_damage` → 每帧对区域内敌方 `UnitBase.apply_slow()`（通过 StatusEffect 系统施加减速）→ lifetime 到期 super._process() 自动 queue_free
 
 **arrows 流程**：SpellManager 获取施法方国王塔位置 → 创建 ArrowsSpellController → setup(origin, target, card, team, arrows_root) → 按 flight_time 编排发射+伤害时间表 → 每波 `_spawn_wave()`：横线阵型发射点 + 向日葵黄金角落点分布 + 按距离反推速度同步到达 → 每波 `_deal_wave_damage()`：`deal_area_damage` → 全部波次完成自毁
 
@@ -506,7 +507,8 @@ SpellManager.cast_spell() 按 `card_data.spell_type` 三分支分流：
 ```
 Node2D
 └── BattlefieldEffect         ← 生命周期管理 + _on_expire() 到期回调
-    └── DelayedDamageEffect   ← 引信期间脉冲指示 → 到期范围伤害
+    ├── DelayedDamageEffect   ← 引信期间脉冲指示 → 到期范围伤害
+    └── PoisonField           ← 持续 DOT + 减速区域（super._process 管理到期，追加 tick 逻辑）
 ```
 
 **核心设计**：
@@ -529,7 +531,21 @@ CombatantBase.die()
   → queue_free()
 ```
 
-**扩展规则**：新增战场效果只需继承 `BattlefieldEffect`，重写 `_on_expire()`，创建对应场景文件，在 EffectManager 中注册生成入口。
+**扩展规则**：新增战场效果只需继承 `BattlefieldEffect`，重写 `_on_expire()`（如需持续逻辑则在 `_process()` 中调 `super._process(delta)` 后追加），创建对应场景文件，在 EffectManager 中注册生成入口。
+
+### 6.6.2 状态效果系统（0.9.0，已实现）
+
+状态效果是施加在 CombatantBase 上的临时修饰（减速、眩晕、中毒DoT 等）。由 `StatusEffect`（RefCounted 数据对象）+ `CombatantBase` 上的 `_status_effects` 列表共同管理。
+
+**核心类**：`StatusEffect`（`scripts/effects/StatusEffect.gd`）— 纯数据对象，不挂场景树。字段：`type`（"slow" / "stun" / "poison"）、`duration`、`elapsed`、`move_speed_mult`、`tick_interval` / `tick_damage`（DoT 用）。同类效果按 `merge()` 规则叠加（slow 取最强减速 + 最长持续）。
+
+**CombatantBase 接口**：
+- `apply_status_effect(effect)` — 施加效果，同类自动 merge
+- `_process_status_effects(delta)` — 子类 `_process()` 调用，处理过期和 DoT tick
+- `get_move_speed_mult()` — 查询当前移动速度乘数（slow / stun 影响）
+- `is_stunned()` — 是否眩晕（AttackComponent 检查此标记，眩晕时不能攻击）
+
+**扩展新效果**：在 StatusEffect 加 type 和字段 → 在 `_process_status_effects()` 加 tick 逻辑 → 在查询方法中读取效果。
 
 ### 6.7 卡组轮转（P1）
 
@@ -632,29 +648,27 @@ instantiate → set position → add_child → setup → register
 ## 八、出牌调用链（最终版，无"或者"）
 
 ```
-1. CardSlot._get_drag_data()
-   → 返回 { "card_id": self.card_id, "cost": self.cost } + DragPreview
+1. CardSlot 点击 → SignalBus.card_selected.emit(card_id, hand_index)
+   → BattleManager._on_card_selected → _select_hand_card(hand_index)
+   → DeployPreview.show_preview(card_data)
 
-2. Arena._can_drop_data(pos, data)
-   → return BattleManager.can_deploy(team, data.card_id, world_pos)
+2. BattleManager._unhandled_input (左键点击战场)
+   → world.get_local_mouse_position() → BattleConstants.snap_to_cell_center()
+   → _try_deploy(world_pos)
 
-3. Arena._process() （拖拽中）
-   → 在鼠标位置绘制预览圆圈（合法=绿，非法=红）
+3. BattleManager._try_deploy(world_pos)
+   → try_play_card(card_id, "player", world_pos)
 
-4. Arena._drop_data(pos, data)
-   → BattleManager.try_play_card(data.card_id, "player", world_pos)
-
-5. BattleManager.try_play_card(card_id, team, pos) → bool
-   → 检查 battle_running + can_deploy
-   → 扣能量（先扣，失败则回滚）
+4. BattleManager.try_play_card(card_id, team, pos) → bool
+   → 检查 battle_running + 能量 + 部署位置合法性
    → 按 card_type 分发：
        "troop"    → SpawnManager.spawn_unit()
        "building" → SpawnManager.spawn_building()
        "spell"    → SpellManager.cast_spell()
-   → 成功: card_played 信号 + DeckManager.cycle_card()
-   → 失败: 回滚能量
+   → 扣能量
+   → 成功: DeckManager.play_card() + card_played 信号
 
-6. SpawnManager.spawn_unit()
+5. SpawnManager.spawn_unit()
    → DataRegistry 取数据
    → 读 spawn_count / spawn_spread
    → 循环: instantiate → position → add_child → setup → register

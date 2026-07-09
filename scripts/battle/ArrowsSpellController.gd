@@ -102,7 +102,7 @@ func _spawn_wave(wave_idx: int) -> void:
 
 		var arrow := ArrowProjectile.new()
 		_arrows_root.add_child(arrow)
-		arrow.setup(arrow_origin, landing, arrow_speed_grids, common_arc)
+		arrow.setup_flight(arrow_origin, landing, arrow_speed_grids, common_arc)
 
 
 func _deal_wave_damage() -> void:

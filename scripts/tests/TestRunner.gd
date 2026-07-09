@@ -24,6 +24,9 @@ const SUITES := [
 	preload("res://scripts/tests/test_poison_spell.gd"),
 	preload("res://scripts/tests/test_obstacle_avoidance.gd"),
 	preload("res://scripts/tests/test_unit_separation.gd"),
+	preload("res://scripts/tests/test_status_effect.gd"),
+	preload("res://scripts/tests/test_status_combatant.gd"),
+	preload("res://scripts/tests/test_projectile_base.gd"),
 ]
 
 

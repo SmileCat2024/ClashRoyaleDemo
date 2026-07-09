@@ -24,8 +24,6 @@ var movement_targeting: String = "any"     ## "any" | "building_only"
 var _move_target = null    ## 当前移动目标（CombatantBase 或 null）
 var _is_moving: bool = false  ## 本帧是否在移动（供 SpriteAnimator 轮询）
 var _last_move_dir: Vector2 = Vector2.ZERO  ## 上一帧实际移动方向（供 CollisionSystem 切向滑动）
-var _slow_factor: float = 1.0   ## 减速乘数（1.0=正常，0.85=减速15%）
-var _slow_timer: float = 0.0    ## 减速剩余时间（秒）
 var is_jumping_river: bool = false
 var _jump_start: Vector2 = Vector2.ZERO
 var _jump_end: Vector2 = Vector2.ZERO
@@ -130,27 +128,24 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-## 施加减速效果。多个减速取最强值，持续时间取最长。
+## 施加减速效果（便捷封装，内部创建 StatusEffect）。
 ## factor: 移动速度乘数（如 0.85 = 减速 15%）
 ## duration: 持续时间（秒）
 func apply_slow(factor: float, duration: float) -> void:
-	_slow_factor = minf(_slow_factor, factor)
-	_slow_timer = maxf(_slow_timer, duration)
+	var effect := StatusEffect.new("slow", duration)
+	effect.move_speed_mult = factor
+	apply_status_effect(effect)
 
 
-## 当前实际移动速度（基础速度 × 减速乘数）
+## 当前实际移动速度（基础速度 × 状态效果乘数）
 func _get_effective_move_speed() -> float:
-	return move_speed * _slow_factor
+	return move_speed * get_move_speed_mult()
 
 
 func _process(delta: float) -> void:
 	if not initialized or is_dead:
 		return
-	# 减速计时器
-	if _slow_timer > 0.0:
-		_slow_timer -= delta
-		if _slow_timer <= 0.0:
-			_slow_factor = 1.0
+	_process_status_effects(delta)
 	_is_moving = false
 	if is_jumping_river:
 		_is_moving = true
@@ -163,8 +158,7 @@ func _process(delta: float) -> void:
 	if attack and attack.has_valid_target():
 		var target_pos := BattlePathing.game_position_of(attack.current_target)
 		var dist = BattlePathing.path_distance(position, target_pos, movement_type, can_jump_river)
-		var target_hr = attack.current_target.get("hurt_radius")
-		var reach: float = attack.attack_range + collision_radius + (float(target_hr) if target_hr != null else 0.0)
+		var reach: float = AttackComponent.compute_reach(attack.attack_range, collision_radius, attack.current_target)
 		if dist > reach:
 			_is_moving = true
 			_move_towards_position(target_pos, delta)
@@ -176,8 +170,7 @@ func _process(delta: float) -> void:
 	if _move_target:
 		var target_pos := BattlePathing.game_position_of(_move_target)
 		var dist = BattlePathing.path_distance(position, target_pos, movement_type, can_jump_river)
-		var move_hr = _move_target.get("hurt_radius")
-		var stop_dist = _get_primary_attack_range() + collision_radius + (float(move_hr) if move_hr != null else 0.0)
+		var stop_dist = AttackComponent.compute_reach(_get_primary_attack_range(), collision_radius, _move_target)
 		if dist > stop_dist:
 			_is_moving = true
 			_move_towards_position(target_pos, delta)

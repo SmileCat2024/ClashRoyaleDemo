@@ -3,32 +3,31 @@
 #       每隔固定间隔造成一次范围伤害（DOT），同时持续减速区域内的敌方单位。
 #       典型用例：毒药法术卡（8秒持续，每秒1跳，共8跳92伤害，减速15%）。
 #
+#       继承 BattlefieldEffect：复用生命周期管理（_elapsed / lifetime / initialized）。
+#       _process 调用 super._process() 处理到期 queue_free，然后追加 tick 伤害和减速逻辑。
+#
 #       与 DelayedDamageEffect（一次性延迟爆炸）的区别：
 #         - PoisonField 是持续伤害（多次 tick），DelayedDamageEffect 是单次爆炸
 #         - PoisonField 有减速效果，DelayedDamageEffect 没有
 #
-#       生命周期：setup() 首跳 → 每帧减速 + 每 tick_interval 一跳 → duration 到期 queue_free
 # 挂载位置：PoisonField.tscn 的根节点，由 SpellManager 直接创建并挂到 EffectsRoot 下
 # 初学者阅读建议：先看 setup() 了解参数，再看 _process() 了解 tick 和减速逻辑，最后看 _draw() 了解视觉。
 
-extends Node2D
-
-# ---- 初始化标记 ----
-var initialized: bool = false
+extends BattlefieldEffect
 
 # ---- 伤害参数（setup 时填充）----
 var _radius: float = 0.0              ## 作用半径（像素）
 var _tick_damage: int = 0             ## 每跳对单位的伤害
 var _tick_tower_damage: int = -1      ## 每跳对塔的伤害（-1 = 无减伤）
-var _team: String = "player"          ## 施法方阵营
+# team 继承自 BattlefieldEffect
 
 # ---- DOT 参数 ----
-var _duration: float = 8.0            ## 总持续时间（秒）
+# lifetime 继承自 BattlefieldEffect（= duration）
 var _tick_interval: float = 1.0       ## 伤害间隔（秒）
 var _slow_factor: float = 0.85        ## 减速乘数（0.85 = 减速15%）
 
 # ---- 运行时 ----
-var _elapsed: float = 0.0             ## 已经过时间（秒）
+# _elapsed 继承自 BattlefieldEffect
 var _tick_timer: float = 0.0          ## 距下次伤害 tick 的倒计时（秒）
 
 const FADE_DURATION := 1.0            ## 最后1秒淡出
@@ -43,14 +42,13 @@ const FADE_DURATION := 1.0            ## 最后1秒淡出
 ## duration:   总持续时间（秒）
 ## interval:   伤害间隔（秒）
 ## slow:       减速乘数（如 0.85 = 减速15%）
-func setup(center: Vector2, radius: float, tick_dmg: int, tick_tower_dmg: int, \
+## 注意：父类 BattlefieldEffect.setup 签名不同，此处用 setup_field 避免冲突
+func setup_field(center: Vector2, radius: float, tick_dmg: int, tick_tower_dmg: int, \
 		team_name: String, duration: float, interval: float, slow: float) -> void:
-	position = center
+	super.setup(center, team_name, duration)
 	_radius = radius
 	_tick_damage = tick_dmg
 	_tick_tower_damage = tick_tower_dmg
-	_team = team_name
-	_duration = duration
 	_tick_interval = interval
 	_slow_factor = slow
 	_tick_timer = interval  # 首跳之后，间隔 interval 再跳
@@ -59,19 +57,14 @@ func setup(center: Vector2, radius: float, tick_dmg: int, tick_tower_dmg: int, \
 	# 首跳立即造成伤害
 	_deal_tick_damage()
 
-	initialized = true
 	queue_redraw()
 
 
 func _process(delta: float) -> void:
-	if not initialized:
-		return
-
-	_elapsed += delta
-
-	# 到期检查（在 tick 之前，防止 duration 边界多跳一次）
-	if _elapsed >= _duration:
-		queue_free()
+	# super._process 处理生命周期：累加 _elapsed，到期时 _on_expire + queue_free
+	super._process(delta)
+	# 到期后（super 已标记 queue_free），不再执行 tick 逻辑
+	if not initialized or _elapsed >= lifetime:
 		return
 
 	# 每帧减速区域内敌方单位
@@ -88,12 +81,12 @@ func _process(delta: float) -> void:
 
 ## 单次范围伤害（含塔减伤）
 func _deal_tick_damage() -> void:
-	DamageSystem.deal_area_damage(position, _radius, _tick_damage, _team, _tick_tower_damage)
+	DamageSystem.deal_area_damage(position, _radius, _tick_damage, team, _tick_tower_damage)
 
 
 ## 持续减速：每帧对区域内敌方单位施加减速，持续时间略长于 tick 间隔以防间隙
 func _apply_slow() -> void:
-	var enemies = EntityRegistry.get_enemies_of(_team)
+	var enemies = EntityRegistry.get_enemies_of(team)
 	for e in enemies:
 		if not (e is UnitBase):
 			continue
@@ -112,7 +105,7 @@ func _draw() -> void:
 
 	# 最后 FADE_DURATION 秒淡出
 	var alpha_mult := 1.0
-	var remaining := _duration - _elapsed
+	var remaining := get_remaining_time()
 	if remaining < FADE_DURATION:
 		alpha_mult = clampf(remaining / FADE_DURATION, 0.0, 1.0)
 

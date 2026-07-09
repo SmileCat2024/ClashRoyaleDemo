@@ -54,6 +54,9 @@ var attack_components: Array = []
 # ---- 帧动画驱动器（由 _init_combat_stats 动态创建，无动画数据时为 null）----
 var sprite_animator: SpriteAnimator = null
 
+# ---- 状态效果（由 apply_status_effect 管理，_process_status_effects 每帧更新）----
+var _status_effects: Array = []
+
 # ---- 子节点引用 ----
 # UnitBase.tscn / TowerBase.tscn 均有这三个子节点。
 @onready var body_rect: ColorRect = $Body
@@ -181,6 +184,96 @@ func _apply_altitude_offset() -> void:
 		health_bar.position.y += dy
 	if debug_label:
 		debug_label.position.y += dy
+
+
+# ---- 状态效果系统 ----
+
+## 施加一个状态效果。同类型效果按 merge() 规则叠加（如 slow 取最强减速 + 最长持续）。
+func apply_status_effect(effect: StatusEffect) -> void:
+	if is_dead:
+		return
+	for existing in _status_effects:
+		if existing.type == effect.type:
+			existing.merge(effect)
+			return
+	_status_effects.append(effect)
+
+
+## 便捷方法：施加眩晕（完全瘫痪）
+func apply_stun(duration: float) -> void:
+	apply_status_effect(StatusEffect.new("stun", duration))
+
+
+## 便捷方法：施加冰冻（与眩晕相同的瘫痪效果，独立类型用于视觉/来源区分）
+func apply_freeze(duration: float) -> void:
+	apply_status_effect(StatusEffect.new("freeze", duration))
+
+
+## 便捷方法：施加狂暴增益（移动速度 + 攻击速度提升）
+func apply_rage(move_mult: float, attack_mult: float, duration: float) -> void:
+	var effect := StatusEffect.new("rage", duration)
+	effect.move_speed_mult = move_mult
+	effect.attack_speed_mult = attack_mult
+	apply_status_effect(effect)
+
+
+## 是否拥有指定类型的状态效果
+func has_status_type(type_name: String) -> bool:
+	for effect in _status_effects:
+		if effect.type == type_name:
+			return true
+	return false
+
+
+## 每帧更新所有活跃状态效果（过期移除、DoT tick）。子类 _process() 应调用此方法。
+func _process_status_effects(delta: float) -> void:
+	if _status_effects.is_empty():
+		return
+	for i in range(_status_effects.size() - 1, -1, -1):
+		var effect: StatusEffect = _status_effects[i]
+		effect.elapsed += delta
+		# poison DoT tick
+		if effect.type == "poison" and effect.tick_interval > 0.0:
+			effect.tick_timer += delta
+			if effect.tick_timer >= effect.tick_interval:
+				effect.tick_timer -= effect.tick_interval
+				take_damage(effect.tick_damage)
+		if effect.is_expired():
+			_status_effects.remove_at(i)
+
+
+## 返回当前移动速度乘数（受 slow / freeze / stun / rage 影响）。
+## 减益（slow）取最强（最小 mult），增益（rage）取最强（最大 mult），两者相乘。
+## stun / freeze 直接返回 0.0（完全不能动）。
+func get_move_speed_mult() -> float:
+	var debuff_mult := 1.0
+	var buff_mult := 1.0
+	for effect in _status_effects:
+		match effect.type:
+			"slow":
+				debuff_mult = minf(debuff_mult, effect.move_speed_mult)
+			"stun", "freeze":
+				return 0.0
+			"rage":
+				buff_mult = maxf(buff_mult, effect.move_speed_mult)
+	return debuff_mult * buff_mult
+
+
+## 返回当前攻击速度乘数（受 rage 影响，> 1.0 = 更快冷却）。
+func get_attack_speed_mult() -> float:
+	var mult := 1.0
+	for effect in _status_effects:
+		if effect.type == "rage":
+			mult = maxf(mult, effect.attack_speed_mult)
+	return mult
+
+
+## 返回是否处于瘫痪状态（眩晕或冰冻，完全不能行动和攻击）。
+func is_stunned() -> bool:
+	for effect in _status_effects:
+		if effect.type == "stun" or effect.type == "freeze":
+			return true
+	return false
 
 
 ## 受到伤害。护盾存在时，单次伤害至多打掉盾，不溢出到血量。

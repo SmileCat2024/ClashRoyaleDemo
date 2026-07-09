@@ -1,5 +1,72 @@
 # CHANGELOG
 
+## [0.10.0] - 2026-07-09 — 投射物共享基类重构 + StatusEffect 框架增强（freeze/rage）
+
+### 新增
+- **ProjectileBase 共享飞行基础设施**：消除三个投射物子类（ProjectileBase / SpellProjectile / ArrowProjectile）之间的飞行逻辑重复
+  - `_fly_toward(dest, delta) -> bool`：通用定点飞行步进（线性移动 + 弧高视觉偏移 + 到达判定）
+  - `_fly_progress() -> float`：飞行进度 [0,1]，供子类 _draw() 计算弧高
+  - `_apply_arc_offset()`：弧高视觉偏移，body_rect 为 null 时自动跳过（支持无 Body 子节点的子类）
+  - body_rect 改为 `get_node_or_null("Body")`，ArrowProjectile 无需 Body ColorRect
+- **StatusEffect 新效果类型**：freeze（冰冻）和 rage（狂暴增益）
+  - `freeze`：与 stun 相同的完全瘫痪效果（不能移动和攻击），独立类型用于视觉/来源区分。merge 取最长剩余时间
+  - `rage`：移动速度 + 攻击速度增益（mult > 1.0）。merge 取最强 buff + 最长剩余时间
+  - StatusEffect 新增 `attack_speed_mult` 字段
+- **CombatantBase 新方法**：
+  - `get_attack_speed_mult()`：当前攻击速度乘数（受 rage 影响）
+  - `apply_stun(duration)` / `apply_freeze(duration)` / `apply_rage(move_mult, attack_mult, duration)`：便捷封装
+  - `has_status_type(type_name)`：查询是否拥有指定类型效果
+  - `get_move_speed_mult()` 升级：减益（slow）取最强 × 增益（rage）取最强，两者相乘；stun/freeze 返回 0.0
+  - `is_stunned()` 同时检查 stun 和 freeze
+- **AttackComponent 攻速/瘫痪集成**：
+  - 冷却和抬手计时受 `get_attack_speed_mult()` 影响（rage 加速攻击频率）
+  - 抬手延迟期间检查 is_stunned（眩晕/冰冻中断攻击动作）
+
+### 变更
+- **ArrowProjectile 继承 ProjectileBase**：从 `extends Node2D` 改为 `extends ProjectileBase`，复用 `_fly_toward()` / `_fly_progress()` / `compute_arc_offset()`，消除 ~25 行重复飞行逻辑
+- **SpellProjectile 消除字段重复**：移除 `_origin` / `_target` / `_speed` / `_flight_dist` / `_arc_height` / `_body_base_y`，改用基类 `_start_pos` / `_last_target_pos` / `speed` / `_total_dist` / `arc_height` / `_body_base_y`。`_process_flight()` 从手写飞行逻辑改为调用 `_fly_toward()`
+- **ProjectileBase._process()** 简化：从手写移动+弧高代码改为调用 `_fly_toward()` + `_on_hit()`
+
+### 测试
+- 新增 `test_status_effect.gd`：slow/stun/freeze/rage/poison merge 叠加规则 + is_expired + get_remaining（11 个测试）
+- 新增 `test_status_combatant.gd`：CombatantBase 状态查询 + 便捷方法 + 过期移除 + slow×rage 交互 + stun/freeze 覆盖（17 个测试）
+- 新增 `test_projectile_base.gd`：_fly_toward 移动/到达/斜向 + _fly_progress + null body_rect 安全行为（8 个测试）
+
+### 涉及文件
+- 修改：`ProjectileBase.gd`、`SpellProjectile.gd`、`ArrowProjectile.gd`、`StatusEffect.gd`、`CombatantBase.gd`、`AttackComponent.gd`、`TestRunner.gd`
+- 新增：`test_status_effect.gd`、`test_status_combatant.gd`、`test_projectile_base.gd`
+
+## [0.9.0] - 2026-07-09 — 底层架构审查修复（P0-P3 全量）
+
+### 新增
+- **StatusEffect 状态效果框架**：通用状态效果系统，替代侵入式减速实现
+  - `StatusEffect`（RefCounted 数据对象）：type / duration / elapsed / move_speed_mult / tick_damage 等字段，同类 merge() 叠加规则
+  - 当前支持 slow（减速）、stun（眩晕）、poison（DoT）三种类型预埋，扩展只需加字段 + tick 逻辑
+  - CombatantBase 新增 `apply_status_effect()` / `_process_status_effects()` / `get_move_speed_mult()` / `is_stunned()`
+  - AttackComponent 眩晕检查（`is_stunned()` 时不能攻击）
+- **PlayerBattleState**：封装单方战斗状态（team / energy / max_energy / energy_progress）
+  - BattleManager 持有两个实例替代散装 `player_energy` / `enemy_energy` 变量
+  - 通过 `_get_state(team)` 统一获取，消除 if-else 分支，为 2v2 预留结构
+- **AttackComponent.compute_reach()**：统一 reach 公式（attack_range + collision_radius + hurt_radius），消除 4 处重复
+
+### 修复
+- **[P0] EntityRegistry 重开泄漏**：BattleManager.start_battle() 开头调用 `EntityRegistry.clear()`，防止重开时幽灵引用累积
+- **[P1] ProjectileBase 溅射伤害统一走 DamageSystem**：`_deal_splash_damage()` 改为调用 `DamageSystem.deal_area_damage()`，消除遍历场景树的旧实现，获得塔减伤支持
+
+### 变更
+- **[P1] PoisonField 继承 BattlefieldEffect**：从直接 `extends Node2D` 改为 `extends BattlefieldEffect`，复用生命周期管理。`_process()` 调 `super._process(delta)` 后追加 tick 逻辑，setup 调 `super.setup()`。`_team` → `team`、`_duration` → `lifetime`、`_elapsed` 继承自基类
+- **[P2] UnitBase 减速重构**：移除 `_slow_factor` / `_slow_timer` 散装变量，`apply_slow()` 内部创建 StatusEffect，`_get_effective_move_speed()` 改用 `get_move_speed_mult()`
+- **[P3] SpellProjectile 继承 ProjectileBase**：从 `extends Node2D` 改为 `extends ProjectileBase`，共享 team 字段、body_rect 引用和 `compute_arc_offset()` 静态方法
+- **[P3] ProjectileBase 新增 class_name + compute_arc_offset()**：作为所有投射物的基类类型，提取抛物线弧高计算
+- **[P3] AttackComponent._fire_projectile() 走 ProjectileManager**：优先通过 ProjectileManager 统一入口，DebugBattle 回退直接创建
+- **[P3] TowerBase._activate() → activate_king()**：修复私有命名被外部调用的封装问题
+- TowerBase._process() 新增 `_process_status_effects(delta)` 调用
+
+### 涉及文件
+- 新增：`scripts/effects/StatusEffect.gd`、`scripts/battle/PlayerBattleState.gd`
+- 修改：`CombatantBase.gd`、`UnitBase.gd`、`TowerBase.gd`、`AttackComponent.gd`、`ProjectileBase.gd`、`SpellProjectile.gd`、`PoisonField.gd`、`BattleManager.gd`、`test_king_tower_activation.gd`
+- 文档：SYSTEM_DESIGN.md（索敌规则修正、出牌流程修正、PoisonField 继承、StatusEffect、PlayerBattleState）、TODO.md、CLAUDE.md
+
 ## [0.8.9] - 2026-07-08 — 通用单位影子系统 + 圣水条平滑 + 牌库全卡牌
 
 ### 新增

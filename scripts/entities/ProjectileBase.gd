@@ -1,7 +1,8 @@
 # 文件名：ProjectileBase.gd
-# 作用：飞行物实体——从发射者飞向目标，命中后造成伤害，然后销毁。
+# 作用：飞行物基类——提供共享飞行基础设施（_fly_toward / _fly_progress / _apply_arc_offset），
+#       子类 SpellProjectile（法术弹道）和 ArrowProjectile（箭矢）复用这些方法，不各自重写飞行逻辑。
 #
-#       两种飞行模式：
+#       本类自身也是可用的完整飞行物：
 #         锁定型（homing = true）：持续追踪目标，命中后单体伤害。
 #         范围型（homing = false）：发射时锁定方向，不追踪，到达后对范围内所有敌方造成溅射伤害。
 #
@@ -11,6 +12,7 @@
 # 挂载位置：Projectile.tscn 的根节点
 # 初学者阅读建议：先看 setup() 了解飞行物怎么初始化，再看 _process() 了解每帧的移动和命中判定。
 
+class_name ProjectileBase
 extends Node2D
 
 # ---- 战斗属性 ----
@@ -35,7 +37,8 @@ var target = null                      ## 目标节点（单位或塔）
 var _last_target_pos: Vector2 = Vector2.ZERO  ## 目标位置（锁定型持续更新，范围型发射时固定）
 
 # ---- 子节点引用 ----
-@onready var body_rect: ColorRect = $Body
+# 使用 get_node_or_null 以支持无 Body 子节点的子类（如 ArrowProjectile 纯 _draw 渲染）
+@onready var body_rect: ColorRect = get_node_or_null("Body")
 
 
 ## 初始化飞行物。由 ProjectileManager.spawn_projectile() 调用。
@@ -80,24 +83,38 @@ func _process(delta: float) -> void:
 	if homing and _has_valid_target():
 		_last_target_pos = BattlePathing.game_position_of(target)
 
-	# 朝目标位置移动
-	var to_target = _last_target_pos - position
-	var distance = to_target.length()
-
-	if distance <= speed * delta:
-		# 本帧就能到达 → 命中
-		position = _last_target_pos
+	# 通用定点飞行步进
+	if _fly_toward(_last_target_pos, delta):
 		_on_hit()
-		return
-	else:
-		position += to_target.normalized() * speed * delta
 
-	# 弹道抛物线视觉高度（不影响逻辑位置和命中判定）
+
+## 通用定点飞行：沿直线向 dest 移动 speed（像素/秒），施加抛物线弧高视觉偏移。
+## 返回 true 表示本帧已到达目标位置。子类（SpellProjectile / ArrowProjectile）共享此方法，
+## 各自只需在 setup() 中设置 _start_pos / _total_dist / speed / arc_height，然后在 _process 中调用。
+func _fly_toward(dest: Vector2, delta: float) -> bool:
+	var to_dest := dest - position
+	var dist := to_dest.length()
+	if dist <= speed * delta:
+		position = dest
+		return true
+	position += to_dest.normalized() * speed * delta
+	_apply_arc_offset()
+	return false
+
+
+## 返回当前飞行进度 [0, 1]。用于子类的 _draw() 弧高计算。
+func _fly_progress() -> float:
+	if _total_dist <= 0.0:
+		return 1.0
+	return clampf(_start_pos.distance_to(position) / _total_dist, 0.0, 1.0)
+
+
+## 施加当前弧高偏移到 body_rect（基于飞行进度）。无 body_rect 时跳过（ArrowProjectile 自行 _draw）。
+func _apply_arc_offset() -> void:
+	if body_rect == null:
+		return
 	if arc_height > 0.0 and _total_dist > 0.0:
-		var traveled := _start_pos.distance_to(position)
-		var progress: float = clampf(traveled / _total_dist, 0.0, 1.0)
-		var arc := arc_height * sin(progress * PI) * BattleConstants.CELL_SIZE
-		body_rect.position.y = _body_base_y - arc
+		body_rect.position.y = _body_base_y - compute_arc_offset(arc_height, _fly_progress())
 
 
 ## 检查目标是否有效（存在、未销毁、未死亡）
@@ -123,35 +140,12 @@ func _on_hit() -> void:
 	queue_free()
 
 
-## 范围伤害：对溅射半径内的所有敌方目标造成伤害
+## 范围伤害：统一走 DamageSystem.deal_area_damage（含 EntityRegistry 查询 + 塔减伤支持）
 func _deal_splash_damage() -> void:
-	var scene = get_tree().current_scene
-	var units_root = scene.get_node_or_null("World/UnitsRoot")
-	var towers_root = scene.get_node_or_null("World/TowersRoot")
-
-	if units_root:
-		for u in units_root.get_children():
-			if _is_valid_enemy(u):
-				if position.distance_to(BattlePathing.game_position_of(u)) <= splash_radius:
-					if u.has_method("take_damage"):
-						u.take_damage(damage)
-
-	if towers_root:
-		for t in towers_root.get_children():
-			if _is_valid_enemy(t):
-				if position.distance_to(BattlePathing.game_position_of(t)) <= splash_radius:
-					if t.has_method("take_damage"):
-						t.take_damage(damage)
+	DamageSystem.deal_area_damage(position, splash_radius, damage, team)
 
 
-## 判断一个节点是否是有效的敌方目标
-func _is_valid_enemy(node) -> bool:
-	if node == null or not is_instance_valid(node):
-		return false
-	var dead_val = node.get("is_dead")
-	if dead_val != null and dead_val:
-		return false
-	var node_team = node.get("team")
-	if node_team == null or node_team == team:
-		return false
-	return true
+## 计算抛物线弧高视觉偏移（像素）。子类（SpellProjectile 等）共享此方法。
+## arc_height_grids: 弧高（格），progress: 飞行进度 [0, 1]
+static func compute_arc_offset(arc_height_grids: float, progress: float) -> float:
+	return arc_height_grids * sin(progress * PI) * BattleConstants.CELL_SIZE
