@@ -354,7 +354,7 @@ var unit_data := {
 		}],
 		"animation": {
 			"visual_offset_y": -55.0,
-			"visual_scale": 0.096,
+			"visual_scale": 0.0768,
 			"health_bar_y": -120,
 			"states": {
 				"walk_front": {

@@ -230,12 +230,12 @@ func _process(delta: float) -> void:
 	# TowerBase._process 无需额外操作。
 
 
-## 死亡：变灰，从注册表注销，发出信号（塔不 queue_free，留在战场作为残骸）
+## 死亡：隐藏精灵，从注册表注销，发出信号（塔不 queue_free，保留节点避免引用失效）
 func die() -> void:
 	super.die()
 	EntityRegistry.unregister(self)
 	if _tower_sprite:
-		_tower_sprite.modulate = Color(0.3, 0.3, 0.3, 0.5)
+		_tower_sprite.visible = false
 	if health_bar:
 		health_bar.visible = false
 	if _hp_label:

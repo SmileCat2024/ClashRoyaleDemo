@@ -97,16 +97,6 @@ func _draw() -> void:
 	_draw_dashed_vline(BattleConstants.LEFT_LANE_X, 0, h, ts * 0.5, Color(1, 1, 0, 0.3))
 	_draw_dashed_vline(BattleConstants.RIGHT_LANE_X, 0, h, ts * 0.5, Color(1, 1, 0, 0.3))
 
-	# --- 塔占位框（矩形边框 + 中心十字 + 半透明填充）---
-	var ec := Color(0.9, 0.3, 0.2)
-	var pc := Color(0.2, 0.5, 0.9)
-	_draw_tower_footprint(BattleConstants.TOWER_PIXEL_POSITIONS["EnemyKingTower"], BattleConstants.KING_TOWER_SIZE, ec)
-	_draw_tower_footprint(BattleConstants.TOWER_PIXEL_POSITIONS["EnemyLeftTower"], BattleConstants.GUARD_TOWER_SIZE, ec)
-	_draw_tower_footprint(BattleConstants.TOWER_PIXEL_POSITIONS["EnemyRightTower"], BattleConstants.GUARD_TOWER_SIZE, ec)
-	_draw_tower_footprint(BattleConstants.TOWER_PIXEL_POSITIONS["PlayerLeftTower"], BattleConstants.GUARD_TOWER_SIZE, pc)
-	_draw_tower_footprint(BattleConstants.TOWER_PIXEL_POSITIONS["PlayerRightTower"], BattleConstants.GUARD_TOWER_SIZE, pc)
-	_draw_tower_footprint(BattleConstants.TOWER_PIXEL_POSITIONS["PlayerKingTower"], BattleConstants.KING_TOWER_SIZE, pc)
-
 	# --- 坐标标注（列号在顶部，行号在左侧）---
 	var font := ThemeDB.fallback_font
 	var lc := Color(1, 1, 0.3, 0.7)
@@ -114,15 +104,6 @@ func _draw() -> void:
 		draw_string(font, Vector2(x * ts + 2, ts - 3), str(x), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, lc)
 	for y in range(0, BattleConstants.MAP_TILES_H):
 		draw_string(font, Vector2(2, y * ts + ts - 3), str(y), HORIZONTAL_ALIGNMENT_LEFT, -1, 10, lc)
-
-
-## 绘制塔占位框：半透明填充 + 矩形边框 + 中心十字
-func _draw_tower_footprint(center: Vector2, size: Vector2, color: Color) -> void:
-	var rect := Rect2(center.x - size.x * 0.5, center.y - size.y * 0.5, size.x, size.y)
-	draw_rect(rect, Color(color.r, color.g, color.b, 0.12))
-	draw_rect(rect, color, false, 2.0)
-	draw_line(Vector2(center.x - 4, center.y), Vector2(center.x + 4, center.y), color, 1.0)
-	draw_line(Vector2(center.x, center.y - 4), Vector2(center.x, center.y + 4), color, 1.0)
 
 
 ## 绘制竖直虚线
