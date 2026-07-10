@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## [0.17.0] - 2026-07-10 — 地狱塔建筑卡（递增光束 + 建筑寿命 + InfernoBeam 视觉组件）
+
+### 新增
+- **地狱塔（inferno_tower）**：稀有建筑卡，5费，对空+对地，单体锁定持续光束，伤害随锁定时间三阶段递增（43→158→847）。射程6格，攻速0.4秒，部署1秒，寿命30秒（自然掉血约58.3HP/秒），HP1748，碰撞0.6格，mass=0 自动成为寻路障碍。全卡牌循环牌库自动收录。
+- **递增伤害机制**（AttackComponent）：`ramp_damage`/`ramp_thresholds` 数据字段驱动，持续锁定同一目标时累加锁定时间，按阈值切换伤害阶段；目标切换/丢失时重置。`get_ramp_stage_index()` / `get_ramp_intensity()` / `has_beam_target()` / `get_beam_target()` 供光束视觉查询。
+- **建筑寿命/部署机制**（UnitBase）：`lifespan`/`deploy_time`/`deploy_decay_rate` 数据字段驱动，部署期间不索敌不攻击，寿命倒计时到期自毁，期间持续自然掉血。
+- **InfernoBeam 光束视觉组件**（`scripts/components/InfernoBeam.gd`）：ADD 混合 Node2D，9 层叠加绘制忠实复刻 HTML 原型「窄束清晰版 v6」——粉红外光晕→橙色发光层→黄色核心束→白色高光芯→边缘闪烁波纹→波纹条→端点光球→沿线火花，三阶段递进（宽度/振幅/波纹密度/端点亮/火花数逐级增大）。4 频率正弦 noise 复刻热颤抖动。`beam_emit_offset_y` 数据字段配置光束发射点高度。
+- **地狱塔测试套件**（`scripts/tests/test_inferno_tower.gd`）：41 断言覆盖递增伤害三阶段切换、锁定时间累加、目标切换重置、非递增单位向后兼容、数据配置校验。
+- **地狱塔建筑贴图**：`assets/sprites/inferno_tower/inferno_tower.png`（1254×1254，linear 过滤）。
+
+### 修改
+- `scripts/autoload/DataRegistry.gd`：+inferno_tower unit_data/card_data；巨人 visual_offset_y/health_bar_y 下移1格
+- `scripts/components/AttackComponent.gd`：+递增伤害字段/逻辑/查询方法 + 部署期间不攻击
+- `scripts/entities/UnitBase.gd`：+建筑寿命/部署/掉血 + InfernoBeam 子节点驱动
+- `scripts/tests/TestRunner.gd`：注册 test_inferno_tower
+- `docs/兵种数据.md`：全面更新（§0.3 计数 12单位15卡、§1 字段字典 +ramp/lifespan/deploy/beam_emit_offset_y、§2 横向对比表、§3.12 地狱塔数据卡片含三阶段伤害表、§5 卡牌总表、§6 附录对比图）
+
 ## [0.16.0] - 2026-07-10 — 音效系统基础设施 + 24 个音效资源接入
 
 ### 新增

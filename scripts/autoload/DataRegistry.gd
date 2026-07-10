@@ -428,9 +428,9 @@ var unit_data := {
 			"damage": 253,
 		}],
 		"animation": {
-			"visual_offset_y": -55.0,
+			"visual_offset_y": -35.0,
 			"visual_scale": 0.0768,
-			"health_bar_y": -120,
+			"health_bar_y": -100,
 			"states": {
 				"walk_front": {
 					"frames": ["walk_front_01.png", "walk_front_02.png"],
@@ -646,6 +646,63 @@ var unit_data := {
 			"deploy": "deploy_goblins",
 		},
 	},
+	"inferno_tower": {
+		"id": "inferno_tower",
+		"display_name": "地狱塔",
+		"max_hp": 1748,
+		"shield": 0,
+		"move_speed": 0.0,  # 不可移动（建筑）
+		"movement_type": "ground",
+		"sight_range": 6.0,  # 索敌范围 = 射程
+		"movement_targeting": "any",
+		"collision_radius": 0.6,
+		"hurt_radius": 0.6,
+		"mass": 0,  # 不可移动，自动成为寻路障碍
+		"shadow_size": 0.8,
+		"deploy_time": 1.0,   # 部署时间（秒），期间不能索敌/攻击
+		"lifespan": 30.0,     # 寿命（秒），到期自毁
+		"beam_emit_offset_y": -66.0,  # 光束发射点 Y（像素，塔顶喷口附近）
+		"attacks": [{
+			"name": "inferno_beam",
+			"targeting": "any",
+			"attack_ground": true,
+			"attack_air": true,
+			"attack_range": 6.0,
+			"attack_interval": 0.4,
+			"first_attack_delay": 0.0,  # 部署时间已模拟首次延迟
+			"delivery": "instant",
+			"impact_type": "single",
+			"impact_radius": 0.0,
+			"damage": 43,  # 基础伤害（第1阶段），实际由 ramp_damage 覆盖
+			# 递增伤害：持续锁定同一目标，伤害按阶段递增（地狱塔光束核心机制）
+			# 锁定时间达到阈值后切换到对应阶段伤害；目标切换/丢失时重置锁定时间
+			"ramp_damage": [43, 158, 847],
+			"ramp_thresholds": [0.0, 2.0, 4.0],
+		}],
+		# 单帧建筑贴图（1254×1254，scale 0.0792 ≈ 99px），底部对齐地面
+		"animation": {
+			"visual_offset_x": 0.0,
+			"visual_offset_y": -26.0,
+			"visual_scale": 0.0792,
+			"health_bar_y": -105.0,
+			"texture_filter": "linear",
+			"states": {
+				"idle": {
+					"frames": ["inferno_tower.png"],
+					"duration": [1.0],
+					"mode": "loop",
+				},
+				"walk": {
+					"frames": ["inferno_tower.png"],
+					"duration": [1.0],
+					"mode": "loop",
+				},
+			},
+		},
+		"sfx": {
+			"deploy": "deploy_building",
+		},
+	},
 }
 
 # ==============================================================================
@@ -747,7 +804,7 @@ var card_data := {
 		"projectile_speed": 10.0,  # 飞行速度（格/秒，600格/分钟）
 		"knockback": true,         # 击退
 		"knockback_distance": 1.0, # 击退距离（格）
-		"icon": "",
+		"icon": "res://assets/ui/cards/fireball.png",
 		"description": "范围伤害法术，可对空对地。击退被命中的单位。",
 	},
 	"card_poison": {
@@ -767,7 +824,7 @@ var card_data := {
 		"slow_factor": 0.85,       # 减速 15%
 		"projectile_speed": 10.0,  # 飞行速度（格/秒）
 		"knockback": false,
-		"icon": "",
+		"icon": "res://assets/ui/cards/poison.png",
 		"description": "持续伤害法术，减速区域内敌方部队。8秒内每秒造成92伤害。",
 	},
 	"card_arrows": {
@@ -782,7 +839,7 @@ var card_data := {
 		"tower_damage": 25,        # 单波对皇家塔的伤害（总 75）
 		"projectile_speed": 18.33, # 飞行速度（格/秒，1100格/分钟）
 		"knockback": false,
-		"icon": "",
+		"icon": "res://assets/ui/cards/arrows.png",
 		"description": "3波箭雨从天而降，覆盖目标区域。对空对地，无击退。",
 	},
 	"card_prince": {
@@ -793,7 +850,7 @@ var card_data := {
 		"unit_id": "prince",
 		"spawn_count": 1,
 		"spawn_spread": 0.0,
-		"icon": "",
+		"icon": "res://assets/ui/cards/prince.png",
 		"description": "持续移动进入冲锋状态，移速翻倍且命中伤害大幅提升。中速近战，只打地面。",
 	},
 	"card_mortar": {
@@ -804,7 +861,7 @@ var card_data := {
 		"unit_id": "mortar",
 		"spawn_count": 1,
 		"spawn_spread": 0.0,
-		"icon": "",
+		"icon": "res://assets/ui/cards/mortar.png",
 		"description": "远程建筑，发射范围伤害炮弹。不可移动，自动成为障碍。",
 	},
 	"card_mega_minion": {
@@ -815,7 +872,7 @@ var card_data := {
 		"unit_id": "mega_minion",
 		"spawn_count": 1,
 		"spawn_spread": 0.0,
-		"icon": "",
+		"icon": "res://assets/ui/cards/mega_minion.png",
 		"description": "飞行单位，对空对地，中等射程。",
 	},
 	"card_goblins": {
@@ -827,8 +884,19 @@ var card_data := {
 		"spawn_count": 4,
 		"spawn_spread": 0.0,
 		"spawn_offsets": [Vector2(-0.8, -0.8), Vector2(0.8, -0.8), Vector2(-0.8, 0.8), Vector2(0.8, 0.8)],  # 左前/右前/左下/右下 2x2方阵
-		"icon": "",
+		"icon": "res://assets/ui/cards/goblins.png",
 		"description": "四只快速近战哥布林，围成方阵部署。",
+	},
+	"card_inferno_tower": {
+		"id": "card_inferno_tower",
+		"display_name": "地狱塔",
+		"cost": 5,
+		"card_type": "troop",  # 建筑卡，通过 unit_id 关联（mass=0 不可移动）
+		"unit_id": "inferno_tower",
+		"spawn_count": 1,
+		"spawn_spread": 0.0,
+		"icon": "res://assets/ui/cards/inferno_tower.png",
+		"description": "防御建筑，发射持续光束。锁定同一目标越久伤害越高，最高可秒杀肉盾。有寿命限制。",
 	},
 }
 

@@ -54,6 +54,22 @@ const SHADOW_SQUASH := 0.35
 ## 影子椭圆水平半径（px）。setup 时从 shadow_size（格）转换。0 = 不画影子。
 var _shadow_radius: float = 0.0
 
+# ---- 建筑机制（寿命 / 部署 / 自然掉血）----
+## 部署时间（秒）。> 0 时建筑部署完成后才开始索敌/攻击/掉血/倒计时。普通单位 = 0。
+var deploy_time: float = 0.0
+var _deploy_timer: float = 0.0
+## 是否已部署完成（可行动）。普通单位默认 true；有 deploy_time 的建筑初始 false。
+var is_deployed: bool = true
+## 寿命（秒）。> 0 时建筑到期自毁。普通单位 = 0（无寿命）。
+var lifespan: float = 0.0
+var _lifespan_timer: float = 0.0
+## 自然掉血速率（HP/秒）。建筑存在期间持续掉血，寿命到时血量恰好归零。
+var _burn_rate: float = 0.0
+var _burn_accumulator: float = 0.0
+## 光束发射点 Y 偏移（像素，负=上移）。仅地狱塔配置，其他单位 = 0（无光束）。
+var beam_emit_offset_y: float = 0.0
+var _beam: InfernoBeam = null
+
 
 ## 初始化单位属性。由 SpawnManager 在生成单位后调用。
 func setup(unit_data: Dictionary, team_name: String) -> void:
@@ -82,6 +98,18 @@ func setup(unit_data: Dictionary, team_name: String) -> void:
 	death_damage = int(unit_data.get("death_damage", 0))
 	death_radius = BattleConstants.px(float(unit_data.get("death_radius", 0.0)))
 	death_fuse_time = float(unit_data.get("death_fuse_time", 0.0))
+
+	# 建筑机制配置（寿命/部署/自然掉血，仅建筑单位使用）
+	deploy_time = float(unit_data.get("deploy_time", 0.0))
+	if deploy_time > 0.0:
+		is_deployed = false
+		_deploy_timer = deploy_time
+	lifespan = float(unit_data.get("lifespan", 0.0))
+	if lifespan > 0.0:
+		_lifespan_timer = lifespan
+		_burn_rate = float(unit_data.get("lifespan_damage_per_sec", float(max_hp) / lifespan))
+	# 光束发射点偏移（仅地狱塔等递增光束单位配置）
+	beam_emit_offset_y = float(unit_data.get("beam_emit_offset_y", 0.0))
 
 	# 碰撞几何参数（格 → 像素）
 	collision_radius = BattleConstants.px(float(unit_data.get("collision_radius", 0.5)))
@@ -135,14 +163,54 @@ func setup(unit_data: Dictionary, team_name: String) -> void:
 func _draw() -> void:
 	if not initialized or is_dead:
 		return
-	if _shadow_radius <= 0.0:
+	# 影子椭圆（在 origin 处绘制，Y 压缩变扁）
+	if _shadow_radius > 0.0:
+		# 飞行单位影子更淡（离地越远越散）
+		var alpha := 0.18 if altitude > 0.0 else 0.28
+		# 用 Y 压缩把正圆变成扁平椭圆
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, SHADOW_SQUASH))
+		draw_circle(Vector2.ZERO, _shadow_radius, Color(0, 0, 0, alpha))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# 地狱塔递增光束由独立子节点 InfernoBeam 绘制（ADD 混合），此处不处理
+
+
+## 地狱塔递增光束视觉更新：按需创建/隐藏 InfernoBeam 子节点，每帧传入起止/阶段。
+## InfernoBeam 是 ADD 混合的 Node2D，专门负责多层叠加光束绘制（复刻 HTML 原型）。
+func _update_beam_visual() -> void:
+	var attack = get_primary_attack()
+	if attack == null or not attack.has_method("has_beam_target"):
 		return
-	# 飞行单位影子更淡（离地越远越散）
-	var alpha := 0.18 if altitude > 0.0 else 0.28
-	# 用 Y 压缩把正圆变成扁平椭圆
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, SHADOW_SQUASH))
-	draw_circle(Vector2.ZERO, _shadow_radius, Color(0, 0, 0, alpha))
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	if not attack.has_beam_target():
+		if _beam != null and is_instance_valid(_beam):
+			_beam.visible = false
+		return
+	var target = attack.get_beam_target()
+	if target == null or not is_instance_valid(target):
+		if _beam != null and is_instance_valid(_beam):
+			_beam.visible = false
+		return
+	# 首次激活时创建光束节点
+	if _beam == null or not is_instance_valid(_beam):
+		_beam = InfernoBeam.new()
+		add_child(_beam)
+	# 起点：塔顶喷口（本地坐标）；终点：目标逻辑位置（转父节点本地坐标 + 身体偏移）
+	var from_pos := Vector2(0.0, beam_emit_offset_y)
+	var to_pos := BattlePathing.game_position_of(target) - position + Vector2(0.0, -10.0)
+	_beam.set_params(from_pos, to_pos, attack.get_ramp_stage_index(), 1.0)
+	_beam.visible = true
+
+
+## 建筑寿命倒计时 + 自然掉血。每帧扣除 burn_rate HP，寿命到期 die() 兜底。
+func _process_lifespan(delta: float) -> void:
+	_lifespan_timer -= delta
+	_burn_accumulator += _burn_rate * delta
+	var burn_int := int(_burn_accumulator)
+	if burn_int > 0:
+		_burn_accumulator -= burn_int
+		take_damage(burn_int)
+	# 寿命到期兜底（防止掉血速率计算误差导致血量未归零）
+	if _lifespan_timer <= 0.0 and not is_dead:
+		die()
 
 
 ## 施加减速效果（便捷封装，内部创建 StatusEffect）。
@@ -184,10 +252,23 @@ func _end_charge() -> void:
 func _process(delta: float) -> void:
 	if not initialized or is_dead:
 		return
+	# 建筑部署倒计时（deploy_time 期间不能行动；部署完成后才开始寿命/掉血/攻击）
+	if not is_deployed:
+		_deploy_timer -= delta
+		if _deploy_timer <= 0.0:
+			is_deployed = true
+		return
+	# 建筑寿命 + 自然掉血（仅 lifespan > 0 的建筑，部署完成后才开始）
+	if lifespan > 0.0:
+		_process_lifespan(delta)
+		if is_dead:
+			return
 	# 冲锋累计：上一帧未持续移动则清零（已进入冲锋态的等攻击命中退出）
 	if _charge_enabled and not _is_moving:
 		_charge_distance_accum = 0.0
 	_process_status_effects(delta)
+	# 地狱塔递增光束视觉更新（InfernoBeam 子节点）
+	_update_beam_visual()
 	_is_moving = false
 	if is_jumping_river:
 		_is_moving = true
