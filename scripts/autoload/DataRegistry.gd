@@ -23,7 +23,7 @@ var unit_data := {
 		"shield": 0,
 		"move_speed": 1.0,  # 中速
 		"movement_type": "ground",
-		"sight_range": 6.0,
+		"sight_range": 5.5,  # 原版5.5
 		"movement_targeting": "any",
 		"collision_radius": 0.5,
 		"hurt_radius": 0.5,
@@ -96,7 +96,7 @@ var unit_data := {
 		"move_speed": 2.0,  # 极快
 		"movement_type": "ground",
 		"can_jump_river": true,
-		"sight_range": 6.0,
+		"sight_range": 9.5,  # 原版9.5（极远视野，快速冲塔型）
 		"movement_targeting": "any",
 		"collision_radius": 0.6,
 		"hurt_radius": 0.6,
@@ -167,7 +167,7 @@ var unit_data := {
 		"shield": 0,
 		"move_speed": 1.0,  # 中速
 		"movement_type": "ground",
-		"sight_range": 7.0,
+		"sight_range": 6.0,  # 原版6.0
 		"movement_targeting": "any",
 		"collision_radius": 0.5,
 		"hurt_radius": 0.5,
@@ -274,7 +274,7 @@ var unit_data := {
 		"shield": 0,
 		"move_speed": 1.0,  # 中速
 		"movement_type": "air",
-		"sight_range": 6.0,
+		"sight_range": 7.7,  # 原版7.7
 		"movement_targeting": "any",
 		"collision_radius": 0.3,
 		"hurt_radius": 0.3,
@@ -330,10 +330,10 @@ var unit_data := {
 		"shield": 0,
 		"move_speed": 1.0,  # 中速
 		"movement_type": "ground",
-		"sight_range": 6.0,
+		"sight_range": 5.5,  # 原版5.5
 		"movement_targeting": "any",
-		"collision_radius": 0.35,
-		"hurt_radius": 0.35,
+		"collision_radius": 0.5,  # 原版0.5/个
+		"hurt_radius": 0.5,
 		"mass": 3,
 		"shadow_size": 0.35,
 		"attacks": [{
@@ -406,10 +406,10 @@ var unit_data := {
 		"shield": 0,
 		"move_speed": 0.75,  # 慢速（内部数值45 → 0.75格/秒）
 		"movement_type": "ground",
-		"sight_range": 6.0,
+		"sight_range": 7.5,  # 原版7.5
 		"movement_targeting": "building_only",
-		"collision_radius": 0.7,
-		"hurt_radius": 0.7,
+		"collision_radius": 0.75,  # 原版0.75
+		"hurt_radius": 0.75,
 		"mass": 10,
 		"shadow_size": 0.8,
 		"attacks": [{
@@ -475,10 +475,10 @@ var unit_data := {
 		"shield": 0,
 		"move_speed": 1.0,  # 中速（Medium 60）
 		"movement_type": "ground",
-		"sight_range": 6.0,
+		"sight_range": 5.5,  # 原版5.5
 		"movement_targeting": "any",
-		"collision_radius": 0.55,
-		"hurt_radius": 0.55,
+		"collision_radius": 0.65,  # 原版0.65
+		"hurt_radius": 0.65,
 		"mass": 7,
 		"shadow_size": 0.6,
 		# 冲锋机制：持续直线移动 min_charge_distance 格后进入冲锋，
@@ -515,10 +515,10 @@ var unit_data := {
 		"shield": 0,
 		"move_speed": 0.0,  # 不可移动（建筑）
 		"movement_type": "ground",
-		"sight_range": 12.0,  # 视野覆盖最大射程
+		"sight_range": 11.5,  # 视野覆盖最大射程（原版11.5）
 		"movement_targeting": "any",
-		"collision_radius": 0.8,
-		"hurt_radius": 0.8,
+		"collision_radius": 0.6,  # 原版0.6
+		"hurt_radius": 0.6,
 		"mass": 0,  # 不可移动，自动成为寻路障碍
 		"shadow_size": 0.8,
 		"attacks": [{
@@ -549,10 +549,10 @@ var unit_data := {
 		"shield": 0,
 		"move_speed": 1.0,  # 中速（Medium 60）
 		"movement_type": "air",
-		"sight_range": 6.0,
+		"sight_range": 5.5,  # 原版5.5
 		"movement_targeting": "any",
-		"collision_radius": 0.4,
-		"hurt_radius": 0.4,
+		"collision_radius": 0.6,  # 原版0.6
+		"hurt_radius": 0.6,
 		"mass": 3,
 		"shadow_size": 0.4,
 		"attacks": [{
@@ -583,8 +583,8 @@ var unit_data := {
 		"movement_type": "ground",
 		"sight_range": 5.5,
 		"movement_targeting": "any",
-		"collision_radius": 0.3,
-		"hurt_radius": 0.3,
+		"collision_radius": 0.5,  # 原版0.5/个
+		"hurt_radius": 0.5,
 		"mass": 3,
 		"shadow_size": 0.3,
 		"attacks": [{
