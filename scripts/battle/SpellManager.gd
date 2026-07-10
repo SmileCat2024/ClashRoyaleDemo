@@ -33,16 +33,18 @@ func cast_spell(card_id: String, team_name: String, target_pos: Vector2) -> void
 
 	match spell_type:
 		"poison":
-			# 毒药：无弹道，直接在目标位置创建持续伤害区域
+			AudioManager.play("poison_cast", target_pos)
 			_create_poison_field(target_pos, card, team_name)
 		"arrows":
 			var origin := _get_king_tower_position(team_name)
+			AudioManager.play("arrows_rain", origin)
 			var controller = ARROWS_CONTROLLER_SCRIPT.new()
 			add_child(controller)
 			controller.setup(origin, target_pos, card, team_name, projectiles_root)
 		_:
 			# fireball / 其他 → 单体飞行物（抛物线弹道）
 			var origin2 := _get_king_tower_position(team_name)
+			AudioManager.play("fireball_launch", origin2)
 			var projectile = SPELL_PROJECTILE_SCENE.instantiate()
 			projectiles_root.add_child(projectile)
 			projectile.setup_spell(origin2, target_pos, card, team_name)

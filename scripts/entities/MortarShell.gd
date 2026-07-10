@@ -72,6 +72,7 @@ func _process(delta: float) -> void:
 ## 落地：范围溅射伤害 + 爆炸视觉
 func _on_impact() -> void:
 	SignalBus.projectile_hit.emit(_last_target_pos, team)
+	AudioManager.play("mortar_impact", _last_target_pos)
 	_state = "exploding"
 	_explode_timer = 0.0
 	body_rect.visible = false

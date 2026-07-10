@@ -348,6 +348,7 @@ func _enter_overtime() -> void:
 	battle_phase = "overtime"
 	energy_interval = BASE_ENERGY_INTERVAL / overtime_energy_multiplier
 	energy_timer = 0.0
+	AudioManager.play("countdown_10s")
 	SignalBus.battle_phase_changed.emit("overtime", overtime_duration)
 	print("[BattleManager] overtime started (energy x%.1f)" % overtime_energy_multiplier)
 

@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## [0.16.0] - 2026-07-10 — 音效系统基础设施 + 24 个音效资源接入
+
+### 新增
+- **AudioManager Autoload 单例**（`scripts/autoload/AudioManager.gd`）：程序化创建 Master/BGM/SFX 三总线（无需手动改 AudioServer）、SFX 播放器池（16 轮转复用）、AudioStream 资源缓存、并发控制（max_polyphony 限制同事件同时播放数）、音调随机化（pitch_range）、BGM 淡入淡出（Tween）、M 键静音切换。stream 路径为空或资源缺失时静默跳过，不中断游戏。
+- **音效事件数据表**（DataRegistry `sound_data`）：38 个音效事件配置（事件 ID → stream 路径 + volume_db + pitch_range + max_polyphony），其中 24 个已接入实际 MP3 资源，14 个预留待补。
+- **BGM 数据表**（DataRegistry `bgm_data`）：4 个 BGM 配置（menu/battle/victory/defeat，stream 暂留空）。
+- **单位音效字段**（DataRegistry `unit_data.sfx`）：10 个单位添加 sfx 配置（deploy/attack/move 按 key 引用 sound_data 事件），支持 `AudioManager.play_unit_sfx(unit_id, sfx_key)` 按单位播放专属音效，未配置时回退到通用事件。
+- **24 个 MP3 音效资源**接入 `assets/audio/sfx/`：部署音 ×9（弓箭手/哥布林/小皮卡/气球/火枪手/王子/野猪/亡灵重甲/建筑）、攻击音 ×3（小皮卡/巨人/火枪手）、法术音 ×6（火球发射+命中、迫击炮发射+命中、万箭齐发、毒药）、王子冲锋音 ×2（冲锋+冲锋命中）、野猪移动音 ×1、通用音 ×3（卡牌选中/倒计时10秒/公主塔摧毁）。
+- **SignalBus 自动驱动**：AudioManager 监听已有信号自动播放音效——`card_selected`（卡牌选中音）、`card_played`（troop→单位专属部署音、building→建筑部署音、spell→法术部署音）、`tower_destroyed`（公主塔/国王塔摧毁音）、`projectile_spawned`（飞行物发射音）、`projectile_hit`（飞行物命中音）、`battle_started`（战斗开始音+BGM）、`battle_ended`（胜利/失败音+BGM）。
+- **音效触发点手动接入**（7 个文件）：
+  - `AttackComponent`：`_play_attack_sfx()`（trajectory=ballistic→迫击炮发射音，其他→unit_data.sfx.attack）
+  - `SpellManager`：cast_spell 按法术类型播放（fireball_launch / arrows_rain / poison_cast）
+  - `SpellProjectile`：火球命中音（_on_impact）
+  - `MortarShell`：迫击炮命中音（_on_impact）
+  - `UnitBase`：王子冲锋音（_accumulate_charge 进入冲锋态）+ 野猪移动音（_move_towards_position 间歇 1.5s 蹄声）
+  - `BattleManager`：倒计时10秒音（_enter_overtime 进入加时赛）
+- **音频资源目录 + README**：`assets/audio/sfx/README.md`（命名约定 + 接入流程 + 事件 ID 速查表）、`assets/audio/bgm/README.md`。
+- **查询方法**：`DataRegistry.get_sound_data(event_id)` / `get_bgm_data(bgm_id)` / `get_unit_sfx(unit_id)`。
+- **启动校验**：DataRegistry `_validate_all_data()` 新增音效配置结构性校验（pitch_range 格式、stream 字段存在性），通过时输出音效/BGM 计数。
+
+### 涉及文件
+- 新增：`scripts/autoload/AudioManager.gd`、`assets/audio/sfx/`（24 MP3 + README.md）、`assets/audio/bgm/README.md`
+- 修改：`project.godot`（注册 AudioManager autoload）、`scripts/autoload/DataRegistry.gd`（sound_data + bgm_data + get 方法 + 校验 + 10 单位 sfx 字段）、`scripts/components/AttackComponent.gd`、`scripts/battle/SpellManager.gd`、`scripts/entities/SpellProjectile.gd`、`scripts/entities/MortarShell.gd`、`scripts/entities/UnitBase.gd`、`scripts/battle/BattleManager.gd`、`docs/CHANGELOG.md`
+
 ## [0.15.1] - 2026-07-09 — 修复 building_only 索敌忽略建筑卡牌
 
 ### 修复

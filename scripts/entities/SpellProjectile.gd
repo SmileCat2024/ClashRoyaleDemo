@@ -88,6 +88,7 @@ func _process_explode(delta: float) -> void:
 ## 落地：即时范围伤害 + 击退 + 爆炸视觉
 func _on_impact() -> void:
 	SignalBus.projectile_hit.emit(_last_target_pos, team)
+	AudioManager.play("fireball_impact", _last_target_pos)
 
 	_state = "exploding"
 	_explode_timer = 0.0

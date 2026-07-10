@@ -219,6 +219,7 @@ func _can_attack_target(target: Node) -> bool:
 ## 执行一次攻击，按 delivery 分支。
 ## 冲锋状态（owner.is_charging=true）下，instant 攻击使用 charge_damage 并在命中后退出冲锋。
 func _execute_attack() -> void:
+	_play_attack_sfx()
 	# 冲锋伤害加成：owner 处于冲锋态时用 charge_damage 替代普通伤害（王子冲锋突刺）
 	var dmg := damage
 	if combatant.get("is_charging") == true:
@@ -267,3 +268,14 @@ func _fire_projectile() -> void:
 	proj.setup(spawn_pos, current_target, damage, projectile_speed, combatant.team, is_homing, splash_px)
 	proj.arc_height = arc_height
 	SignalBus.projectile_spawned.emit(proj, combatant.team)
+
+
+## 播放攻击音效。迫击炮（ballistic）用专用发射音；其他单位走 unit_data.sfx.attack。
+func _play_attack_sfx() -> void:
+	if trajectory == "ballistic":
+		AudioManager.play("mortar_launch", BattlePathing.game_position_of(combatant))
+		return
+	var uid = combatant.get("unit_id")
+	if uid == null:
+		return
+	AudioManager.play_unit_sfx(uid, "attack", BattlePathing.game_position_of(combatant))

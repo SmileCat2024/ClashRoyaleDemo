@@ -133,12 +133,16 @@ var unit_data := {
 					"duration": [1.0],
 					"mode": "loop",
 				},
-				"attack_back": {
-					"frames": ["attack_back_01.png", "attack_back_02.png"],
-					"duration": [0.12, 0.18],  # 挥锤：举起快，砸下有停顿
-					"mode": "once",
-				},
+			"attack_back": {
+				"frames": ["attack_back_01.png", "attack_back_02.png"],
+				"duration": [0.12, 0.18],  # 挥锤：举起快，砸下有停顿
+				"mode": "once",
 			},
+			},
+		},
+		"sfx": {
+			"deploy": "deploy_hog_rider",
+			"move": "hog_rider_move",
 		},
 	},
 	"musketeer": {
@@ -169,6 +173,10 @@ var unit_data := {
 			"damage": 217,
 			"projectile_speed": 17.5,
 		}],
+		"sfx": {
+			"deploy": "deploy_musketeer",
+			"attack": "attack_musketeer",
+		},
 	},
 	"mini_pekka": {
 		"id": "mini_pekka",
@@ -197,6 +205,10 @@ var unit_data := {
 			"impact_radius": 0.0,
 			"damage": 755,
 		}],
+		"sfx": {
+			"deploy": "deploy_mini_pekka",
+			"attack": "attack_mini_pekka",
+		},
 	},
 	"balloon": {
 		"id": "balloon",
@@ -243,12 +255,15 @@ var unit_data := {
 					"duration": [1.0],
 					"mode": "loop",
 				},
-				"walk": {
-					"frames": ["balloon.png"],
-					"duration": [1.0],
-					"mode": "loop",
-				},
+			"walk": {
+				"frames": ["balloon.png"],
+				"duration": [1.0],
+				"mode": "loop",
 			},
+			},
+		},
+		"sfx": {
+			"deploy": "deploy_balloon",
 		},
 	},
 	"archers": {
@@ -323,6 +338,9 @@ var unit_data := {
 				},
 			},
 		},
+		"sfx": {
+			"deploy": "deploy_archers",
+		},
 	},
 	"giant": {
 		"id": "giant",
@@ -389,6 +407,9 @@ var unit_data := {
 				},
 			},
 		},
+		"sfx": {
+			"attack": "attack_giant",
+		},
 	},
 	"prince": {
 		"id": "prince",
@@ -425,6 +446,10 @@ var unit_data := {
 			"impact_radius": 0.0,
 			"damage": 391,
 		}],
+		"sfx": {
+			"deploy": "deploy_prince",
+			"charge": "prince_charge",
+		},
 	},
 	"mortar": {
 		"id": "mortar",
@@ -456,6 +481,9 @@ var unit_data := {
 			"projectile_speed": 6.0,     # 飞行速度（格/秒）
 			"arc_height": 7.0,           # 最大射程处弧高（格），近处按距离比例自动降低
 		}],
+		"sfx": {
+			"deploy": "deploy_building",
+		},
 	},
 	"mega_minion": {
 		"id": "mega_minion",
@@ -485,6 +513,9 @@ var unit_data := {
 			"damage": 312,
 			"projectile_speed": 14.0,
 		}],
+		"sfx": {
+			"deploy": "deploy_mega_minion",
+		},
 	},
 	"goblins": {
 		"id": "goblins",
@@ -547,12 +578,15 @@ var unit_data := {
 					"duration": [0.12, 0.12],
 					"mode": "once",
 				},
-				"attack_back": {
-					"frames": ["attack_back_01.png", "attack_back_02.png", "attack_back_03.png"],
-					"duration": [0.1, 0.1, 0.12],
-					"mode": "once",
-				},
+			"attack_back": {
+				"frames": ["attack_back_01.png", "attack_back_02.png", "attack_back_03.png"],
+				"duration": [0.1, 0.1, 0.12],
+				"mode": "once",
 			},
+			},
+		},
+		"sfx": {
+			"deploy": "deploy_goblins",
 		},
 	},
 }
@@ -820,6 +854,335 @@ var building_data := {}
 
 
 # ==============================================================================
+# 音效数据表（SFX）
+# 集中配置所有战斗音效事件。key 为事件 id（AudioManager.play 用此 id 查找配置）。
+# stream 字段为空字符串时 AudioManager 静默跳过（资源未上线时不报错，方便分批接入）。
+#
+# 字段说明：
+#   stream:        AudioStream 资源路径（res://assets/audio/sfx/xxx.ogg）
+#   volume_db:     播放音量（dB），相对 SFX 总线音量的偏移。0=不偏移，-6= quieter
+#   pitch_range:   [min, max] 音调随机区间（1.0=原调），让重复音效不单调
+#   max_polyphony: 同一事件同时播放上限，超过则丢弃新的（避免嘈杂）
+#   priority:      优先级（数字越大越优先）。超出 max_polyphony 时优先级低的被丢弃
+# ==============================================================================
+
+var sound_data := {
+	# ---- 部署 ----
+	"deploy": {
+		"stream": "",
+		"volume_db": -3.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+	"deploy_spell": {
+		"stream": "",
+		"volume_db": -2.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+
+	# ---- 攻击（通用模板，单位专属音效通过 unit_data.sfx.attack 引用此类 key）----
+	"attack_melee": {  # 近战挥砍（骑士/王子/哥布林等）
+		"stream": "",
+		"volume_db": -6.0,
+		"pitch_range": [0.9, 1.1],
+		"max_polyphony": 4,
+		"priority": 3,
+	},
+	"attack_ranged": {  # 远程发射（弓箭手/火枪手）
+		"stream": "",
+		"volume_db": -5.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 4,
+		"priority": 3,
+	},
+	"charge_hit": {  # 王子冲锋命中
+		"stream": "res://assets/audio/sfx/王子冲锋命中.MP3",
+		"volume_db": -2.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 2,
+		"priority": 6,
+	},
+
+	# ---- 飞行物 ----
+	"projectile_launch": {  # 投射物发射（弓箭/炮弹出膛）
+		"stream": "",
+		"volume_db": -8.0,
+		"pitch_range": [0.9, 1.1],
+		"max_polyphony": 6,
+		"priority": 2,
+	},
+	"projectile_hit": {  # 投射物命中
+		"stream": "",
+		"volume_db": -6.0,
+		"pitch_range": [0.9, 1.1],
+		"max_polyphony": 6,
+		"priority": 3,
+	},
+	"mortar_launch": {  # 迫击炮发射（可单独配置或回退到 projectile_launch）
+		"stream": "res://assets/audio/sfx/迫击炮发射.MP3",
+		"volume_db": -3.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 2,
+		"priority": 4,
+	},
+
+	# ---- 命中 / 受击 ----
+	"hit_metal": {  # 金属碰撞（骑士打到骑士/塔）
+		"stream": "",
+		"volume_db": -5.0,
+		"pitch_range": [0.9, 1.1],
+		"max_polyphony": 5,
+		"priority": 3,
+	},
+	"hit_flesh": {  # 血肉命中（一般单位受击）
+		"stream": "",
+		"volume_db": -7.0,
+		"pitch_range": [0.9, 1.1],
+		"max_polyphony": 6,
+		"priority": 2,
+	},
+
+	# ---- 法术 ----
+	"fireball_launch": {  # 火球发射
+		"stream": "res://assets/audio/sfx/火球发射.MP3",
+		"volume_db": -2.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 2,
+		"priority": 6,
+	},
+	"fireball_impact": {  # 火球爆炸
+		"stream": "res://assets/audio/sfx/火球命中.MP3",
+		"volume_db": 0.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 2,
+		"priority": 7,
+	},
+	"arrows_rain": {  # 万箭齐发箭雨
+		"stream": "res://assets/audio/sfx/万箭齐发.MP3",
+		"volume_db": -4.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+	"poison_cast": {  # 毒药施放
+		"stream": "res://assets/audio/sfx/毒药.MP3",
+		"volume_db": -4.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+
+	# ---- 死亡 / 摧毁 ----
+	"unit_die": {  # 单位死亡
+		"stream": "",
+		"volume_db": -8.0,
+		"pitch_range": [0.85, 1.15],
+		"max_polyphony": 5,
+		"priority": 2,
+	},
+	"tower_destroyed": {  # 塔被摧毁
+		"stream": "res://assets/audio/sfx/公主塔爆了.MP3",
+		"volume_db": 2.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 1,
+		"priority": 10,
+	},
+	"king_tower_destroyed": {  # 国王塔被摧毁（胜负判定）
+		"stream": "",
+		"volume_db": 3.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 1,
+		"priority": 10,
+	},
+
+	# ---- 战斗流程 ----
+	"battle_start": {
+		"stream": "",
+		"volume_db": 0.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 1,
+		"priority": 8,
+	},
+	"victory": {
+		"stream": "",
+		"volume_db": 0.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 1,
+		"priority": 10,
+	},
+	"defeat": {
+		"stream": "",
+		"volume_db": 0.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 1,
+		"priority": 10,
+	},
+
+	# ---- 卡牌选中 ----
+	"card_select": {
+		"stream": "res://assets/audio/sfx/选中卡牌.MP3",
+		"volume_db": -4.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+
+	# ---- 倒计时 ----
+	"countdown_10s": {
+		"stream": "res://assets/audio/sfx/倒计时10秒.MP3",
+		"volume_db": 0.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 1,
+		"priority": 8,
+	},
+
+	# ---- 单位专属部署音（unit_data.sfx.deploy 引用）----
+	"deploy_archers": {
+		"stream": "res://assets/audio/sfx/弓箭手部署.MP3",
+		"volume_db": -3.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+	"deploy_goblins": {
+		"stream": "res://assets/audio/sfx/哥布林部署.MP3",
+		"volume_db": -3.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+	"deploy_mini_pekka": {
+		"stream": "res://assets/audio/sfx/小皮卡部署.MP3",
+		"volume_db": -3.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+	"deploy_balloon": {
+		"stream": "res://assets/audio/sfx/气球部署.MP3",
+		"volume_db": -3.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+	"deploy_musketeer": {
+		"stream": "res://assets/audio/sfx/火枪手部署.MP3",
+		"volume_db": -3.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+	"deploy_prince": {
+		"stream": "res://assets/audio/sfx/王子部署.MP3",
+		"volume_db": -3.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+	"deploy_hog_rider": {
+		"stream": "res://assets/audio/sfx/野猪部署.MP3",
+		"volume_db": -3.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+	"deploy_mega_minion": {
+		"stream": "res://assets/audio/sfx/亡灵重甲部署.MP3",
+		"volume_db": -3.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+	"deploy_building": {
+		"stream": "res://assets/audio/sfx/建筑部署.MP3",
+		"volume_db": -3.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+
+	# ---- 单位专属攻击音（unit_data.sfx.attack 引用）----
+	"attack_mini_pekka": {
+		"stream": "res://assets/audio/sfx/小皮卡攻击.MP3",
+		"volume_db": -5.0,
+		"pitch_range": [0.9, 1.1],
+		"max_polyphony": 3,
+		"priority": 4,
+	},
+	"attack_giant": {
+		"stream": "res://assets/audio/sfx/巨人攻击.MP3",
+		"volume_db": -5.0,
+		"pitch_range": [0.9, 1.1],
+		"max_polyphony": 3,
+		"priority": 4,
+	},
+	"attack_musketeer": {
+		"stream": "res://assets/audio/sfx/火枪手攻击.MP3",
+		"volume_db": -5.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 3,
+		"priority": 4,
+	},
+
+	# ---- 迫击炮命中 ----
+	"mortar_impact": {
+		"stream": "res://assets/audio/sfx/迫击炮命中.MP3",
+		"volume_db": -2.0,
+		"pitch_range": [0.9, 1.1],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+
+	# ---- 王子冲锋 ----
+	"prince_charge": {
+		"stream": "res://assets/audio/sfx/王子冲锋.MP3",
+		"volume_db": -1.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 1,
+		"priority": 6,
+	},
+
+	# ---- 野猪移动 ----
+	"hog_rider_move": {
+		"stream": "res://assets/audio/sfx/野猪移动.MP3",
+		"volume_db": -8.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 2,
+		"priority": 2,
+	},
+}
+
+
+# ==============================================================================
+# 背景音乐数据表（BGM）
+# key 为 bgm id，AudioManager.play_bgm(id) 用此 id 查找配置。
+# stream 为空时静默跳过。
+# ==============================================================================
+
+var bgm_data := {
+	"battle": {
+		"stream": "",
+		"volume_db": -6.0,
+	},
+	"menu": {
+		"stream": "",
+		"volume_db": -8.0,
+	},
+	"victory": {
+		"stream": "",
+		"volume_db": -4.0,
+	},
+	"defeat": {
+		"stream": "",
+		"volume_db": -4.0,
+	},
+}
+
+
+# ==============================================================================
 # 查询方法
 # ==============================================================================
 
@@ -853,6 +1216,26 @@ func get_building_data(building_id: String) -> Dictionary:
 		return building_data[building_id]
 	push_error("[DataRegistry] Unknown building id: " + building_id)
 	return {}
+
+
+## 查询音效事件配置。找不到时返回空字典（AudioManager 自行静默处理）。
+## 注意：与 get_unit/card/tower_data 不同，此处不报错——音效缺失不应影响游戏运行。
+func get_sound_data(event_id: String) -> Dictionary:
+	return sound_data.get(event_id, {})
+
+
+## 查询 BGM 配置。找不到时返回空字典。
+func get_bgm_data(bgm_id: String) -> Dictionary:
+	return bgm_data.get(bgm_id, {})
+
+
+## 查询某单位的 sfx 配置（unit_data 内的 sfx 字典）。无 sfx 字段时返回空字典。
+## 单位专属音效结构示例：
+##   "sfx": { "attack": "attack_melee", "death": "unit_die" }
+## 值为 sound_data 中的事件 id。AudioManager.play_unit_sfx() 用此映射查找最终配置。
+func get_unit_sfx(unit_id: String) -> Dictionary:
+	var u := get_unit_data(unit_id)
+	return u.get("sfx", {})
 
 
 ## 返回玩家默认卡组（卡牌 id 列表）。开发阶段包含全部卡牌。
@@ -980,10 +1363,26 @@ func _validate_all_data() -> void:
 		if int(tw.get("mass", -1)) != 0:
 			errors.append("塔 '%s' mass 必须为 0（不可移动）" % tid)
 
+	# ---- 校验音效配置（仅结构性校验，stream 允许为空字符串）----
+	for sid in sound_data:
+		var s: Dictionary = sound_data[sid]
+		if not s.has("stream"):
+			errors.append("音效 '%s' 缺少 stream 字段（可填空字符串）" % sid)
+		var pr = s.get("pitch_range", null)
+		if pr != null:
+			if not (pr is Array) or pr.size() != 2:
+				errors.append("音效 '%s' pitch_range 必须是 [min, max] 二元数组" % sid)
+			elif float(pr[0]) > float(pr[1]):
+				errors.append("音效 '%s' pitch_range[0] > pitch_range[1]" % sid)
+	for bid in bgm_data:
+		if not bgm_data[bid].has("stream"):
+			errors.append("BGM '%s' 缺少 stream 字段（可填空字符串）" % bid)
+
 	# ---- 输出结果 ----
 	if errors.is_empty():
-		print("[DataRegistry] 配置校验通过 | 卡牌: %d | 单位: %d | 塔: %d" % [
-			card_data.size(), unit_data.size(), tower_data.size()
+		print("[DataRegistry] 配置校验通过 | 卡牌: %d | 单位: %d | 塔: %d | 音效: %d | BGM: %d" % [
+			card_data.size(), unit_data.size(), tower_data.size(),
+			sound_data.size(), bgm_data.size()
 		])
 	else:
 		push_error("[DataRegistry] 配置校验发现 %d 个错误：" % errors.size())

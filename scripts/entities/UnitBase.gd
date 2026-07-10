@@ -23,6 +23,8 @@ var movement_targeting: String = "any"     ## "any" | "building_only"
 # ---- 运行时 ----
 var _move_target = null    ## 当前移动目标（CombatantBase 或 null）
 var _is_moving: bool = false  ## 本帧是否在移动（供 SpriteAnimator 轮询）
+var _move_sfx_timer: float = 0.0  ## 移动音效间歇计时器（仅 sfx.move 配置的单位使用）
+const MOVE_SFX_INTERVAL := 1.5  ## 移动音效播放间隔（秒）
 var _last_move_dir: Vector2 = Vector2.ZERO  ## 上一帧实际移动方向（供 CollisionSystem 切向滑动）
 var is_jumping_river: bool = false
 # ---- 冲锋（王子专属，数据驱动；无 charge 配置时 _charge_enabled=false）----
@@ -165,6 +167,7 @@ func _accumulate_charge(moved: float) -> void:
 	_charge_distance_accum += moved
 	if _charge_distance_accum >= _charge_min_distance:
 		is_charging = true
+		AudioManager.play_unit_sfx(unit_id, "charge", BattlePathing.game_position_of(self))
 		queue_redraw()
 
 
@@ -243,6 +246,11 @@ func _move_towards_position(target_pos: Vector2, delta: float) -> void:
 	position += move_dir * step
 	_last_move_dir = move_dir
 	_accumulate_charge(step)
+	# 移动音效：间歇播放（仅配了 sfx.move 的单位，如野猪骑士蹄声）
+	_move_sfx_timer -= delta
+	if _move_sfx_timer <= 0.0:
+		AudioManager.play_unit_sfx(unit_id, "move")
+		_move_sfx_timer = MOVE_SFX_INTERVAL
 
 
 ## 计算静态障碍物（塔/建筑）的避让转向向量。

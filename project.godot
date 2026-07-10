@@ -23,6 +23,7 @@ DataRegistry="*res://scripts/autoload/DataRegistry.gd"
 SignalBus="*res://scripts/autoload/SignalBus.gd"
 EntityRegistry="*res://scripts/autoload/EntityRegistry.gd"
 SpriteRegistry="*res://scripts/autoload/SpriteRegistry.gd"
+AudioManager="*res://scripts/autoload/AudioManager.gd"
 
 [display]
 
