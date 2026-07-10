@@ -121,11 +121,21 @@ var unit_data := {
 			"visual_scale": 0.135,
 			"visual_offset_y": -15.0,
 			"health_bar_y": -90,
-			"jump_frame": 2,  # 跳河期间锁定显示第3帧（0-indexed）
+			"jump_frame": 0,  # 跳河期间锁定显示第1帧（front/back 各动画首帧均合法）
 			"states": {
+				"walk_front": {
+					"frames": ["walk_front_01.png", "walk_front_02.png"],
+					"duration": [0.15, 0.15],
+					"mode": "loop",
+				},
 				"walk_back": {
 					"frames": ["walk_back_01.png", "walk_back_02.png", "walk_back_03.png", "walk_back_04.png"],
 					"duration": [0.15, 0.15, 0.15, 0.15],
+					"mode": "loop",
+				},
+				"idle_front": {
+					"frames": ["walk_front_01.png"],  # 待机/攻击间隔定格在移动第1帧
+					"duration": [1.0],
 					"mode": "loop",
 				},
 				"idle_back": {
@@ -133,11 +143,16 @@ var unit_data := {
 					"duration": [1.0],
 					"mode": "loop",
 				},
-			"attack_back": {
-				"frames": ["attack_back_01.png", "attack_back_02.png"],
-				"duration": [0.12, 0.18],  # 挥锤：举起快，砸下有停顿
-				"mode": "once",
-			},
+				"attack_front": {
+					"frames": ["attack_front_01.png", "attack_front_02.png"],
+					"duration": [0.12, 0.18],  # 挥锤：举起快，砸下有停顿，对齐 damage_delay
+					"mode": "once",
+				},
+				"attack_back": {
+					"frames": ["attack_back_01.png", "attack_back_02.png"],
+					"duration": [0.12, 0.18],  # 挥锤：举起快，砸下有停顿
+					"mode": "once",
+				},
 			},
 		},
 		"sfx": {
@@ -173,6 +188,48 @@ var unit_data := {
 			"damage": 217,
 			"projectile_speed": 17.5,
 		}],
+		# ---- 帧动画配置 ----
+		# 素材为高清图：walk ~710-858px宽 / attack ~747-1121px宽，高度 ~1400-1850px
+		# visual_scale 0.028（与 knight 一致，按角色高度对齐）
+		"animation": {
+			"visual_offset_x": 0.0,
+			"visual_offset_y": -25.0,
+			"visual_scale": 0.028,
+			"health_bar_y": -65.0,
+			"texture_filter": "linear",
+			"states": {
+				"walk_front": {
+					"frames": ["walk_front_01.png", "walk_front_02.png"],
+					"duration": [0.2, 0.2],
+					"mode": "loop",
+				},
+				"walk_back": {
+					"frames": ["walk_back_01.png", "walk_back_02.png"],
+					"duration": [0.2, 0.2],
+					"mode": "loop",
+				},
+				"idle_front": {
+					"frames": ["walk_front_01.png"],  # 暂用移动第1帧做待机
+					"duration": [1.0],
+					"mode": "loop",
+				},
+				"idle_back": {
+					"frames": ["walk_back_01.png"],  # 暂用移动第1帧做待机
+					"duration": [1.0],
+					"mode": "loop",
+				},
+				"attack_front": {
+					"frames": ["attack_front_01.png", "attack_front_02.png"],
+					"duration": [0.12, 0.18],  # 举枪快，射击有停顿
+					"mode": "once",
+				},
+				"attack_back": {
+					"frames": ["attack_back_01.png", "attack_back_02.png", "attack_back_03.png", "attack_back_04.png"],
+					"duration": [0.08, 0.08, 0.1, 0.14],  # 举枪→瞄准→射击→收枪，4帧展开
+					"mode": "once",
+				},
+			},
+		},
 		"sfx": {
 			"deploy": "deploy_musketeer",
 			"attack": "attack_musketeer",
