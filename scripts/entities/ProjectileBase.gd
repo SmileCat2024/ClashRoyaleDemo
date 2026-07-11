@@ -129,11 +129,13 @@ func _has_valid_target() -> bool:
 
 ## 命中处理：造成伤害，发出信号，销毁自身
 func _on_hit() -> void:
-	if splash_radius > 0.0:
-		_deal_splash_damage()
-	elif _has_valid_target():
-		# 目标仍存活 → 走统一伤害结算入口（含护盾、死亡判定）
-		DamageSystem.resolve_impact(target, damage)
+	# 联机 client 端：不造成伤害（由 host 计算），只发信号 + 销毁
+	if not NetworkManager.is_networked_client():
+		if splash_radius > 0.0:
+			_deal_splash_damage()
+		elif _has_valid_target():
+			# 目标仍存活 → 走统一伤害结算入口（含护盾、死亡判定）
+			DamageSystem.resolve_impact(target, damage)
 	# 目标已死 → 飞行物自然消失，不造成伤害
 
 	SignalBus.projectile_hit.emit(position, team)

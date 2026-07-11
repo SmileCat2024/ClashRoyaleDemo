@@ -1,13 +1,19 @@
 # 文件名：Arena.gd
 # 作用：管理战场背景绘制、部署区域判定。
 #       负责回答"这个位置玩家能不能放单位"等问题。
+#       find_nearest_valid_deploy() 实现非法位置（出界/建筑上）自动吸附到最近合法格。
 # 挂载位置：BattleScene/Arena（Arena.tscn 的根节点）
-# 初学者阅读建议：先看 is_player_deploy_position()，了解部署区域怎么判断。
+# 初学者阅读建议：先看 is_player_deploy_position()，了解部署区域怎么判断；
+#       再看 find_nearest_valid_deploy()，了解非法位置怎么自动吸附。
 
 extends Node2D
 
 ## 是否绘制调试网格（每格 20 像素的辅助线）
 @export var show_debug_grid: bool = true
+
+## 部署建筑冲突 margin：新单位格中心距障碍碰撞圆边缘至少留此缓冲（像素），
+## 避免部署后立即被碰撞系统弹开。
+const DEPLOY_OBSTACLE_MARGIN := 10.0
 
 @onready var _map_bg: Sprite2D = $MapBackground
 
@@ -45,6 +51,53 @@ func is_enemy_deploy_position(pos: Vector2) -> bool:
 func is_spell_deploy_position(pos: Vector2) -> bool:
 	return pos.y >= 0.0 and pos.y <= BattleConstants.ARENA_HEIGHT \
 		and pos.x >= 0.0 and pos.x <= BattleConstants.ARENA_WIDTH
+
+
+## 检查格中心是否落在任何静态障碍（塔 / mass=0 建筑卡）的碰撞范围内。
+## 障碍 collision_radius 外加 DEPLOY_OBSTACLE_MARGIN 缓冲，避免部署后紧贴建筑被弹开。
+func overlaps_static_obstacle(pos: Vector2) -> bool:
+	for obs in EntityRegistry.get_static_obstacles():
+		var r = obs.get("collision_radius")
+		if r == null:
+			r = 1.0
+		if pos.distance_to(obs.position) < float(r) + DEPLOY_OBSTACLE_MARGIN:
+			return true
+	return false
+
+
+## 综合判断一个格中心位置是否可部署。
+## 法术：仅区域检查（全图含河道，不需避让建筑）。
+## 单位：区域检查 + 建筑冲突检查。
+func is_cell_deployable(pos: Vector2, is_spell: bool, team: String) -> bool:
+	if is_spell:
+		return is_spell_deploy_position(pos)
+	if team == "player":
+		return is_player_deploy_position(pos) and not overlaps_static_obstacle(pos)
+	return is_enemy_deploy_position(pos) and not overlaps_static_obstacle(pos)
+
+
+## 找到离 raw_pos 最近的合法部署格中心。
+## 先吸附到格中心：若合法直接返回（绝大多数帧如此，零额外开销）。
+## 否则遍历整个竞技场格中心，返回欧氏距离最近的合法格。
+## 法术卡可全图施放（含河道），单位卡避开建筑且限于己方半场。
+func find_nearest_valid_deploy(raw_pos: Vector2, is_spell: bool, team: String) -> Vector2:
+	var center := BattleConstants.snap_to_cell_center(raw_pos)
+	if is_cell_deployable(center, is_spell, team):
+		return center
+	# 全竞技场格中心搜索（18×32=576 格，仅在边缘/建筑附近才触发）
+	var best_pos := center
+	var best_dist := INF
+	var half := BattleConstants.CELL_SIZE * 0.5
+	for gy in range(BattleConstants.MAP_TILES_H):
+		for gx in range(BattleConstants.MAP_TILES_W):
+			var candidate := Vector2(float(gx) * BattleConstants.CELL_SIZE + half,
+				float(gy) * BattleConstants.CELL_SIZE + half)
+			if is_cell_deployable(candidate, is_spell, team):
+				var d := candidate.distance_squared_to(raw_pos)
+				if d < best_dist:
+					best_dist = d
+					best_pos = candidate
+	return best_pos
 
 
 ## 在敌方部署区域内随机选一个位置

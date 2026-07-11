@@ -45,6 +45,12 @@ func get_next() -> String:
 	return _next
 
 
+## 被动设置手牌状态（联机模式 client 端使用，由 host 通过 RPC 同步）。
+func set_hand(hand: Array, next_card: String) -> void:
+	_hand = hand.duplicate()
+	_next = next_card
+
+
 ## 打出手牌中指定索引的牌。
 ## hand_index: 0-3
 ## 返回打出的牌 id；索引无效返回空字符串。

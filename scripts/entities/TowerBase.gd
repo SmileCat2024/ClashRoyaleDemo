@@ -11,7 +11,13 @@ extends CombatantBase
 # ---- 身份信息（塔独有）----
 var tower_id: String = ""
 var tower_type: String = "guard"  ## "king" 或 "guard"
-var king_activated: bool = true   ## 国王塔是否已激活（公主塔始终为 true）
+var king_activated: bool = true:
+	set(value):
+		var was := king_activated
+		king_activated = value
+		# 从 false → true 时恢复精灵亮度（client 端由 Synchronizer 同步触发）
+		if value and not was and _tower_sprite:
+			_tower_sprite.modulate = Color.WHITE
 
 # ---- 精灵节点（有 sprite 配置时创建，替代 ColorRect 渲染）----
 var _tower_sprite: Sprite2D = null
@@ -133,6 +139,8 @@ func _create_hp_label() -> void:
 	_hp_label.name = "HPLabel"
 	_hp_label.text = str(current_hp)
 	_hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# 鼠标穿透，避免标签矩形拦截战场点击（见 CombatantBase._disable_control_mouse）
+	_hp_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_hp_label)
 
 	# 粗体：FontVariation embolden
@@ -177,6 +185,8 @@ func _update_hp_label() -> void:
 
 ## 受到伤害。国王塔首次受击后激活。
 func take_damage(amount: int) -> void:
+	if _is_remote():
+		return  # Client 端血量由 Synchronizer 同步
 	super.take_damage(amount)
 	if tower_type == "king" and not king_activated and not is_dead:
 		activate_king()
@@ -225,6 +235,10 @@ func _draw() -> void:
 func _process(delta: float) -> void:
 	if not initialized or is_dead:
 		return
+	if _is_remote():
+		# Client 端：position/hp 由 BattleManager 手动 RPC 同步。仅刷新血条标签。
+		_update_hp_label()
+		return
 	_process_status_effects(delta)
 	# 塔的攻击逻辑由子节点 AttackComponent 独立处理（_init_combat_stats 时自动创建），
 	# TowerBase._process 无需额外操作。
@@ -233,6 +247,16 @@ func _process(delta: float) -> void:
 ## 死亡：隐藏精灵，从注册表注销，发出信号（塔不 queue_free，保留节点避免引用失效）
 func die() -> void:
 	super.die()
+	if _is_remote():
+		# Client 端：不注销、不发信号，只隐藏视觉（由 Synchronizer 同步 is_dead 触发）
+		if _tower_sprite:
+			_tower_sprite.visible = false
+		if health_bar:
+			health_bar.visible = false
+		if _hp_label:
+			_hp_label.visible = false
+		queue_redraw()
+		return
 	EntityRegistry.unregister(self)
 	if _tower_sprite:
 		_tower_sprite.visible = false
@@ -243,3 +267,14 @@ func die() -> void:
 	queue_redraw()
 	SignalBus.tower_destroyed.emit(tower_id, team, tower_type)
 	print("[TowerBase] tower destroyed:", tower_id, team, tower_type)
+
+
+## 联机 client 端：检测到 host 同步的 is_dead=true 后，隐藏视觉
+func _on_remote_death() -> void:
+	if _tower_sprite:
+		_tower_sprite.visible = false
+	if health_bar:
+		health_bar.visible = false
+	if _hp_label:
+		_hp_label.visible = false
+	queue_redraw()

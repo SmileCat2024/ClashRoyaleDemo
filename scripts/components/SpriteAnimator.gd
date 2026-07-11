@@ -127,8 +127,20 @@ func _update_animation() -> void:
 		_attack_anim_playing = false
 
 	# 检查攻击触发（只有存在攻击动画时才进入不可打断模式）
-	var attack := combatant.get_primary_attack()
-	if attack and attack.is_firing():
+	# 联机 client 端：优先从 combatant.is_attacking() 读取网络同步值
+	var firing := false
+	if combatant.has_method("is_attacking"):
+		firing = combatant.is_attacking()
+	else:
+		var attack := combatant.get_primary_attack()
+		firing = attack != null and attack.is_firing()
+	if firing:
+		# 优先用三态攻击朝向（front/back/side），命中即播放
+		if combatant.has_method("get_attack_facing"):
+			if _play_if_exists("attack_" + combatant.get_attack_facing()):
+				_attack_anim_playing = true
+				return
+		# 降级：无 get_attack_facing 或 side 未配置 → front/back 双向降级 → 无方向 attack
 		var facing := combatant.get_facing()
 		var other := "back" if facing == "front" else "front"
 		if _play_if_exists("attack_" + facing) \

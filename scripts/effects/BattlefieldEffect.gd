@@ -30,7 +30,9 @@ func _process(delta: float) -> void:
 		return
 	_elapsed += delta
 	if _elapsed >= lifetime:
-		_on_expire()
+		# 联机 client 端：跳过 _on_expire（伤害由 host 计算），只做视觉销毁
+		if not NetworkManager.is_networked_client():
+			_on_expire()
 		queue_free()
 
 

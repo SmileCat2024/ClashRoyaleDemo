@@ -18,12 +18,32 @@ var team: String = "player"
 
 # ---- 生存属性 ----
 var max_hp: int = 100
-var current_hp: int = 100
+## 当前血量。setter 自动更新血条，确保 client 端 Synchronizer 同步后血条也刷新。
+var current_hp: int = 100:
+	set(value):
+		current_hp = value
+		if initialized and health_bar != null:
+			health_bar.value = current_hp
 var shield: int = 0           ## 护盾上限（0 = 无护盾）
-var current_shield: int = 0   ## 当前护盾值
+## 当前护盾值。setter 同步血条显示。
+var current_shield: int = 0:
+	set(value):
+		current_shield = value
+		if initialized and health_bar != null:
+			health_bar.value = current_hp + current_shield
 
 # ---- 死亡状态 ----
-var is_dead: bool = false
+var is_dead: bool = false:
+	set(value):
+		var was_dead := is_dead
+		is_dead = value
+		# Client 端检测到 host 同步的死亡（false→true），触发远程死亡视觉
+		if value and not was_dead and _is_remote():
+			_on_remote_death()
+
+
+# ---- 联机 ----
+var network_id: int = 0  ## 联机唯一标识（host 分配），用于 RPC 配对同名节点
 
 # ---- 攻击数据（原始字典数组，由 AttackComponent 读取）----
 var attacks_data: Array = []
@@ -74,6 +94,18 @@ func _init_combat_stats(data: Dictionary) -> void:
 	_create_attack_components()
 	_create_sprite_animator(data)
 	_style_health_bar()
+	_setup_network_sync()
+	# 血条/占位方块/调试标签等 Control 子节点默认 mouse_filter=STOP 会拦截战场点击，
+	# 导致点击单位/塔所在格子时 BattleManager._unhandled_input 收不到事件。统一设为穿透。
+	_disable_control_mouse()
+
+
+## 把实体身上所有 Control 子孙节点设为鼠标穿透（MOUSE_FILTER_IGNORE）。
+## Body(ColorRect)/HealthBar(ProgressBar)/DebugLabel(Label) 等仅用于显示，
+## 不应消费鼠标事件——否则玩家点击单位所在格子时会因命中这些 UI 矩形而无法部署/施法。
+func _disable_control_mouse() -> void:
+	for c in find_children("*", "Control", true, false):
+		c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
 ## 根据 attacks_data 为每项攻击配置创建一个 AttackComponent（P0 只用第一个）
@@ -288,6 +320,8 @@ func is_stunned() -> bool:
 func take_damage(amount: int) -> void:
 	if is_dead:
 		return
+	if _is_remote():
+		return  # Client 端不处理伤害，血量由 Synchronizer 同步
 
 	# 护盾优先吸收
 	if current_shield > 0:
@@ -309,6 +343,8 @@ func take_damage(amount: int) -> void:
 ## 具体死亡表现（注销、信号、queue_free）由子类重写。
 func die() -> void:
 	is_dead = true
+	if _is_remote():
+		return  # Client 端不发死亡信号（由 host 的 Synchronizer 同步 is_dead）
 	if death_damage > 0 and death_radius > 0.0:
 		SignalBus.death_damage_triggered.emit(
 			global_position, death_damage, death_radius, death_fuse_time, team
@@ -326,3 +362,21 @@ func knockback(direction: Vector2, distance: float) -> void:
 		BattleConstants.ARENA_WIDTH - BattleConstants.CELL_SIZE * 0.5)
 	position.y = clampf(position.y, BattleConstants.CELL_SIZE * 0.5,
 		BattleConstants.ARENA_HEIGHT - BattleConstants.CELL_SIZE * 0.5)
+
+
+# =============================================================================
+# 联机同步
+# =============================================================================
+
+## 当前是否为 client 端（非权威端）。Client 端不执行战斗逻辑，只接收 host 同步的状态。
+func _is_remote() -> bool:
+	return NetworkManager.is_networked() and not NetworkManager.is_server()
+
+## 联机同步初始化。手动 RPC 同步方案：不再使用 MultiplayerSynchronizer。
+## 单位/塔状态由 BattleManager._sync_state_to_client() 定频 RPC 同步。
+func _setup_network_sync() -> void:
+	pass
+
+## Client 端检测到 host 同步的死亡时调用。子类覆写以播放死亡视觉。
+func _on_remote_death() -> void:
+	pass

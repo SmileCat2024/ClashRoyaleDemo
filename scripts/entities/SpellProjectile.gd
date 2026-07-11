@@ -93,9 +93,11 @@ func _on_impact() -> void:
 	_state = "exploding"
 	_explode_timer = 0.0
 	body_rect.visible = false
-	DamageSystem.deal_area_damage(_last_target_pos, _radius, _damage, team, _tower_damage)
-	if _knockback_distance > 0.0:
-		_apply_knockback()
+	# 联机 client 端：不造成伤害/击退（由 host 计算），只显示爆炸视觉
+	if not NetworkManager.is_networked_client():
+		DamageSystem.deal_area_damage(_last_target_pos, _radius, _damage, team, _tower_damage)
+		if _knockback_distance > 0.0:
+			_apply_knockback()
 
 
 ## 对爆炸范围内所有敌方单位施加击退（塔免疫，由 knockback 内部判定）

@@ -145,6 +145,13 @@ static func tile_to_pixel(tile_x: float, tile_y: float) -> Vector2:
 	return Vector2(px, py)
 
 
+## 联机 client 端 180 度镜像：以竞技场中心为对称点，同时翻转 X 和 Y。
+## 用途：每个玩家屏幕上都看到自己的塔在下方。Host 用逻辑坐标，Client 渲染/输入用镜像坐标。
+## 镜像是自反的：mirror(mirror(p)) == p。
+static func mirror(pos: Vector2) -> Vector2:
+	return Vector2(ARENA_WIDTH - pos.x, ARENA_HEIGHT - pos.y)
+
+
 ## 将任意像素坐标吸附到最近的格中心。
 ## 格 n 的中心在 (n + 0.5) * CELL_SIZE，例如格0中心 = 10px，格1中心 = 30px。
 ## 部署、法术释放等操作都先经过此函数对齐到格中心。

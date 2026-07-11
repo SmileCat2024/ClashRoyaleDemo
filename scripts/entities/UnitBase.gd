@@ -23,6 +23,12 @@ var movement_targeting: String = "any"     ## "any" | "building_only"
 # ---- 运行时 ----
 var _move_target = null    ## 当前移动目标（CombatantBase 或 null）
 var _is_moving: bool = false  ## 本帧是否在移动（供 SpriteAnimator 轮询）
+
+# ---- 联机视觉状态（host 计算并同步，client 直接读取）----
+var _net_visual_state: String = "idle"
+var _net_facing: String = "front"
+var _net_flip_h: bool = false
+var _net_is_firing: bool = false
 var _move_sfx_timer: float = 0.0  ## 移动音效间歇计时器（仅 sfx.move 配置的单位使用）
 const MOVE_SFX_INTERVAL := 1.5  ## 移动音效播放间隔（秒）
 var _last_move_dir: Vector2 = Vector2.ZERO  ## 上一帧实际移动方向（供 CollisionSystem 切向滑动）
@@ -66,6 +72,18 @@ var _shadow_radius: float = 0.0
 ## 部署时间（秒）。> 0 时建筑部署完成后才开始索敌/攻击/掉血/倒计时。普通单位 = 0。
 var deploy_time: float = 0.0
 var _deploy_timer: float = 0.0
+## Client 端位置插值：RPC 同步的目标位置 + 上一帧目标（检测移动）+ 初始化标志
+var _sync_target_pos: Vector2 = Vector2.ZERO
+var _last_sync_target: Vector2 = Vector2.ZERO
+var _sync_pos_init: bool = false
+## 最近一次同步推算的速度（像素/秒），丢包期间沿此方向外推避免单位"漂移减速"
+var _sync_velocity: Vector2 = Vector2.ZERO
+## 距离上次收到 RPC 的时间（秒），用于外推距离计算
+var _sync_time_since_update: float = 0.0
+## 外推时间上限（秒），超过此值停止外推避免无限漂移
+const MAX_EXTRAPOLATION_TIME := 0.15
+## 插值平滑系数（越大越快追上目标，过大会回退为跳变）
+const SYNC_LERP_SPEED := 18.0
 ## 是否已部署完成（可行动）。普通单位默认 true；有 deploy_time 的建筑初始 false。
 var is_deployed: bool = true
 ## 寿命（秒）。> 0 时建筑到期自毁。普通单位 = 0（无寿命）。
@@ -77,6 +95,10 @@ var _burn_accumulator: float = 0.0
 ## 光束发射点 Y 偏移（像素，负=上移）。仅地狱塔配置，其他单位 = 0（无光束）。
 var beam_emit_offset_y: float = 0.0
 var _beam: InfernoBeam = null
+## Client 端光束同步状态（host 通过 RPC 同步，client 端 _update_beam_visual 读取替代 AttackComponent）
+var _sync_beam_active: bool = false
+var _sync_beam_target: Vector2 = Vector2.ZERO
+var _sync_beam_stage: int = 0
 
 # ---- 部署下落动画（deploy_time 前期的视觉表现，不影响逻辑）----
 var _deploy_anim_timer: float = 0.0   ## 下落动画剩余时间（秒，>0 表示动画进行中）
@@ -202,6 +224,20 @@ func _draw() -> void:
 ## 地狱塔递增光束视觉更新：按需创建/隐藏 InfernoBeam 子节点，每帧传入起止/阶段。
 ## InfernoBeam 是 ADD 混合的 Node2D，专门负责多层叠加光束绘制（复刻 HTML 原型）。
 func _update_beam_visual() -> void:
+	# Client 端：用 RPC 同步的光束状态替代 AttackComponent 查询（client 不跑索敌逻辑）
+	if _is_remote():
+		if not _sync_beam_active:
+			if _beam != null and is_instance_valid(_beam):
+				_beam.visible = false
+			return
+		if _beam == null or not is_instance_valid(_beam):
+			_beam = InfernoBeam.new()
+			add_child(_beam)
+		var from_pos_c := Vector2(0.0, beam_emit_offset_y)
+		var to_pos_c := _sync_beam_target - position + Vector2(0.0, -10.0)
+		_beam.set_params(from_pos_c, to_pos_c, _sync_beam_stage, 1.0)
+		_beam.visible = true
+		return
 	var attack = get_primary_attack()
 	if attack == null or not attack.has_method("has_beam_target"):
 		return
@@ -223,6 +259,14 @@ func _update_beam_visual() -> void:
 	var to_pos := BattlePathing.game_position_of(target) - position + Vector2(0.0, -10.0)
 	_beam.set_params(from_pos, to_pos, attack.get_ramp_stage_index(), 1.0)
 	_beam.visible = true
+
+
+## Client 端：接收 host 同步的光束状态（由 BattleManager._rpc_sync_beams 调用）。
+## target_pos 已由 BattleManager 做过镜像。
+func update_beam_from_sync(active: bool, target_pos: Vector2, stage: int) -> void:
+	_sync_beam_active = active
+	_sync_beam_target = target_pos
+	_sync_beam_stage = stage
 
 
 ## 建筑寿命倒计时 + 自然掉血。每帧扣除 burn_rate HP，寿命到期 die() 兜底。
@@ -276,6 +320,26 @@ func _end_charge() -> void:
 
 func _process(delta: float) -> void:
 	if not initialized or is_dead:
+		return
+	# Client 端：position 由 BattleManager 手动 RPC 同步（已镜像），本地 lerp 插值平滑。
+	# _is_moving 由两个 RPC 包的目标位置变化判断（host 端单位是否在移动）。
+	# 本地运行部署动画倒计时。
+	if _is_remote():
+		if _sync_pos_init:
+			_sync_time_since_update += delta
+			# 外推预测：沿最近速度方向延伸目标，丢包时单位不会减速漂移
+			var extrap_time := minf(_sync_time_since_update, MAX_EXTRAPOLATION_TIME)
+			var predicted_target := _sync_target_pos + _sync_velocity * extrap_time
+			position = position.lerp(predicted_target, clampf(delta * SYNC_LERP_SPEED, 0.0, 1.0))
+		_is_moving = _sync_target_pos.distance_to(_last_sync_target) > 0.5
+		if not is_deployed:
+			_deploy_timer -= delta
+			_update_deploy_anim(delta)
+			if _deploy_timer <= 0.0:
+				is_deployed = true
+				_finish_deploy_anim()
+		# 地狱塔光束视觉更新（用 RPC 同步的状态驱动，client 端不跑索敌逻辑）
+		_update_beam_visual()
 		return
 	# 部署倒计时（deploy_time 期间不能行动；部署完成后才开始寿命/掉血/攻击）
 	if not is_deployed:
@@ -646,9 +710,24 @@ func _get_primary_attack_range() -> float:
 	return BattleConstants.px(float(attacks_data[0].get("attack_range", 1.5)))
 
 
+## SpriteAnimator 用：当前是否在攻击（client 端读网络同步值，host 端读 AttackComponent）
+func is_attacking() -> bool:
+	if _is_remote():
+		return _net_is_firing
+	var attack = get_primary_attack()
+	return attack != null and attack.is_firing()
+
+
 ## 覆写视觉状态：移动中返回 "walk"，否则返回 "idle"。
 ## SpriteAnimator 每帧轮询此方法决定播放什么动画。
 func get_visual_state() -> String:
+	if _is_remote():
+		# Client 端本地推断：_net_visual_state 从未 RPC 同步，改用 _is_moving
+		if is_dead:
+			return "death"
+		if not is_deployed:
+			return "walk"
+		return "walk" if _is_moving else "idle"
 	if is_dead:
 		return "death"
 	if is_jumping_river:
@@ -657,20 +736,60 @@ func get_visual_state() -> String:
 		return "walk"
 	if _is_moving:
 		return "walk"
-	return "idle"
+	# Host 端顺便更新网络变量（供 Synchronizer 同步到 client）
+	var state := "idle"
+	var attack = get_primary_attack()
+	_net_is_firing = attack != null and attack.is_firing()
+	_net_visual_state = state
+	return state
 
 
 ## 覆写朝向：根据当前目标 Y 坐标判定 front（面朝下/镜头）或 back（面朝上/背身）。
 func get_facing() -> String:
+	if _is_remote():
+		# Client 端本地推断：坐标镜像 + team 翻转后，按 team 决定朝向恰好正确
+		# （player 单位镜像后向上走→back，enemy 单位镜像后向下走→front）
+		var f2 := "back" if team == "player" else "front"
+		_net_facing = f2
+		return f2
 	# 部署期间无目标，按阵营强制朝向（player 向上走=back，enemy 向下走=front）
 	if not is_deployed:
-		return "back" if team == "player" else "front"
-	return "front" if _get_target_y() >= position.y else "back"
+		var f := "back" if team == "player" else "front"
+		_net_facing = f
+		return f
+	var facing := "front" if _get_target_y() >= position.y else "back"
+	_net_facing = facing
+	return facing
 
 
 ## 覆写水平翻转：目标在右侧时翻转为 true（素材默认面朝左）。
 func get_flip_h() -> bool:
-	return _get_target_x() > position.x
+	if _is_remote():
+		# Client 端本地推断：用 RPC 目标位置的 X 变化判断左右移动
+		var dx := _sync_target_pos.x - _last_sync_target.x
+		var flip := dx > 0.3
+		_net_flip_h = flip
+		return flip
+	var flip := _get_target_x() > position.x
+	_net_flip_h = flip
+	return flip
+
+
+## 攻击动画朝向（三态）：根据攻击目标相对自身的方向判定。
+## - 目标偏水平（|dx| > |dy|，45° 内）→ "side"
+## - 目标在正下方（dy 主导且 dy > 0）→ "front"
+## - 目标在正上方（dy 主导且 dy < 0）→ "back"
+## 无攻击目标时回退到 get_facing()（仅 front/back）。
+func get_attack_facing() -> String:
+	if _is_remote():
+		return "back" if team == "player" else "front"
+	var tx := _get_target_x()
+	var ty := _get_target_y()
+	var dx := absf(tx - position.x)
+	var dy := ty - position.y
+	if dx > absf(dy):
+		return "side"
+	return "back" if ty < position.y else "front"
 
 
 ## 当前关注目标的 X 坐标（攻击目标优先，其次移动目标，无目标返回自身）。
@@ -725,7 +844,20 @@ func _find_nearest_enemy_tower():
 ## 死亡：触发死亡范围伤害（super.die），从注册表注销，发出信号，销毁
 func die() -> void:
 	super.die()
+	if _is_remote():
+		# Client 端：不注销（未注册）、不触发死亡逻辑链，只播放视觉
+		return
 	EntityRegistry.unregister(self)
 	SignalBus.unit_died.emit(self, team)
 	print("[UnitBase] unit died:", unit_id)
 	queue_free()
+
+
+## 联机 client 端：检测到 host 同步的 is_dead=true 后，延迟销毁（留 0.3 秒让死亡视觉播放）
+func _on_remote_death() -> void:
+	# 变灰 + 淡出
+	modulate = Color(0.5, 0.5, 0.5, 0.7)
+	# 延迟销毁（让玩家看到死亡瞬间）
+	var tw := create_tween()
+	tw.tween_property(self, "modulate:a", 0.0, 0.3)
+	tw.tween_callback(queue_free)

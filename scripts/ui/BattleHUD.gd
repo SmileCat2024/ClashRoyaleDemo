@@ -73,6 +73,8 @@ func _on_battle_ended(result: String) -> void:
 	var text = "胜利！" if result == "victory" else "失败..."
 	if result == "draw":
 		text = "平局"
+	elif result == "disconnect":
+		text = "对手已断线"
 	$CenterMessageLabel.text = text
 	$CenterMessageLabel.visible = true
 	$EndPanel.visible = true

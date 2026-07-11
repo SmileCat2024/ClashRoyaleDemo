@@ -32,7 +32,7 @@ horizontal_alignment = 1
 
 [node name="DescLabel" type="Label" parent="VBoxContainer"]
 layout_mode = 2
-text = "2D 像素风卡牌塔防对战课程原型"
+text = "2D 像素风卡牌塔防对战"
 horizontal_alignment = 1
 
 [node name="Spacer" type="Control" parent="VBoxContainer"]
@@ -40,11 +40,97 @@ custom_minimum_size = Vector2(0, 20)
 layout_mode = 2
 
 [node name="StartButton" type="Button" parent="VBoxContainer"]
-custom_minimum_size = Vector2(160, 30)
+custom_minimum_size = Vector2(200, 36)
 layout_mode = 2
-text = "开始战斗"
+text = "单机 vs AI"
+
+[node name="HostButton" type="Button" parent="VBoxContainer"]
+custom_minimum_size = Vector2(200, 36)
+layout_mode = 2
+text = "创建房间（联机）"
+
+[node name="JoinButton" type="Button" parent="VBoxContainer"]
+custom_minimum_size = Vector2(200, 36)
+layout_mode = 2
+text = "加入房间（联机）"
 
 [node name="QuitButton" type="Button" parent="VBoxContainer"]
-custom_minimum_size = Vector2(160, 30)
+custom_minimum_size = Vector2(200, 36)
 layout_mode = 2
 text = "退出游戏"
+
+[node name="StatusLabel" type="Label" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -180.0
+offset_top = -80.0
+offset_right = 180.0
+offset_bottom = 40.0
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="HostList" type="ItemList" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -120.0
+offset_top = -60.0
+offset_right = 120.0
+offset_bottom = 20.0
+item_count = 0
+
+[node name="IPInput" type="LineEdit" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -120.0
+offset_top = 30.0
+offset_right = 120.0
+offset_bottom = 56.0
+placeholder_text = "或手动输入 IP"
+
+[node name="ConnectButton" type="Button" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -60.0
+offset_top = 66.0
+offset_right = 60.0
+offset_bottom = 92.0
+text = "连接"
+
+[node name="BackButton" type="Button" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -50.0
+offset_top = -44.0
+offset_right = 50.0
+offset_bottom = -16.0
+text = "返回"
+
+[connection signal="pressed" from="ConnectButton" to="." method="_on_connect_pressed"]
+[connection signal="pressed" from="BackButton" to="." method="_on_back_pressed"]
+[connection signal="item_activated" from="HostList" to="." method="_on_host_list_item_activated"]

@@ -54,8 +54,9 @@ func setup_field(center: Vector2, radius: float, tick_dmg: int, tick_tower_dmg: 
 	_tick_timer = interval  # 首跳之后，间隔 interval 再跳
 	z_index = 5             # 在单位之上、飞行物之下
 
-	# 首跳立即造成伤害
-	_deal_tick_damage()
+	# 首跳立即造成伤害（联机 client 端跳过，伤害由 host 计算）
+	if not NetworkManager.is_networked_client():
+		_deal_tick_damage()
 
 	queue_redraw()
 
@@ -65,6 +66,11 @@ func _process(delta: float) -> void:
 	super._process(delta)
 	# 到期后（super 已标记 queue_free），不再执行 tick 逻辑
 	if not initialized or _elapsed >= lifetime:
+		return
+
+	# 联机 client 端：只更新视觉（脉冲/淡出），不造成伤害/减速
+	if NetworkManager.is_networked_client():
+		queue_redraw()
 		return
 
 	# 每帧减速区域内敌方单位

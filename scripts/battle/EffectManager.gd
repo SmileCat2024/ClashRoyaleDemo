@@ -16,6 +16,10 @@ const DELAYED_DAMAGE_SCENE := preload("res://scenes/effects/DelayedDamageEffect.
 
 
 func _ready() -> void:
+	# 联机 client 端：不监听信号（伤害由 host 计算），炸弹由 host 通过 RPC 同步创建
+	if NetworkManager.is_networked_client():
+		print("[EffectManager] client mode, skip signal monitoring")
+		return
 	SignalBus.death_damage_triggered.connect(_on_death_damage_triggered)
 	print("[EffectManager] initialized")
 
@@ -36,4 +40,17 @@ func spawn_delayed_damage(pos: Vector2, damage: int, radius: float, fuse: float,
 	var effect: Node2D = DELAYED_DAMAGE_SCENE.instantiate()
 	effects_root.add_child(effect)
 	effect.setup_damage(pos, team, fuse, damage, radius)
+	# Host 端：通知 client 也创建炸弹视觉效果（client 端 _process early return，不造成伤害）
+	if NetworkManager.is_server():
+		_rpc_spawn_effect.rpc(pos, damage, radius, fuse, team)
 	return effect
+
+
+## 联机 RPC：Host → Client，让 client 端也创建延迟炸弹视觉效果
+@rpc("authority", "call_remote", "reliable")
+func _rpc_spawn_effect(pos: Vector2, damage: int, radius: float, fuse: float, team: String) -> void:
+	if NetworkManager.is_server():
+		return
+	var effect: Node2D = DELAYED_DAMAGE_SCENE.instantiate()
+	effects_root.add_child(effect)
+	effect.setup_damage(pos, team, fuse, damage, radius)

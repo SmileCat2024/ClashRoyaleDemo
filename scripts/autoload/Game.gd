@@ -17,6 +17,15 @@ enum GameState {
 ## 当前游戏状态
 var current_state: GameState = GameState.MENU
 
+## 是否处于联机模式（true = 联机对战 / false = 单机 vs AI）
+var network_mode: bool = false
+
+
+## 设置联机模式（由 MainMenu 在进入战斗前调用）
+func set_network_mode(enabled: bool) -> void:
+	network_mode = enabled
+	print("[Game] network_mode =", enabled)
+
 
 ## 进入战斗场景
 func start_battle() -> void:

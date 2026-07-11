@@ -15,6 +15,9 @@ const UNIT_SCENE := preload("res://scenes/entities/units/UnitBase.tscn")
 ## 单位的父容器（所有生成的单位都挂在这里下面）
 @onready var units_root: Node2D = $"../../World/UnitsRoot"
 
+## 联机单位 ID 计数器（host 分配唯一名字 "U1", "U2", ...，用于 Synchronizer 配对）
+var _next_net_id: int = 1
+
 
 ## 根据卡牌 id 生成单位到指定位置。
 ## card_id: 卡牌 id（如 "card_knight"）
@@ -60,6 +63,15 @@ func spawn_unit(card_id: String, team_name: String, pos: Vector2) -> Node:
 		# 注册到 EntityRegistry
 		EntityRegistry.register(unit)
 
+		# 联机模式：Host 分配唯一名字并通知 Client 创建同名单位
+		# 同名节点让 BattleManager 手动 RPC 状态同步正确配对
+		var final_pos: Vector2 = pos + offset
+		if NetworkManager.is_networked() and NetworkManager.is_server():
+			var net_name := "U%d" % _next_net_id
+			_next_net_id += 1
+			unit.name = net_name
+			_rpc_spawn_unit.rpc(net_name, unit_id, team_name, final_pos)
+
 		# 发出信号
 		SignalBus.unit_spawned.emit(unit, team_name)
 		last_unit = unit
@@ -93,3 +105,30 @@ static func _calc_one_offset(index: int, total: int, spread_px: float, offsets_d
 		return Vector2.ZERO
 	var angle = TAU * float(index) / float(total)
 	return Vector2(cos(angle), sin(angle)) * spread_px
+
+
+# =============================================================================
+# 联机 RPC
+# =============================================================================
+
+## Host → Client：通知 Client 创建同名单位。两端节点名一致，Synchronizer 自动配对。
+@rpc("authority", "call_remote", "reliable")
+func _rpc_spawn_unit(unit_name: String, unit_id: String, team_name: String, world_pos: Vector2) -> void:
+	if NetworkManager.is_server():
+		return  # Host 自己已创建
+	var u_data = DataRegistry.get_unit_data(unit_id)
+	if u_data.is_empty():
+		push_error("[SpawnManager] Client 收到未知 unit_id: " + unit_id)
+		return
+	var unit = UNIT_SCENE.instantiate()
+	unit.name = unit_name
+	units_root.add_child(unit)
+	# Client 端 team 翻转：host 的 player → client 的 enemy，反之亦然。
+	# 这样 client 自己始终是 player（蓝方），对方始终是 enemy（红方）。
+	var local_team := "enemy" if team_name == "player" else "player"
+	unit.setup(u_data, local_team)
+	# Client 端：镜像初始位置（后续由 BattleManager 手动 RPC 持续同步镜像坐标）
+	unit.position = BattleConstants.mirror(world_pos)
+	# Client 不注册到 EntityRegistry（不跑索敌/攻击逻辑）
+	SignalBus.unit_spawned.emit(unit, local_team)
+	print("[SpawnManager] Client spawn:", unit_name, unit_id, team_name)

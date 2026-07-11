@@ -85,6 +85,9 @@ func setup(attack_data: Dictionary) -> void:
 
 func _process(delta: float) -> void:
 	_is_firing = false
+	# 联机 client 端：不跑索敌/冷却/攻击逻辑（伤害由 host 计算）
+	if NetworkManager.is_networked_client():
+		return
 	# 抬手→命中延迟阶段：等待 damage_delay 到期才结算伤害
 	if _is_winding_up:
 		# 瘫痪时暂停抬手计时（眩晕/冰冻中断攻击动作）

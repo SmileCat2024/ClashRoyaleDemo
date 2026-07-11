@@ -28,6 +28,17 @@ var energy_interval: float = BASE_ENERGY_INTERVAL
 var deck_manager: DeckManager = null
 var selected_hand_index: int = -1  ## 当前选中的手牌索引（-1 = 未选中）
 
+# ---- 联机状态 ----
+var is_network_mode: bool = false  ## 是否联机模式
+var is_host: bool = false          ## 是否是 host
+var local_team: String = "player"  ## 本地玩家阵营
+var _remote_deck: DeckManager = null  ## 远程玩家的卡组（仅 host 维护，跟踪 client 手牌轮转）
+var _client_ready: bool = false    ## client 是否已加载完战斗场景
+var _sync_timer: float = 0.0       ## 状态同步累计计时器
+const SYNC_INTERVAL: float = 0.033  ## 状态同步间隔（秒，30Hz）
+var _synced_unit_names: Dictionary = {}  ## 上次同步的单位名集合（client 端检测消失的单位用）
+var _sync_node_cache: Dictionary = {}  ## Client 端 name→node 缓存，避免每次 RPC 重复 get_node_or_null
+
 # ---- 节点引用 ----
 # World 容器（持有 Y 压缩变换，所有世界节点在其下）
 @onready var world: Node2D = $"../../World"
@@ -44,6 +55,10 @@ var _towers: Array = []
 
 func _ready() -> void:
 	print("[BattleManager] initialized")
+	# 读取联机状态
+	is_network_mode = Game.network_mode
+	is_host = (not is_network_mode) or NetworkManager.is_server()
+	local_team = NetworkManager.local_team() if is_network_mode else "player"
 	# 清理上一局的注册表残留（重开时旧实体已被引擎 free，但未调用 unregister）
 	# 必须在 _setup_towers() 之前，否则会清掉刚注册的塔
 	EntityRegistry.clear()
@@ -57,10 +72,17 @@ func _ready() -> void:
 	# 连接全局信号
 	SignalBus.tower_destroyed.connect(_on_tower_destroyed)
 	SignalBus.card_selected.connect(_on_card_selected)
+	# 联机断线处理
+	if is_network_mode:
+		NetworkManager.peer_disconnected.connect(_on_peer_disconnected)
+		NetworkManager.server_disconnected.connect(_on_server_disconnected)
 	# 初始化所有塔的属性
 	_setup_towers()
 	# 开始战斗
 	start_battle()
+	# Client 端：通知 host 已准备好
+	if is_network_mode and not is_host:
+		_rpc_client_ready.rpc_id(1)
 
 
 ## 遍历 UnitsRoot 下的所有塔节点（TowerBase 实例），根据节点名称设置阵营和类型
@@ -76,7 +98,12 @@ func _setup_towers() -> void:
 			var data = DataRegistry.get_tower_data(data_key)
 			# 从常量设置位置（.tscn 中的值仅作编辑器预览）
 			if BattleConstants.TOWER_PIXEL_POSITIONS.has(child.name):
-				child.position = BattleConstants.TOWER_PIXEL_POSITIONS[child.name]
+				var tower_pos: Vector2 = BattleConstants.TOWER_PIXEL_POSITIONS[child.name]
+				# Client 端塔位置镜像 + team 翻转（自己的塔在下方且为蓝方）
+				if is_network_mode and not is_host:
+					tower_pos = BattleConstants.mirror(tower_pos)
+					team_name = "enemy" if team_name == "player" else "player"
+				child.position = tower_pos
 			child.setup(data, team_name, child.name)
 			EntityRegistry.register(child)
 
@@ -91,17 +118,36 @@ func start_battle() -> void:
 	_enemy_state.reset()
 	energy_timer = 0.0
 	selected_hand_index = -1
-	# 初始化卡组
-	deck_manager.setup(DataRegistry.get_default_player_deck())
+
+	if is_network_mode and is_host:
+		# Host 联机：初始化自己 + 远程玩家的卡组
+		deck_manager.setup(DataRegistry.get_default_player_deck())
+		_remote_deck = DeckManager.new()
+		_remote_deck.name = "RemoteDeck"
+		add_child(_remote_deck)
+		_remote_deck.setup(DataRegistry.get_default_enemy_deck())
+		# 不启动 AI（远程玩家是真人）
+	elif not is_network_mode:
+		# 单机模式：初始化玩家卡组 + AI
+		deck_manager.setup(DataRegistry.get_default_player_deck())
+	else:
+		# Client：手牌由 host 通过 RPC 同步，此处不初始化
+		pass
+
 	SignalBus.battle_started.emit()
 	SignalBus.battle_phase_changed.emit("regular", max_battle_time)
 	SignalBus.energy_changed.emit("player", _player_state.energy, max_energy)
 	SignalBus.energy_changed.emit("enemy", _enemy_state.energy, max_energy)
-	if enemy_ai and enemy_ai.has_method("setup"):
+
+	# 单机模式才 setup AI
+	if not is_network_mode and enemy_ai and enemy_ai.has_method("setup"):
 		enemy_ai.setup()
+
 	# 延迟广播手牌状态，确保 CardBar 的 _ready 已连接信号
-	call_deferred("_broadcast_hand_state")
-	print("[BattleManager] battle started")
+	# Client 联机：手牌由 host 通过 RPC 同步，此处不广播（避免闪烁空手牌）
+	if not (is_network_mode and not is_host):
+		call_deferred("_broadcast_hand_state")
+	print("[BattleManager] battle started (network=%s host=%s)" % [is_network_mode, is_host])
 
 
 ## 向 UI 广播当前手牌和选中状态（延迟调用，确保 UI 已就绪）
@@ -118,6 +164,9 @@ func end_battle(result: String) -> void:
 	if deploy_preview:
 		deploy_preview.hide_preview()
 	SignalBus.battle_ended.emit(result)
+	# 联机模式下 host 通知 client 战斗结果
+	if is_network_mode and is_host:
+		_rpc_battle_end.rpc(result)
 	print("[BattleManager] battle ended:", result)
 
 
@@ -129,11 +178,20 @@ func restart_battle() -> void:
 func _process(delta: float) -> void:
 	if not battle_running:
 		return
+	# Client 端：不跑战斗逻辑（时间/能量/碰撞由 host 同步）
+	if is_network_mode and not is_host:
+		return
 	battle_time += delta
 	update_energy(delta)
 	_check_time_limit()
 	# 碰撞分离：在所有单位移动之后统一执行（场景树顺序保证单位先于 Manager 执行 _process）
 	CollisionSystem.resolve_overlaps(EntityRegistry.get_all_combatants())
+	# Host 联机：定频同步状态给 client
+	if is_network_mode and is_host:
+		_sync_timer += delta
+		if _sync_timer >= SYNC_INTERVAL:
+			_sync_timer = 0.0
+			_sync_state_to_client()
 
 
 ## 能量恢复逻辑：每 energy_interval 秒，双方各 +1 能量（不超过上限）
@@ -163,9 +221,9 @@ func _select_hand_card(hand_index: int) -> void:
 	if hand_index >= hand.size():
 		return
 	var card_id = hand[hand_index]
-	# 能量不足时不允许选中
-	if not can_afford_card("player", card_id):
-		print("[BattleManager] 能量不足:", card_id, "(需要", DataRegistry.get_card_data(card_id).get("cost", 0), "当前", _player_state.energy, ")")
+	# 能量不足时不允许选中（联机模式下用 local_team 判断）
+	if not can_afford_card(local_team, card_id):
+		print("[BattleManager] 能量不足:", card_id, "(需要", DataRegistry.get_card_data(card_id).get("cost", 0), "当前", _get_state(local_team).energy, ")")
 		return
 	# 再次点击同一张 = 取消
 	if selected_hand_index == hand_index:
@@ -193,7 +251,19 @@ func _try_deploy(world_position: Vector2) -> void:
 		return
 	var hand = deck_manager.get_hand()
 	var card_id = hand[selected_hand_index]
-	var success = try_play_card(card_id, "player", world_position)
+
+	# Client 联机：发 RPC 给 host，不在本地处理
+	if is_network_mode and not is_host:
+		_rpc_play_card.rpc_id(1, selected_hand_index, local_team, world_position)
+		# 立即清除选中（体验上不等 RPC 往返）
+		selected_hand_index = -1
+		if deploy_preview:
+			deploy_preview.hide_preview()
+		SignalBus.selection_changed.emit(-1)
+		return
+
+	# Host / 单机：本地处理
+	var success = try_play_card(card_id, local_team, world_position)
 	if success:
 		# 卡组轮转：打出的牌回队尾，下一张填补空位
 		deck_manager.play_card(selected_hand_index)
@@ -230,18 +300,11 @@ func try_play_card(card_id: String, team_name: String, world_position: Vector2) 
 	var card := DataRegistry.get_card_data(card_id)
 	var card_type: String = card.get("card_type", "")
 
-	# 检查部署位置是否合法（法术可全图施放，单位受半场限制）
-	if card_type == "spell":
-		if not arena.is_spell_deploy_position(world_position):
-			print("[BattleManager] 无效法术位置:", world_position)
-			return false
-	elif team_name == "player":
-		if not arena.is_player_deploy_position(world_position):
-			print("[BattleManager] 无效部署位置:", world_position)
-			return false
-	else:
-		if not arena.is_enemy_deploy_position(world_position):
-			return false
+	# 检查部署位置是否合法
+	# 法术可全图施放（含河道）；单位限己方半场且不可部署在建筑/塔上
+	if not arena.is_cell_deployable(world_position, card_type == "spell", team_name):
+		print("[BattleManager] 无效部署位置:", world_position)
+		return false
 
 	# 按卡牌类型分流
 	match card_type:
@@ -412,17 +475,257 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_4:
 				_select_hand_card(3)
 			KEY_R:
-				restart_battle()
+				# 联机模式：只有 host 能重开，通过 RPC 让 client 也重开
+				if is_network_mode:
+					if is_host:
+						_rpc_restart.rpc()
+						restart_battle()
+				else:
+					restart_battle()
 			KEY_G:
-				add_energy("player", 1)
+				# 联机 client 端：不能调试加能量（能量由 host 同步）
+				if not (is_network_mode and not is_host):
+					add_energy("player", 1)
 			KEY_H:
-				add_energy("enemy", 1)
+				# 联机 client 端：不能调试加能量
+				if not (is_network_mode and not is_host):
+					add_energy("enemy", 1)
 	elif event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if battle_running and selected_hand_index >= 0:
 				# 通过 World 节点的逆变换获取游戏空间坐标（自动处理 Y 压缩 + 偏移）
-				# 吸附到最近的格中心
-				var world_pos: Vector2 = BattleConstants.snap_to_cell_center(world.get_local_mouse_position())
+				# 判断当前卡牌类型：法术全图含河道，单位限己方半场且避让建筑
+				var hand = deck_manager.get_hand()
+				var card_id = hand[selected_hand_index]
+				var card = DataRegistry.get_card_data(card_id)
+				var is_spell = (card.get("card_type") == "spell")
+				# 吸附到最近合法格中心（出界/贴近建筑时自动锁定）
+				# Client 端画面是 180 度镜像的：鼠标视觉坐标需逆镜像回逻辑坐标再做部署判定
+				var raw_pos: Vector2 = world.get_local_mouse_position()
+				if is_network_mode and not is_host:
+					raw_pos = BattleConstants.mirror(raw_pos)
+				var world_pos: Vector2 = arena.find_nearest_valid_deploy(
+					raw_pos, is_spell, local_team)
 				_try_deploy(world_pos)
 		elif event.button_index == MOUSE_BUTTON_RIGHT:
 			_cancel_selection()
+
+
+# ==============================================================================
+# 联机 RPC（@rpc 方法）
+# ==============================================================================
+
+## Client → Host：通知已加载完战斗场景，准备好接收状态同步
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_client_ready() -> void:
+	_client_ready = true
+	print("[BattleManager] client 已就绪，开始同步状态")
+	# 立即同步一次完整状态
+	_sync_state_to_client()
+	if _remote_deck:
+		var remote_hand := _remote_deck.get_hand()
+		var remote_next := _remote_deck.get_next()
+		_rpc_sync_hand.rpc(remote_hand, remote_next)
+
+
+## Client → Host：请求出牌。hand_index 为 client 手牌索引。
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_play_card(hand_index: int, team: String, world_position: Vector2) -> void:
+	if not is_host:
+		return
+	# 远程玩家的 team 应为 enemy（与 host 的 remote_team 一致）
+	if team != NetworkManager.remote_team():
+		team = NetworkManager.remote_team()
+	# 查找远程玩家手牌
+	if _remote_deck == null:
+		return
+	var hand = _remote_deck.get_hand()
+	if hand_index < 0 or hand_index >= hand.size():
+		return
+	var card_id = hand[hand_index]
+	var success = try_play_card(card_id, team, world_position)
+	if success:
+		# 轮转远程玩家手牌
+		_remote_deck.play_card(hand_index)
+		# 同步新手牌给 client
+		_rpc_sync_hand.rpc(_remote_deck.get_hand(), _remote_deck.get_next())
+		print("[BattleManager] 远程玩家出牌:", card_id)
+
+
+## Host → Client：同步手牌
+@rpc("authority", "call_remote", "reliable")
+func _rpc_sync_hand(hand: Array, next_card: String) -> void:
+	if is_host:
+		return  # Host 自己不需要接收
+	deck_manager.set_hand(hand, next_card)
+	SignalBus.hand_updated.emit(hand, next_card)
+	SignalBus.selection_changed.emit(-1)
+
+
+## Host → Client：定频同步战斗状态（能量 + 时间 + 阶段）
+@rpc("authority", "call_remote", "unreliable")
+func _rpc_sync_state(p_energy: int, e_energy: int, p_progress: float, e_progress: float, time_val: float, phase_val: String) -> void:
+	if is_host:
+		return
+	# Client 视角翻转：自己(player)=host 的 enemy；敌方(enemy)=host 的 player
+	_player_state.energy = e_energy
+	_enemy_state.energy = p_energy
+	SignalBus.energy_changed.emit("player", e_energy, max_energy)
+	SignalBus.energy_changed.emit("enemy", p_energy, max_energy)
+	SignalBus.player_energy_progress = e_progress
+	# 更新时间
+	battle_time = time_val
+	# 阶段切换
+	if battle_phase != phase_val:
+		battle_phase = phase_val
+		if phase_val == "overtime":
+			SignalBus.battle_phase_changed.emit("overtime", overtime_duration)
+	# 更新圣水条进度（client 自己 = host 的 enemy）
+	_player_state.energy_progress = e_progress
+
+
+## Host → Client：战斗结束
+@rpc("authority", "call_remote", "reliable")
+func _rpc_battle_end(result: String) -> void:
+	if is_host:
+		return
+	end_battle(result)
+
+
+## Host 端调用：打包当前状态发送给 client
+func _sync_state_to_client() -> void:
+	if not is_host or not _client_ready:
+		return
+	var p_progress := _player_state.energy_progress
+	var e_progress := _enemy_state.energy_progress
+	_rpc_sync_state.rpc(
+		_player_state.energy,
+		_enemy_state.energy,
+		p_progress,
+		e_progress,
+		battle_time,
+		battle_phase
+	)
+	# 单次遍历收集单位状态 + 光束状态（合并避免双遍历）
+	var unit_states: Array = []
+	var beam_states: Array = []
+	for child in units_root.get_children():
+		if not (child is CombatantBase) or not child.initialized:
+			continue
+		unit_states.append([child.name, child.position.x, child.position.y,
+			child.current_hp, child.current_shield, child.is_dead])
+		# 地狱塔光束：beam_emit_offset_y != 0 的单位有光束能力
+		if child is UnitBase and child.beam_emit_offset_y != 0.0:
+			var attack = child.get_primary_attack()
+			if attack != null and attack.has_method("has_beam_target"):
+				var b_active: bool = attack.has_beam_target()
+				var b_target := Vector2.ZERO
+				var b_stage := 0
+				if b_active:
+					var bt = attack.get_beam_target()
+					if bt and is_instance_valid(bt):
+						b_target = BattlePathing.game_position_of(bt)
+					b_stage = attack.get_ramp_stage_index()
+				beam_states.append([child.name, b_active, b_target.x, b_target.y, b_stage])
+	_rpc_sync_units.rpc(unit_states)
+	if not beam_states.is_empty():
+		_rpc_sync_beams.rpc(beam_states)
+
+
+## Host → Client：定频同步地狱塔光束状态。
+## 数据格式：Array of [name, active, target_x, target_y, stage]
+@rpc("authority", "call_remote", "unreliable")
+func _rpc_sync_beams(states: Array) -> void:
+	if is_host:
+		return
+	for s in states:
+		var unit_name: String = s[0]
+		var active: bool = s[1]
+		# 光束目标位置镜像（与单位/塔位置镜像一致）
+		var target_pos := BattleConstants.mirror(Vector2(s[2], s[3]))
+		var stage: int = s[4]
+		var unit = units_root.get_node_or_null(unit_name)
+		if unit is UnitBase:
+			unit.update_beam_from_sync(active, target_pos, stage)
+
+
+## Host → Client：定频同步所有单位/塔状态。替代 MultiplayerSynchronizer 的手动方案。
+## 数据格式：Array of [name, x, y, hp, shield, is_dead]
+@rpc("authority", "call_remote", "unreliable")
+func _rpc_sync_units(states: Array) -> void:
+	if is_host:
+		return
+	var current_names: Dictionary = {}
+	for s in states:
+		var unit_name: String = s[0]
+		current_names[unit_name] = true
+		# 缓存查节点：避免每个 RPC 包重复 get_node_or_null 字符串匹配
+		var unit = _sync_node_cache.get(unit_name, null)
+		if unit == null or not is_instance_valid(unit):
+			unit = units_root.get_node_or_null(unit_name)
+			if unit == null:
+				continue
+			_sync_node_cache[unit_name] = unit
+		# 镜像位置（180 度旋转，让 client 看到自己的塔在下方）
+		var mirrored_pos := BattleConstants.mirror(Vector2(s[1], s[2]))
+		# 单位用插值目标位置（_process 里 lerp 平滑过渡，消除卡顿）；
+		# 塔静止不动，直接设 position。
+		if unit is UnitBase:
+			# 计算外推速度（最近两个同步包的位移 / 同步间隔），供丢包时位置外推
+			if unit._sync_pos_init:
+				unit._sync_velocity = (mirrored_pos - unit._sync_target_pos) / SYNC_INTERVAL
+			unit._last_sync_target = unit._sync_target_pos
+			unit._sync_target_pos = mirrored_pos
+			unit._sync_time_since_update = 0.0
+			if not unit._sync_pos_init:
+				unit.position = mirrored_pos
+				unit._last_sync_target = mirrored_pos
+				unit._sync_pos_init = true
+		else:
+			unit.position = mirrored_pos
+		unit.current_hp = int(s[3])
+		unit.current_shield = int(s[4])
+		# 死亡同步（触发 _on_remote_death 播放死亡视觉）
+		if s[5] and not unit.is_dead:
+			unit.is_dead = true
+		# 国王塔激活检测：hp 低于上限说明已受击
+		if unit is TowerBase and unit.tower_type == "king" and not unit.king_activated:
+			if unit.current_hp < unit.max_hp:
+				unit.activate_king()
+	# 检测从同步中消失的单位（host 端已死亡/释放）→ 标记死亡触发视觉 + 清理缓存
+	for prev_name in _synced_unit_names:
+		if not current_names.has(prev_name):
+			var unit = _sync_node_cache.get(prev_name, null)
+			if unit == null or not is_instance_valid(unit):
+				unit = units_root.get_node_or_null(prev_name)
+			if unit and not unit.is_dead:
+				unit.is_dead = true
+			_sync_node_cache.erase(prev_name)
+	_synced_unit_names = current_names
+
+
+## Host → Client：通知重开（R 键联机同步）
+@rpc("authority", "call_remote", "reliable")
+func _rpc_restart() -> void:
+	if is_host:
+		return
+	restart_battle()
+
+
+# =============================================================================
+# 联机断线处理
+# =============================================================================
+
+## Host 端：Client 断线（掉线/退出）
+func _on_peer_disconnected(_peer_id: int) -> void:
+	if not is_host or not battle_running:
+		return
+	print("[BattleManager] 对手断线，结束战斗")
+	end_battle("disconnect")
+
+## Client 端：与 Host 的连接断开
+func _on_server_disconnected() -> void:
+	if is_host or not battle_running:
+		return
+	print("[BattleManager] 与主机断开连接")
+	end_battle("disconnect")

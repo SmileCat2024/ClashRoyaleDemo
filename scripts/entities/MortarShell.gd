@@ -14,7 +14,12 @@ extends ProjectileBase
 
 # ---- 炮弹参数 ----
 var _splash_radius: float = 0.0  ## 溅射半径（像素）
-const SHELL_RADIUS := 8.0        ## 石头绘制半径（像素），旧版 ColorRect 的 2 倍
+
+# ---- 炮弹贴图 ----
+# 美术提供的迫击炮炮弹 PNG（263×284）。加载一次缓存，找不到时退回圆形绘制。
+var _shell_texture: Texture2D = null
+const SHELL_TEX_SCALE := 0.075    ## 贴图基础缩放（屏幕约 20×23px）
+const FALLBACK_SHELL_RADIUS := 8.0  ## 无贴图时圆形兜底绘制半径（像素）
 
 # ---- 状态 ----
 var _state: String = "flying"  ## "flying" | "exploding"
@@ -49,8 +54,13 @@ func setup_shell(spawn_pos: Vector2, target_node, dmg: int, splash_px: float, sp
 	_body_base_y = body_rect.position.y
 
 	# body_rect 仅作为弧线偏移锚点（基类 _apply_arc_offset 操作其 position），
-	# 石头本体由 _draw() 绘制为圆形，因此设为不可见
+	# 炮弹本体由 _draw() 用贴图绘制，因此设为不可见
 	body_rect.visible = false
+	# 加载炮弹贴图（load 失败返回 null 时 _draw 退回圆形兜底）
+	if _shell_texture == null:
+		var tex_path := "res://assets/sprites/mortar/mortar_shell.png"
+		if ResourceLoader.exists(tex_path):
+			_shell_texture = load(tex_path)
 	_state = "flying"
 	z_index = 45
 	queue_redraw()
@@ -76,22 +86,31 @@ func _on_impact() -> void:
 	_state = "exploding"
 	_explode_timer = 0.0
 	body_rect.visible = false
-	DamageSystem.deal_area_damage(_last_target_pos, _splash_radius, damage, team)
+	# 联机 client 端：不造成伤害（由 host 计算），只显示爆炸视觉
+	if not NetworkManager.is_networked_client():
+		DamageSystem.deal_area_damage(_last_target_pos, _splash_radius, damage, team)
 
 
 func _draw() -> void:
 	if _state == "flying":
 		# 地面影子（逻辑位置 = Vector2.ZERO，不受弧高偏移影响）。
-		# draw_set_transform Y 压扁正圆为扁平椭圆，配合大石头视觉。
+		# draw_set_transform Y 压扁正圆为扁平椭圆，配合炮弹视觉。
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, 0.42))
 		draw_circle(Vector2.ZERO, 7.0, Color(0, 0, 0, 0.28))
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-		# 石头本体（圆形灰褐色），位置随 body_rect 的弧线偏移上移
+		# 炮弹本体：位置随 body_rect 的弧线偏移上移
 		var stone_y: float = body_rect.position.y - _body_base_y
 		var stone_pos := Vector2(0.0, stone_y)
-		draw_circle(stone_pos, SHELL_RADIUS, Color(0.42, 0.38, 0.34))
-		# 石头高光（左上偏亮，增加立体质感）
-		draw_circle(stone_pos + Vector2(-2.5, -2.5), 3.0, Color(0.60, 0.56, 0.50))
+		if _shell_texture != null:
+			# 贴图绘制：Y 方向补偿 World 压缩保持原始宽高比
+			var w: float = _shell_texture.get_width() * SHELL_TEX_SCALE
+			var h: float = _shell_texture.get_height() * SHELL_TEX_SCALE / BattleConstants.Y_COMPRESS
+			var tex_rect := Rect2(stone_pos - Vector2(w / 2.0, h / 2.0), Vector2(w, h))
+			draw_texture_rect(_shell_texture, tex_rect, false)
+		else:
+			# 无贴图兜底：圆形灰褐色石头 + 高光
+			draw_circle(stone_pos, FALLBACK_SHELL_RADIUS, Color(0.42, 0.38, 0.34))
+			draw_circle(stone_pos + Vector2(-2.5, -2.5), 3.0, Color(0.60, 0.56, 0.50))
 	elif _state == "exploding":
 		# 爆炸扩散圆（灰褐色尘土，逐渐淡出）
 		var t: float = _explode_timer / EXPLODE_DURATION

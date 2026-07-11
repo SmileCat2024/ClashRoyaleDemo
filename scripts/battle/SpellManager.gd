@@ -50,6 +50,20 @@ func cast_spell(card_id: String, team_name: String, target_pos: Vector2) -> void
 			projectile.setup_spell(origin2, target_pos, card, team_name)
 
 	print("[SpellManager] cast %s (%s) → %s" % [card_id, team_name, target_pos])
+	# Host 端：通知 client 也创建法术视觉效果（client 端效果实体 _process early return，不造成伤害）
+	if NetworkManager.is_server():
+		_rpc_cast_spell.rpc(card_id, team_name, target_pos)
+
+
+## 联机 RPC：Host → Client，让 client 端也创建法术视觉效果
+@rpc("authority", "call_remote", "reliable")
+func _rpc_cast_spell(card_id: String, team_name: String, target_pos: Vector2) -> void:
+	if NetworkManager.is_server():
+		return  # Host 已本地执行
+	# Client 端 team 翻转 + 180 度镜像落地位置
+	# （发射点 origin 由 _get_king_tower_position 内部按 local_team 镜像）
+	var local_team := "enemy" if team_name == "player" else "player"
+	cast_spell(card_id, local_team, BattleConstants.mirror(target_pos))
 
 
 ## 毒药法术落地：直接在目标位置创建持续伤害区域（无弹道）
@@ -73,6 +87,9 @@ func _create_poison_field(target_pos: Vector2, card: Dictionary, team_name: Stri
 
 ## 获取指定阵营国王塔的位置（World 本地游戏空间坐标）。
 ## 使用常量而非查找节点——即使国王塔被摧毁，法术仍从该位置发射。
+## 不做 client 镜像：_rpc_cast_spell 已翻转 team，翻转后的 team 查出的
+## 国王塔位置本身就是正确的（enemy→敌方塔/屏幕上方，player→己方塔/屏幕下方）。
+## 若再 mirror 会把 origin 多翻转一次，导致敌方法术从己方塔发射。
 static func _get_king_tower_position(team_name: String) -> Vector2:
 	var key := "PlayerKingTower" if team_name == "player" else "EnemyKingTower"
 	return BattleConstants.TOWER_PIXEL_POSITIONS[key]

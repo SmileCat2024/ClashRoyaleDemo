@@ -1,9 +1,9 @@
 # 文件名：DeployPreview.gd
 # 作用：卡牌选中后，在鼠标位置显示部署预览。
-#       坐标吸附到最近的格中心（snap_to_cell_center）。
+#       非法位置（出界/贴近建筑）自动吸附到最近的合法格，预览始终跟随合法位置。
 #       单位卡：根据 spawn_offsets 显式偏移或确定性圆形分布，显示每个单位的精确落点。
-#       法术卡：显示法术半径圆（绿色 = 可施放，红色 = 不可施放）。
-#       绿色 = 可部署，红色 = 不可部署。
+#       法术卡：显示法术半径圆（全图含河道均可施放）。
+#       绿色 = 可部署，红色 = 不可部署（仅在极端无合法格时出现）。
 # 挂载位置：BattleScene/World/DeployPreview
 # 初学者阅读建议：先看 show_preview() 了解偏移怎么算，再看 _draw() 了解怎么画。
 
@@ -34,8 +34,18 @@ var _tex_scale: Vector2 = Vector2.ONE
 ## 纹理偏移（visual_offset，像素）
 var _tex_offset: Vector2 = Vector2.ZERO
 
+## 建筑攻击范围（像素，>0 时绘制射程预览圆）
+var _attack_range: float = 0.0
+## 建筑最小射程盲区（像素，>0 时射程圆中心掏空成环形，如迫击炮）
+var _min_attack_range: float = 0.0
+
 ## 预览方块半边长（匹配 UnitBase body size 16px → 半边 8）
 const PREVIEW_HALF := 8.0
+
+## 射程/法术范围圆统一样式：白色边框 + 极浅白填充
+const RANGE_BORDER_COLOR := Color(1.0, 1.0, 1.0, 0.85)
+const RANGE_FILL_COLOR := Color(1.0, 1.0, 1.0, 0.1)
+const RANGE_BORDER_WIDTH := 1.5
 
 ## Arena 引用，用于校验部署位置
 @onready var _arena: Node2D = get_node_or_null("../Arena")
@@ -44,6 +54,8 @@ const PREVIEW_HALF := 8.0
 ## 设置当前选中的卡牌数据，计算预览内容并显示。
 func show_preview(card_data: Dictionary) -> void:
 	_is_spell = (card_data.get("card_type") == "spell")
+	_attack_range = 0.0
+	_min_attack_range = 0.0
 	if _is_spell:
 		_spell_radius = BattleConstants.px(float(card_data.get("spell_radius", 0)))
 		_offsets = []
@@ -54,6 +66,7 @@ func show_preview(card_data: Dictionary) -> void:
 		var offsets_data = card_data.get("spawn_offsets", null)
 		_offsets = SpawnManager.get_spawn_offsets(count, spread_px, offsets_data)
 		_load_unit_texture(card_data)
+		_load_building_range(card_data)
 	_active = true
 	queue_redraw()
 
@@ -63,6 +76,8 @@ func hide_preview() -> void:
 	_active = false
 	_is_spell = false
 	_frame_texture = null
+	_attack_range = 0.0
+	_min_attack_range = 0.0
 	queue_redraw()
 
 
@@ -85,7 +100,8 @@ func _load_unit_texture(card_data: Dictionary) -> void:
 		float(anim_cfg.get("visual_offset_x", 0.0)),
 		float(anim_cfg.get("visual_offset_y", 0.0))
 	)
-	var frames: SpriteFrames = SpriteRegistry.get_sprite_frames(unit_id)
+	# 预览始终以 player 方视角（自己部署），团队色单位取 player 帧绘制虚影
+	var frames: SpriteFrames = SpriteRegistry.get_sprite_frames(unit_id, "player")
 	if frames == null:
 		return
 	# player 方向上推进，优先 walk_back 第一帧
@@ -95,27 +111,42 @@ func _load_unit_texture(card_data: Dictionary) -> void:
 			return
 
 
+## 读取建筑单位（mass==0）的攻击范围，用于拖动预览显示射程圆。
+## 迫击炮等带 min_attack_range 的单位会绘制中心掏空的环形。
+func _load_building_range(card_data: Dictionary) -> void:
+	var unit_id: String = card_data.get("unit_id", "")
+	if unit_id.is_empty():
+		return
+	var u_data: Dictionary = DataRegistry.get_unit_data(unit_id)
+	if int(u_data.get("mass", 1)) != 0:
+		return  # 非建筑单位（可移动）不显示射程预览
+	var attacks: Array = u_data.get("attacks", [])
+	if attacks.is_empty():
+		return
+	_attack_range = BattleConstants.px(float(attacks[0].get("attack_range", 0.0)))
+	_min_attack_range = BattleConstants.px(float(attacks[0].get("min_attack_range", 0.0)))
+
+
 func _process(_delta: float) -> void:
 	if not _active:
 		return
-	# 鼠标位置吸附到格中心
-	var raw_pos := get_local_mouse_position()
-	_snapped_pos = BattleConstants.snap_to_cell_center(raw_pos)
-	_valid = _check_valid()
-	queue_redraw()
-
-
-## 检查中心格是否在可部署区域内（法术卡用全图判定）。
-func _check_valid() -> bool:
 	if _arena == null:
-		return false
-	if _is_spell:
-		if not _arena.has_method("is_spell_deploy_position"):
-			return false
-		return _arena.is_spell_deploy_position(_snapped_pos)
-	if not _arena.has_method("is_player_deploy_position"):
-		return false
-	return _arena.is_player_deploy_position(_snapped_pos)
+		return
+	# 鼠标位置吸附到最近合法格中心。
+	# 遇到非法位置（出界 / 贴近建筑）时自动锁定到最近的可释放格，预览始终跟随合法位置。
+	# Client 端画面 180 度镜像：视觉坐标先逆镜像成逻辑坐标做部署校验，
+	# 再镜像回视觉坐标显示，让预览出现在玩家点击的屏幕位置。
+	var raw_pos := get_local_mouse_position()
+	var team: String = "enemy" if NetworkManager.is_networked_client() else "player"
+	if NetworkManager.is_networked_client():
+		var logic_pos := BattleConstants.mirror(raw_pos)
+		var logic_snapped: Vector2 = _arena.find_nearest_valid_deploy(logic_pos, _is_spell, team)
+		_snapped_pos = BattleConstants.mirror(logic_snapped)
+		_valid = _arena.is_cell_deployable(logic_snapped, _is_spell, team)
+	else:
+		_snapped_pos = _arena.find_nearest_valid_deploy(raw_pos, _is_spell, team)
+		_valid = _arena.is_cell_deployable(_snapped_pos, _is_spell, team)
+	queue_redraw()
 
 
 func _draw() -> void:
@@ -124,14 +155,15 @@ func _draw() -> void:
 	var border_color := Color(0.3, 0.85, 0.3) if _valid else Color(0.9, 0.25, 0.2)
 
 	if _is_spell:
-		# 法术：画半径圆 + 中心标记
-		var spell_fill := Color(border_color.r, border_color.g, border_color.b, 0.3)
-		draw_circle(_snapped_pos, _spell_radius, spell_fill)
-		draw_arc(_snapped_pos, _spell_radius, 0, TAU, 64, border_color, 2.0)
-		# 中心十字标记
-		draw_line(_snapped_pos - Vector2(6, 0), _snapped_pos + Vector2(6, 0), border_color, 1.5)
-		draw_line(_snapped_pos - Vector2(0, 6), _snapped_pos + Vector2(0, 6), border_color, 1.5)
+		# 法术范围圆：白圈边框 + 浅白填充（与建筑射程预览统一样式）
+		_draw_range_circle(_snapped_pos, _spell_radius, 0.0)
+		# 中心十字瞄准标记
+		draw_line(_snapped_pos - Vector2(6, 0), _snapped_pos + Vector2(6, 0), RANGE_BORDER_COLOR, 1.0)
+		draw_line(_snapped_pos - Vector2(0, 6), _snapped_pos + Vector2(0, 6), RANGE_BORDER_COLOR, 1.0)
 	else:
+		# 建筑单位：先画攻击范围圆（min_attack_range>0 时中心掏空成环形）
+		if _attack_range > 0.0:
+			_draw_range_circle(_snapped_pos, _attack_range, _min_attack_range)
 		# 单位虚影：优先显示模型纹理（半透明），无纹理时退化为白色方块
 		for offset in _offsets:
 			var pos: Vector2 = _snapped_pos + offset
@@ -149,3 +181,32 @@ func _draw() -> void:
 			# 碰撞体边框始终显示（绿=可部署 / 红=不可部署）
 			var border_rect := Rect2(pos.x - PREVIEW_HALF, pos.y - PREVIEW_HALF, PREVIEW_HALF * 2, PREVIEW_HALF * 2)
 			draw_rect(border_rect, border_color, false, 1.5)
+
+
+## 绘制范围圆/环（统一白色样式：白圈边框 + 极浅白填充）。
+## inner_radius=0 时为实心圆；>0 时中心掏空成环形（迫击炮盲区）。
+func _draw_range_circle(center: Vector2, outer_radius: float, inner_radius: float) -> void:
+	if outer_radius <= 0.0:
+		return
+	if inner_radius <= 0.0:
+		# 实心圆填充
+		draw_circle(center, outer_radius, RANGE_FILL_COLOR)
+	else:
+		# 环形填充：分段梯形拼出环形区域
+		var seg := 64
+		for i in seg:
+			var a1 := i * TAU / seg
+			var a2 := (i + 1) * TAU / seg
+			var d1 := Vector2(cos(a1), sin(a1))
+			var d2 := Vector2(cos(a2), sin(a2))
+			var pts := PackedVector2Array([
+				center + d1 * inner_radius,
+				center + d1 * outer_radius,
+				center + d2 * outer_radius,
+				center + d2 * inner_radius,
+			])
+			draw_colored_polygon(pts, RANGE_FILL_COLOR)
+		# 内圈边框
+		draw_arc(center, inner_radius, 0, TAU, seg, RANGE_BORDER_COLOR, RANGE_BORDER_WIDTH)
+	# 外圈边框
+	draw_arc(center, outer_radius, 0, TAU, 64, RANGE_BORDER_COLOR, RANGE_BORDER_WIDTH)

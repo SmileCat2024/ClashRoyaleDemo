@@ -32,6 +32,9 @@ func setup() -> void:
 
 
 func _process(_delta: float) -> void:
+	# 联机模式下不运行 AI（敌方由远程真人玩家操控）
+	if NetworkManager.is_networked():
+		return
 	# 战斗未开始或已结束时不行动
 	if battle_manager == null or not battle_manager.battle_running:
 		return
