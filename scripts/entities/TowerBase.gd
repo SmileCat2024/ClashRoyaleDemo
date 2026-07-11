@@ -104,10 +104,10 @@ func _create_tower_sprite(sprite_data: Dictionary) -> void:
 	)
 	add_child(_tower_sprite)
 
-	# 血条：宽度缩减30% + 厚度增加（6→8px）+ 按精灵高度比例定位 Y
+	# 血条：宽度缩减30% + 厚度增加（8→12px）+ 按精灵高度比例定位 Y
 	# 距精灵顶部固定比例（玩家0.63 / 敌方0.38），保证公主塔/国王塔等不同高度塔的血条视觉位置一致
 	var bar_w: float = health_bar.size.x * 0.7
-	var bar_h: float = 8.0
+	var bar_h: float = 12.0
 	health_bar.size = Vector2(bar_w, bar_h)
 	var sprite_render_h: float = tex_h * scale_y
 	var top_ratio: float = 0.63 if team == "player" else 0.38
@@ -140,7 +140,7 @@ func _create_hp_label() -> void:
 	fv.base_font = ThemeDB.fallback_font
 	fv.variation_embolden = 0.8
 	_hp_label.add_theme_font_override("font", fv)
-	_hp_label.add_theme_font_size_override("font_size", 12)
+	_hp_label.add_theme_font_size_override("font_size", 14)
 
 	# 描边色 + 填充色（队伍差异化）
 	var outline_c: Color

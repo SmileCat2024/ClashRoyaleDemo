@@ -148,16 +148,18 @@ func setup(unit_data: Dictionary, team_name: String) -> void:
 	body_rect.position = Vector2(-size / 2.0, -size / 2.0)
 	body_rect.pivot_offset = Vector2(size / 2.0, size / 2.0)  ## 缩放锚点设为中心，挤压拉伸从中心变形
 
-	# 血条
+	# 血条（高度 6px，比原始 4px 略粗）
 	health_bar.max_value = max_hp
 	health_bar.value = current_hp
+	var hb_h: float = 6.0
 	var hb_w: float = size + 12
-	var hb_y: float = -size / 2.0 - 8
+	# 默认位置：Body 上方保持 4px 间距（= -size/2 - hb_h - 4）
+	var hb_y: float = -size / 2.0 - hb_h - 4.0
 	# 有动画配置的单位，血条位置可由数据覆盖（贴图较大时需要上移）
 	var anim_cfg: Dictionary = unit_data.get("animation", {})
 	if not anim_cfg.is_empty():
 		hb_y = float(anim_cfg.get("health_bar_y", hb_y))
-	health_bar.size = Vector2(hb_w, 4)
+	health_bar.size = Vector2(hb_w, hb_h)
 	health_bar.position = Vector2(-hb_w / 2.0, hb_y)
 
 	# 调试标签（有动画模型的单位隐藏）
