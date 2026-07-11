@@ -56,8 +56,8 @@ func test_only_hog_rider_can_jump_river_for_now() -> void:
 	for uid in DataRegistry.unit_data:
 		var u: Dictionary = DataRegistry.unit_data[uid]
 		var can_jump := bool(u.get("can_jump_river", false))
-		assert_eq(can_jump, uid == "hog_rider",
-			"当前版本只有野猪骑士允许跳河: " + uid)
+		assert_eq(can_jump, uid in ["hog_rider", "prince"],
+			"当前版本只有野猪骑士和王子允许跳河: " + uid)
 
 
 func test_all_units_have_collision_radius() -> void:

@@ -1,5 +1,14 @@
 # CHANGELOG
 
+## [0.18.2] - 2026-07-11 — 王子跳河能力
+
+### 新增
+- **王子（prince）跳河能力**：`can_jump_river = true`，骑乘冲锋可跨河跳跃，与野猪骑士同款跳河机制。复用 `UnitBase._try_river_jump` + `BattlePathing.path_distance`，无需新增代码——移动时比较"走桥"与"跳河"两条路线，跳河更短才跳；桥线上正常走桥不跳；跳河期间临时切换为空中单位（地面攻击打不到、对空攻击能锁定），落地恢复地面；抛物线弧高视觉。王子的冲锋机制（持续移动距离累计触发）与跳河完全兼容，跳河后可立即进入冲锋冲塔。
+
+### 修改
+- `scripts/autoload/DataRegistry.gd`：prince 单位数据新增 `can_jump_river: true`
+- `scripts/tests/test_data_registry.gd`：跳河断言由 `uid == "hog_rider"` 改为 `uid in ["hog_rider", "prince"]`
+
 ## [0.18.1] - 2026-07-11 — 文档补遗：迫击炮建筑寿命
 
 ### 说明

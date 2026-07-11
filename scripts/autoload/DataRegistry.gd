@@ -482,6 +482,7 @@ var unit_data := {
 		"shield": 0,
 		"move_speed": 1.0,  # 中速（Medium 60）
 		"movement_type": "ground",
+		"can_jump_river": true,   # 骑乘冲锋可跳河，与野猪骑士同款跳河能力
 		"sight_range": 5.5,  # 原版5.5
 		"movement_targeting": "any",
 		"collision_radius": 0.65,  # 原版0.65
