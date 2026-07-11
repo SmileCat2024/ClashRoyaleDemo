@@ -39,6 +39,13 @@ static func _resolve_pair(a: Node2D, b: Node2D) -> void:
 	if _get_layer(a) != _get_layer(b):
 		return
 
+	# 部署虚影期间的普通单位（is_deployed=false 且 mass>0）不参与碰撞推挤。
+	# 这样新单位可在已有单位所在格部署，不被推开也不推开别人；
+	# 部署完成（is_deployed=true）后碰撞系统自动分离重叠。
+	# 建筑（mass=0）部署期间仍作为障碍物参与碰撞。
+	if _is_deploying_non_building(a) or _is_deploying_non_building(b):
+		return
+
 	var diff := b.position - a.position
 	var dist := diff.length()
 
@@ -129,6 +136,12 @@ static func _get_layer(entity: Node2D) -> String:
 	if mt == null:
 		return "ground"
 	return str(mt)
+
+
+## 是否处于部署虚影期且为普通单位（非建筑）。
+## is_deployed=false 且 mass>0 → 部署虚影中，跳过碰撞推挤（允许叠加部署）。
+static func _is_deploying_non_building(entity: Node2D) -> bool:
+	return entity.get("is_deployed") == false and _get_mass(entity) > 0
 
 
 static func _get_collision_radius(entity: Node2D) -> float:

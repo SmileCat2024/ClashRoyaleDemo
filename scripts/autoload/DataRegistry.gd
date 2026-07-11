@@ -29,6 +29,7 @@ var unit_data := {
 		"hurt_radius": 0.5,
 		"mass": 6,
 		"shadow_size": 0.5,
+		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		"attacks": [
 			{
 				"name": "sword",
@@ -102,6 +103,7 @@ var unit_data := {
 		"hurt_radius": 0.6,
 		"mass": 4,
 		"shadow_size": 0.55,
+		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		"attacks": [{
 			"name": "hammer_smash",
 			"targeting": "building_only",
@@ -173,6 +175,7 @@ var unit_data := {
 		"hurt_radius": 0.5,
 		"mass": 5,
 		"shadow_size": 0.5,
+		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		"attacks": [{
 			"name": "musket_shot",
 			"targeting": "any",
@@ -248,6 +251,7 @@ var unit_data := {
 		"hurt_radius": 0.45,
 		"mass": 4,
 		"shadow_size": 0.45,
+		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		"attacks": [{
 			"name": "blade_slash",
 			"targeting": "any",
@@ -280,6 +284,7 @@ var unit_data := {
 		"hurt_radius": 0.3,
 		"mass": 6,
 		"shadow_size": 0.7,
+		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		"death_damage": 240,    # 死亡时范围伤害
 		"death_radius": 2.0,    # 死亡伤害半径（格）
 		"death_fuse_time": 3.0, # 死亡炸弹引信时间（秒）
@@ -336,6 +341,7 @@ var unit_data := {
 		"hurt_radius": 0.5,
 		"mass": 3,
 		"shadow_size": 0.35,
+		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		"attacks": [{
 			"name": "bow_shot",
 			"targeting": "any",
@@ -412,6 +418,7 @@ var unit_data := {
 		"hurt_radius": 0.75,
 		"mass": 10,
 		"shadow_size": 0.8,
+		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		"attacks": [{
 			"name": "fist_smash",
 			"targeting": "building_only",
@@ -481,6 +488,7 @@ var unit_data := {
 		"hurt_radius": 0.65,
 		"mass": 7,
 		"shadow_size": 0.6,
+		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		# 冲锋机制：持续直线移动 min_charge_distance 格后进入冲锋，
 		# 移速提升至 charge_move_speed，命中伤害变为 charge_damage。
 		# 攻击出手或受到伤害时退出冲锋并重置累计距离。
@@ -521,6 +529,8 @@ var unit_data := {
 		"hurt_radius": 0.6,
 		"mass": 0,  # 不可移动，自动成为寻路障碍
 		"shadow_size": 0.8,
+		"deploy_time": 3.5,   # 部署时间（秒），建筑部署较慢，期间虚影状态不行动但可受伤
+		"lifespan": 30.0,     # 寿命（秒），建筑存在期间持续掉血，到期自毁（原版最大持续时间30秒）
 		"attacks": [{
 			"name": "mortar_shell",
 			"targeting": "any",
@@ -555,6 +565,7 @@ var unit_data := {
 		"hurt_radius": 0.6,
 		"mass": 3,
 		"shadow_size": 0.4,
+		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		"attacks": [{
 			"name": "claw_strike",
 			"targeting": "any",
@@ -587,6 +598,7 @@ var unit_data := {
 		"hurt_radius": 0.5,
 		"mass": 3,
 		"shadow_size": 0.3,
+		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		"attacks": [{
 			"name": "stab",
 			"targeting": "any",

@@ -48,6 +48,11 @@ const RIVER_JUMP_BANK_OFFSET := 1.0
 const OBSTACLE_LOOK_AHEAD_CELLS := 1.5  ## 前方避障探测距离（格），超出此距离的障碍物不触发避让
 const SEPARATION_RADIUS_CELLS := 0.5   ## 单位间分离探测余量（格），碰撞半径之外额外保持的距离
 
+# ---- 部署下落动画（前 DEPLOY_ANIM_DURATION 秒的视觉表现）----
+const DEPLOY_ANIM_DURATION := 0.2   ## 部署下落动画时长（秒），虚影从上往下落下
+const DEPLOY_DROP_CELLS := 3.5      ## 下落起始高度（格），从高处明显落下
+const DEPLOY_GHOST_ALPHA := 0.4     ## 虚影起始透明度（渐变到 1.0 实心，只改 alpha 不变暗）
+
 ## 影子椭圆纵向压缩比。把正圆按此值压扁成椭圆。
 const SHADOW_SQUASH := 0.35
 
@@ -69,6 +74,12 @@ var _burn_accumulator: float = 0.0
 ## 光束发射点 Y 偏移（像素，负=上移）。仅地狱塔配置，其他单位 = 0（无光束）。
 var beam_emit_offset_y: float = 0.0
 var _beam: InfernoBeam = null
+
+# ---- 部署下落动画（deploy_time 前期的视觉表现，不影响逻辑）----
+var _deploy_anim_timer: float = 0.0   ## 下落动画剩余时间（秒，>0 表示动画进行中）
+var _deploy_drop_dy: float = 0.0      ## 当前下落 Y 偏移（px，负=上移，0=无偏移）
+var _deploy_alpha: float = 1.0        ## 当前透明度（0~1，只改 modulate.a 不变暗）
+var _altitude_visual_dy: float = 0.0  ## 当前 altitude 离地视觉偏移（px，负=上移）
 
 
 ## 初始化单位属性。由 SpawnManager 在生成单位后调用。
@@ -104,6 +115,10 @@ func setup(unit_data: Dictionary, team_name: String) -> void:
 	if deploy_time > 0.0:
 		is_deployed = false
 		_deploy_timer = deploy_time
+		# 部署下落动画初始化：启动 0.1 秒下落 + 半透明虚影
+		_deploy_anim_timer = DEPLOY_ANIM_DURATION
+		_deploy_drop_dy = -BattleConstants.px(DEPLOY_DROP_CELLS)
+		_deploy_alpha = DEPLOY_GHOST_ALPHA
 	lifespan = float(unit_data.get("lifespan", 0.0))
 	if lifespan > 0.0:
 		_lifespan_timer = lifespan
@@ -151,6 +166,9 @@ func setup(unit_data: Dictionary, team_name: String) -> void:
 	if movement_type == "air":
 		altitude = 2.5
 	_set_visual_altitude(altitude)
+	# 部署虚影初始视觉（deploy_time > 0 时单位以半透明虚影状态出现）
+	if not is_deployed:
+		modulate.a = _deploy_alpha
 
 	initialized = true
 	queue_redraw()
@@ -252,11 +270,13 @@ func _end_charge() -> void:
 func _process(delta: float) -> void:
 	if not initialized or is_dead:
 		return
-	# 建筑部署倒计时（deploy_time 期间不能行动；部署完成后才开始寿命/掉血/攻击）
+	# 部署倒计时（deploy_time 期间不能行动；部署完成后才开始寿命/掉血/攻击）
 	if not is_deployed:
 		_deploy_timer -= delta
+		_update_deploy_anim(delta)
 		if _deploy_timer <= 0.0:
 			is_deployed = true
+			_finish_deploy_anim()
 		return
 	# 建筑寿命 + 自然掉血（仅 lifespan > 0 的建筑，部署完成后才开始）
 	if lifespan > 0.0:
@@ -540,14 +560,48 @@ func _store_visual_base_positions() -> void:
 
 
 func _set_visual_altitude(altitude_cells: float) -> void:
-	var dy := -altitude_cells * BattleConstants.CELL_SIZE
-	body_rect.position = _body_base_position + Vector2(0, dy)
+	_altitude_visual_dy = -altitude_cells * BattleConstants.CELL_SIZE
+	_refresh_visual_offsets()
+
+
+## 统一刷新视觉子节点位置 = base + altitude偏移 + 部署下落偏移。
+## altitude 偏移（飞行离地/跳河弧线）和部署下落偏移独立管理，叠加应用。
+func _refresh_visual_offsets() -> void:
+	var total_dy := _altitude_visual_dy + _deploy_drop_dy
+	if body_rect:
+		body_rect.position = _body_base_position + Vector2(0, total_dy)
 	if health_bar:
-		health_bar.position = _health_bar_base_position + Vector2(0, dy)
+		health_bar.position = _health_bar_base_position + Vector2(0, total_dy)
 	if debug_label:
-		debug_label.position = _debug_label_base_position + Vector2(0, dy)
+		debug_label.position = _debug_label_base_position + Vector2(0, total_dy)
 	if sprite_animator:
-		sprite_animator.apply_altitude_offset(dy)
+		sprite_animator.apply_altitude_offset(_altitude_visual_dy)
+		sprite_animator.set_deploy_offset(_deploy_drop_dy)
+
+
+# ---- 部署下落动画（deploy_time 前期 0.1 秒的视觉表现）----
+
+## 每帧推进部署下落动画：Y 偏移从起始高度 lerp 到 0，透明度从虚影 lerp 到实心。
+## 只改 modulate.a（透明度），不变暗（RGB 不动）。动画结束后保持实心等待 deploy_time。
+func _update_deploy_anim(delta: float) -> void:
+	if _deploy_anim_timer <= 0.0:
+		return
+	_deploy_anim_timer -= delta
+	var t := 1.0 - clampf(_deploy_anim_timer / DEPLOY_ANIM_DURATION, 0.0, 1.0)
+	var start_dy := -BattleConstants.px(DEPLOY_DROP_CELLS)
+	_deploy_drop_dy = lerpf(start_dy, 0.0, t)
+	_deploy_alpha = lerpf(DEPLOY_GHOST_ALPHA, 1.0, t)
+	modulate.a = _deploy_alpha
+	_refresh_visual_offsets()
+
+
+## 部署动画结束：恢复实心 + 零偏移（is_deployed 由调用方在 deploy_time 到期时设置）。
+func _finish_deploy_anim() -> void:
+	_deploy_anim_timer = 0.0
+	_deploy_drop_dy = 0.0
+	_deploy_alpha = 1.0
+	modulate.a = 1.0
+	_refresh_visual_offsets()
 
 
 ## 从 attacks_data 读取主攻击的射程（格→像素），用于决定何时停下
@@ -564,6 +618,8 @@ func get_visual_state() -> String:
 		return "death"
 	if is_jumping_river:
 		return "jump"
+	if not is_deployed:
+		return "walk"
 	if _is_moving:
 		return "walk"
 	return "idle"
@@ -571,6 +627,9 @@ func get_visual_state() -> String:
 
 ## 覆写朝向：根据当前目标 Y 坐标判定 front（面朝下/镜头）或 back（面朝上/背身）。
 func get_facing() -> String:
+	# 部署期间无目标，按阵营强制朝向（player 向上走=back，enemy 向下走=front）
+	if not is_deployed:
+		return "back" if team == "player" else "front"
 	return "front" if _get_target_y() >= position.y else "back"
 
 

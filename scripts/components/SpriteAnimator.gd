@@ -27,6 +27,8 @@ var _base_offset: Vector2 = Vector2.ZERO   ## 视觉偏移基准值（不含 alt
 var _current_state: String = ""            ## 当前播放的动画名（调试用）
 var _attack_anim_playing: bool = false     ## 攻击动画播放中（不可打断，播完自动清除）
 var _jump_frame: int = 0                    ## 跳河时锁定的帧索引（0-based，从动画配置读取）
+var _altitude_dy: float = 0.0              ## altitude 离地视觉偏移（px，负=上移）
+var _deploy_dy: float = 0.0                ## 部署下落动画偏移（px，负=上移，0=无偏移）
 
 
 ## 从单位数据初始化。由 CombatantBase._create_sprite_animator 在 add_child 后调用。
@@ -171,8 +173,21 @@ func _play_if_exists(anim_name: String) -> bool:
 ## 传递 altitude 离地偏移。由宿主实体的 altitude 系统调用。
 ## 使用 position（父坐标系）叠加 base_offset + altitude，与 body_rect.position 同空间。
 func apply_altitude_offset(dy: float) -> void:
+	_altitude_dy = dy
+	_refresh_sprite_position()
+
+
+## 传递部署下落动画偏移（px，负=上移）。与 altitude 偏移叠加。
+## 部署动画结束后传入 0.0 恢复正常位置。
+func set_deploy_offset(dy: float) -> void:
+	_deploy_dy = dy
+	_refresh_sprite_position()
+
+
+## 统一刷新精灵位置 = base_offset + altitude偏移 + 部署下落偏移。
+func _refresh_sprite_position() -> void:
 	if _sprite:
-		_sprite.position = _base_offset + Vector2(0, dy)
+		_sprite.position = _base_offset + Vector2(0, _altitude_dy + _deploy_dy)
 
 
 ## 帧变化回调（P2 扩展：帧事件 / hit frame 通知）。
