@@ -34,6 +34,11 @@ window/size/window_width_override=880
 window/size/window_height_override=1560
 window/stretch/mode="canvas_items"
 
+[gui]
+
+theme/custom_font="res://assets/fonts/simhei.ttf"
+
 [rendering]
 
 textures/canvas_textures/default_texture_filter=0
+renderer/rendering_method="gl_compatibility"

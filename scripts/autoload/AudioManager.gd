@@ -43,6 +43,11 @@ var _bgm_volume_db: float = -6.0
 var _sfx_volume_db: float = 0.0
 var _muted: bool = false
 
+# ---- Web 音频解锁 ----
+# 浏览器 autoplay policy 阻止页面加载时自动播放音频，
+# 首次用户交互后才恢复。此标志跟踪是否已解锁。
+var _web_audio_unlocked: bool = false
+
 
 func _ready() -> void:
 	_ensure_buses()
@@ -58,10 +63,22 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Web 平台：首次用户交互后恢复被浏览器 autoplay policy 阻止的 BGM
+	if not _web_audio_unlocked:
+		_web_audio_unlocked = true
+		_resume_bgm_if_needed()
 	# M 键切换静音（避开 F 键，F 键在很多环境下被系统拦截）
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_M:
 			toggle_mute()
+
+
+## Web 平台音频恢复。浏览器 autoplay policy 会阻止页面加载时的自动音频播放，
+## 首次用户交互（点击/触摸/按键）后音频上下文恢复。此时重播被错过的 BGM。
+## 非 Web 平台上，BGM 已在正常播放则不会重播，无副作用。
+func _resume_bgm_if_needed() -> void:
+	if _current_bgm_id != "" and not _bgm_player.playing:
+		_bgm_player.play()
 
 
 # ==============================================================================
