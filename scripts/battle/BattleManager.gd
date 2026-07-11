@@ -21,7 +21,7 @@ var _player_state: PlayerBattleState = null
 var _enemy_state: PlayerBattleState = null
 var max_energy: int = 10
 var energy_timer: float = 0.0
-const BASE_ENERGY_INTERVAL: float = 2.8   ## 常规时间每 2.8 秒恢复 1 点能量
+const BASE_ENERGY_INTERVAL: float = 0.4   ## [临时调试] 常规时间每 0.4 秒恢复 1 点能量（原值 2.8，7x 加速）
 var energy_interval: float = BASE_ENERGY_INTERVAL
 
 # ---- 卡组管理 ----
