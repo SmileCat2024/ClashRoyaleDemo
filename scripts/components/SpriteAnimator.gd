@@ -48,9 +48,9 @@ func setup(unit_data: Dictionary, entity: CombatantBase) -> void:
 	)
 	_jump_frame = int(anim_data.get("jump_frame", 0))
 
-	# 从 SpriteRegistry 获取（或构建）SpriteFrames
+	# 从 SpriteRegistry 获取（或构建）SpriteFrames（团队色单位按 team 取对应贴图）
 	var unit_id: String = unit_data.get("id", "")
-	var frames: SpriteFrames = SpriteRegistry.get_sprite_frames(unit_id)
+	var frames: SpriteFrames = SpriteRegistry.get_sprite_frames(unit_id, entity.team)
 	if frames == null:
 		return  # PNG 加载失败，ColorRect 兜底
 
@@ -75,7 +75,10 @@ func setup(unit_data: Dictionary, entity: CombatantBase) -> void:
 	entity.add_child(_sprite)
 
 	# 阵营色调（美术只画一套中性色，代码微调）
-	if entity.team == "player":
+	# 团队色单位（红蓝双套贴图，如迫击炮）保持原色，不做色调微调避免偏色
+	if SpriteRegistry.is_team_colored(unit_id):
+		_sprite.modulate = Color.WHITE
+	elif entity.team == "player":
 		_sprite.modulate = Color(1.0, 1.0, 0.95)
 	else:
 		_sprite.modulate = Color(0.95, 1.0, 1.0)

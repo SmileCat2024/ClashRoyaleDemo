@@ -552,6 +552,42 @@ var unit_data := {
 		"sfx": {
 			"deploy": "deploy_building",
 		},
+		# 迫击炮建筑贴图（314×464）。首次使用团队色双套贴图：
+		# player 用蓝方贴图，enemy 用红方贴图（联机下 team flip 后两端各看己方蓝/敌方红）。
+		# attack 状态 = 发射时亮一帧（括号2），mode=once 播放后自动切回 idle（括号1）。
+		"animation": {
+			"visual_offset_x": 0.0,
+			"visual_offset_y": -24.0,
+			"visual_scale": 0.14,
+			"health_bar_y": -62.0,
+			"texture_filter": "linear",
+			"states": {
+				"idle": {
+					"frames": {
+						"player": ["mortar_idle_blue.png"],
+						"enemy": ["mortar_idle_red.png"],
+					},
+					"duration": [1.0],
+					"mode": "loop",
+				},
+				"walk": {
+					"frames": {
+						"player": ["mortar_idle_blue.png"],
+						"enemy": ["mortar_idle_red.png"],
+					},
+					"duration": [1.0],
+					"mode": "loop",
+				},
+				"attack": {
+					"frames": {
+						"player": ["mortar_fire_blue.png"],
+						"enemy": ["mortar_fire_red.png"],
+					},
+					"duration": [0.15],
+					"mode": "once",
+				},
+			},
+		},
 	},
 	"mega_minion": {
 		"id": "mega_minion",
@@ -975,7 +1011,7 @@ var tower_data := {
 			"attack_interval": 1.0,
 			"first_attack_delay": 0.5,
 			"delivery": "projectile",
-			"trajectory": "ballistic",
+			"trajectory": "homing",
 			"impact_type": "single",
 			"impact_radius": 0.0,
 			"damage": 109,
