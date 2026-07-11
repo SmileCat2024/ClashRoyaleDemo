@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## [0.19.0] - 2026-07-11 — 迫击炮团队色双套贴图 + 单位团队色区分机制 + 国王塔子弹修复
+
+### 新增
+- **迫击炮建筑贴图接入**：mortar 首次接入帧动画（idle/walk 常态 + attack 发射两帧）。素材为蓝/红双套（314×464，linear 过滤）：player 用蓝方贴图（`mortar_idle_blue.png` / `mortar_fire_blue.png`），enemy 用红方贴图（`mortar_idle_red.png` / `mortar_fire_red.png`）。attack 状态为发射时亮一帧（括号2），`mode = "once"` 播放后自动切回 idle（括号1）。我方蓝、敌方红。
+- **单位团队色区分机制（首次引入，迫击炮为首例）**：为单位（非塔）引入 player/enemy 双套贴图能力。`SpriteRegistry.get_sprite_frames()` 新增 `team` 参数，缓存键改为 `"unit_id:team"`；`animation.states` 内每个 state 的 `frames` 字段支持两种形式——数组（中性贴图，所有队伍共用，默认）或字典 `{"player":[...], "enemy":[...]}`（红蓝双套，按 team 取帧）。新增 `SpriteRegistry.is_team_colored()` 判定。`SpriteAnimator` 对团队色单位跳过中性色调微调（modulate = Color.WHITE）保持红蓝原色。`DeployPreview` 预览传 `"player"`。仅当美术提供了红/蓝两套贴图时才用字典形式，现有中性单位完全不受影响。
+- **迫击炮炮弹贴图**：`MortarShell` 飞行态用 `mortar_shell.png`（263×284）替换原来的灰色圆形石块 `_draw` 绘制（保留地面影子 + 落地爆炸尘土），Y 方向补偿 World 透视压缩保持比例；贴图加载失败时退回圆形兜底。
+
+### 修复
+- **国王塔子弹误用迫击炮炮弹**：`king_tower` 的 `attacks` 中 `trajectory` 误设为 `"ballistic"`，导致开火时走 `AttackComponent._fire_projectile` 的 ballistic 分支调用 `ProjectileManager.spawn_mortar_shell()` 发射迫击炮高抛炮弹（显然不合理）。修复为 `"homing"`，与公主塔一致发射普通追踪子弹。
+
+### 联机同步
+- 团队色机制对联机完全透明：复用现有 `team` 字段（client 端已在单位创建时做 player↔enemy 翻转 + 坐标镜像），无需额外 RPC。两端各自按翻转后的 team 取红/蓝贴图，每个玩家始终看到己方迫击炮为蓝、敌方为红。
+
+### 修改
+- `scripts/autoload/SpriteRegistry.gd`：`get_sprite_frames` +team 参数 / 缓存键带 team；`_build_sprite_frames` +team 帧选择（frames 字典形式）；+`is_team_colored()`；头部注释文档化团队色机制
+- `scripts/components/SpriteAnimator.gd`：`setup` 调用传 `entity.team`；团队色单位跳过 modulate 色调微调
+- `scripts/battle/DeployPreview.gd`：`show_preview` 调用传 `"player"`
+- `scripts/entities/MortarShell.gd`：+`_shell_texture` 加载 + `draw_texture_rect` 贴图绘制（替换圆形石块）
+- `scripts/autoload/DataRegistry.gd`：mortar +`animation` 团队色配置；king_tower `trajectory` ballistic→homing
+- `assets/sprites/mortar/`：+`mortar_idle_blue.png` / `mortar_fire_blue.png` / `mortar_idle_red.png` / `mortar_fire_red.png` / `mortar_shell.png`
+
 ## [0.18.3] - 2026-07-11 — 修复点击单位/塔所在格子无法部署/施法
 
 ### 修复
