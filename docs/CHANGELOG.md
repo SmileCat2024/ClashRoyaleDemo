@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## [0.18.0] - 2026-07-11 — 部署虚影系统 + 部署时间激活延迟
+
+### 新增
+- **部署虚影预览**（DeployPreview）：拖动卡牌时在鼠标位置显示单位模型的半透明虚影（从 SpriteFrames 加载 walk_back 方向第一帧纹理，visual_scale/offset 一致），取代之前的纯方块预览。碰撞体边框（绿/红）始终显示。无动画配置的单位退化为半透明白色方块。
+- **部署下落动画**（UnitBase）：单位部署时前 0.2 秒从 3.5 格高度 lerp 下落 + alpha 0.4→1.0 渐变（只改 modulate.a 不变暗）。部署期间 `get_visual_state()` 返回 walk（播放行进方向动画），`get_facing()` 按阵营强制朝向（player→back 向上走 / enemy→front 向下走）。
+- **部署时间机制**（DataRegistry）：11 个单位添加 `deploy_time` 字段（knight/hog_rider/musketeer/mini_pekka/balloon/archers/giant/prince/mega_minion/goblins = 1.0 秒，mortar = 3.5 秒）。部署期间（`is_deployed=false`）单位不能索敌/攻击/移动，但可受伤（`take_damage` 不检查 `is_deployed`）。
+- **部署虚影免碰撞**（CollisionSystem）：`_resolve_pair()` 跳过 `is_deployed=false` 且 `mass>0` 的普通单位，使释放位置中心格有兵时仍可部署。部署完成后碰撞自然恢复分离重叠。
+- **SpriteAnimator 部署下落偏移**：新增 `set_deploy_offset(dy)` 方法 + `_deploy_dy` 变量，与 altitude 偏移叠加应用。
+
+### 修改
+- `scripts/battle/DeployPreview.gd`：`show_preview` 加载单位帧纹理 + `_load_unit_texture` + `_draw` 绘制半透明模型虚影
+- `scripts/entities/UnitBase.gd`：+部署动画常量/变量/逻辑（`_update_deploy_anim`/`_finish_deploy_anim`/`_refresh_visual_offsets`）+ `get_visual_state` 部署返回 walk + `get_facing` 阵营强制朝向
+- `scripts/components/SpriteAnimator.gd`：+`set_deploy_offset`/`_deploy_dy` + 恢复原始 `_update_animation`（无 deploy 特殊状态）
+- `scripts/systems/CollisionSystem.gd`：`_resolve_pair` 跳过 `is_deployed=false` 且 `mass>0` 单位
+- `scripts/autoload/DataRegistry.gd`：11 个单位 +`deploy_time`
+
 ## [0.17.0] - 2026-07-10 — 地狱塔建筑卡（递增光束 + 建筑寿命 + InfernoBeam 视觉组件）
 
 ### 新增
