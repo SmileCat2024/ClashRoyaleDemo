@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [0.18.3] - 2026-07-11 — 修复点击单位/塔所在格子无法部署/施法
+
+### 修复
+- **Control 节点鼠标拦截 bug**：单位身上的 `Body`(ColorRect)、`HealthBar`(ProgressBar)、`DebugLabel`(Label) 及塔的 `HPLabel`(Label) 都是 `Control` 子类，Godot 4 默认 `mouse_filter = MOUSE_FILTER_STOP`，会吞掉落在其矩形上的鼠标点击，导致 `BattleManager._unhandled_input()` 收不到事件——表现为点击单位/塔所在格子时"没反应"（部署或施法失败），挪到空格子才正常。
+- 修复后：所有合法单元格（含单位/塔所在格）均能正常点击部署与施法，唯一仍非法的是超出竞技场边界 / 超出己方可部署范围 / 贴在建筑上（走原有吸附逻辑）。
+
+### 修改
+- `scripts/entities/CombatantBase.gd`：新增 `_disable_control_mouse()`，在 `_init_combat_stats()` 末尾调用，递归把实体所有 `Control` 子孙节点设为 `MOUSE_FILTER_IGNORE`（鼠标穿透）
+- `scripts/entities/TowerBase.gd`：`_create_hp_label()` 中新增 `_hp_label.mouse_filter = Control.MOUSE_FILTER_IGNORE`（该 Label 在 `_init_combat_stats` 之后才创建，递归覆盖不到）
+
 ## [0.18.2] - 2026-07-11 — 王子跳河能力
 
 ### 新增
