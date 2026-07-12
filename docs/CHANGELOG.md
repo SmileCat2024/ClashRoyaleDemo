@@ -1,5 +1,15 @@
 # CHANGELOG
 
+## [0.19.1] - 2026-07-12 — 修复联机攻击动作不同步
+
+### 修复
+- **联机攻击动画不同步**：从 MultiplayerSynchronizer 迁移到手动 RPC 时，攻击触发状态（`_net_is_firing`）和攻击朝向的同步通道被遗漏——字段定义了但从未通过 RPC 传输，导致 client 端 `is_attacking()` 恒为 false，单位攻击时无动画、表现为"僵住"。修复：补一条事件型 reliable RPC 同步通道，host 端 AttackComponent 出手时通知 UnitBase 发 RPC（传 attack_facing + flip_h），client 端按镜像规则翻转（front↔back 互换、side 不变、flip_h 取反）后置 `_net_is_firing=true`，SpriteAnimator 检测到后播放攻击动画。
+
+### 修改
+- `scripts/entities/UnitBase.gd`：新增 `_net_attack_facing` 字段 + `_on_attack_triggered()` host 端回调 + `@rpc _rpc_attack_trigger(facing, flip_h)` client 端接收 + `_clear_attack_flag()` 攻击动画播完清除标记；`get_attack_facing()` client 分支改读同步值；`get_flip_h()` client 分支攻击期间改用同步翻转值
+- `scripts/components/AttackComponent.gd`：新增 `_notify_attack_visual()`，冲锋/普通冷却两条出手路径在 `_is_firing=true` 后调用通知宿主
+- `scripts/components/SpriteAnimator.gd`：攻击动画播完（`_attack_anim_playing` true→false）时回调 `_clear_attack_flag()`
+
 ## [0.19.0] - 2026-07-11 — 迫击炮团队色双套贴图 + 单位团队色区分机制 + 国王塔子弹修复
 
 ### 新增
