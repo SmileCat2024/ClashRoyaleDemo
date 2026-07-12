@@ -140,6 +140,7 @@ func _process(delta: float) -> void:
 			# 随后 cooldown = attack_interval 进入正常攻击节奏。
 			if combatant.get("is_charging") == true:
 				_is_firing = true
+				_notify_attack_visual()
 				_execute_attack()
 				cooldown = attack_interval
 			else:
@@ -147,6 +148,7 @@ func _process(delta: float) -> void:
 					cooldown -= delta * combatant.get_attack_speed_mult()
 				if cooldown <= 0.0:
 					_is_firing = true  # 触发攻击动画
+					_notify_attack_visual()
 					if damage_delay > 0.0:
 						# 有抬手延迟：标记 firing（动画立即开始），延迟结算伤害
 						_is_winding_up = true
@@ -248,6 +250,13 @@ func _can_attack_target(target: Node) -> bool:
 	if movement == "air" and not attack_air:
 		return false
 	return true
+
+
+## 通知宿主触发攻击视觉。联机 host 端由 UnitBase 发 RPC 同步给 client；
+## 非联机 / 无动画单位由 UnitBase._on_attack_triggered 内部跳过。
+func _notify_attack_visual() -> void:
+	if combatant.has_method("_on_attack_triggered"):
+		combatant._on_attack_triggered()
 
 
 ## 执行一次攻击，按 delivery 分支。

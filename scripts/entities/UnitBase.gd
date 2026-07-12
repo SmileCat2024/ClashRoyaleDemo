@@ -29,9 +29,14 @@ var _net_visual_state: String = "idle"
 var _net_facing: String = "front"
 var _net_flip_h: bool = false
 var _net_is_firing: bool = false
+var _net_attack_facing: String = "front"   ## 攻击朝向（front/back/side），由 host 攻击触发 RPC 同步
 var _move_sfx_timer: float = 0.0  ## 移动音效间歇计时器（仅 sfx.move 配置的单位使用）
 const MOVE_SFX_INTERVAL := 1.5  ## 移动音效播放间隔（秒）
 var _last_move_dir: Vector2 = Vector2.ZERO  ## 上一帧实际移动方向（供 CollisionSystem 切向滑动）
+# ---- A* 路径缓存 ----
+var _path: Array = []                      ## 当前缓存的 A* 路径点（像素坐标，不含起点）
+var _path_target: Vector2 = Vector2.ZERO   ## 当前路径的目标位置（检测目标变化时重算）
+var _path_repath_timer: float = 0.0        ## 路径重算倒计时（秒）
 var is_jumping_river: bool = false
 # ---- 冲锋（王子专属，数据驱动；无 charge 配置时 _charge_enabled=false）----
 var is_charging: bool = false           ## 是否处于冲锋状态（AttackComponent 命中时读取此标记 + charge_damage）
@@ -51,8 +56,11 @@ var _debug_label_base_position: Vector2 = Vector2.ZERO
 const RIVER_JUMP_ARC_HEIGHT := 1.25
 const RIVER_JUMP_SPEED_MULTIPLIER := 1.25
 const RIVER_JUMP_BANK_OFFSET := 1.0
-const OBSTACLE_LOOK_AHEAD_CELLS := 1.5  ## 前方避障探测距离（格），超出此距离的障碍物不触发避让
 const SEPARATION_RADIUS_CELLS := 0.5   ## 单位间分离探测余量（格），碰撞半径之外额外保持的距离
+
+# ---- A* 寻路（路径缓存 + 重算）----
+const PATH_REPATH_INTERVAL := 0.4     ## 路径重算间隔（秒）
+const PATH_WAYPOINT_REACHED := 12.0   ## 到达路径点的判定距离（像素，约 0.6 格）
 
 # ---- 部署下落动画（前 DEPLOY_ANIM_DURATION 秒的视觉表现）----
 const DEPLOY_ANIM_DURATION := 0.35  ## 部署动画总时长（秒）= 下落 + 着地挤压弹跳
@@ -390,25 +398,21 @@ func _process(delta: float) -> void:
 			_move_towards_position(target_pos, delta)
 
 
-## 按单位能力移动：普通地面单位走桥；可跳河单位仅在跳河路线更短时起跳。
-## 地面单位额外叠加障碍物避让转向（steering），主动绕开前方塔/建筑而非硬撞后被推。
+## 按单位能力移动：跳河单位在跳河更短时起跳；其余地面单位沿 A* 路径绕过塔/建筑。
+## 空中单位直线飞向目标（不需要寻路）。
 func _move_towards_position(target_pos: Vector2, delta: float) -> void:
 	if _try_move_for_river_jump(target_pos, delta):
 		return
 
 	var step := _get_effective_move_speed() * delta
-	# 先通过路径系统计算桥/河路由方向
-	var next_pos := BattlePathing.advance_position(position, target_pos, step, movement_type)
+	# A* 寻路：获取下一个路径点（已处理桥路由和障碍物绕行）
+	var next_pos := _get_move_waypoint(target_pos, delta)
+
 	var move_vec := next_pos - position
 	if move_vec.length() < 0.01:
 		return
 
 	var move_dir := move_vec.normalized()
-
-	# 障碍物避让转向：叠加到移动方向上，使单位主动绕开前方静态障碍物
-	var avoidance := _compute_obstacle_avoidance(move_dir)
-	if avoidance.length() > 0.01:
-		move_dir = (move_dir + avoidance).normalized()
 
 	# 同类分离：与附近同层单位保持距离，投影到切向实现侧滑绕过
 	var separation := _compute_unit_separation(move_dir)
@@ -425,63 +429,38 @@ func _move_towards_position(target_pos: Vector2, delta: float) -> void:
 		_move_sfx_timer = MOVE_SFX_INTERVAL
 
 
-## 计算静态障碍物（塔/建筑）的避让转向向量。
-## 算法：对前方探测范围内的每个 mass=0 实体，生成垂直于移动方向的推力，
-##       强度随横向距离和前方距离衰减。跳过当前攻击/移动目标（单位需要接近它们）。
-## 空中单位返回零向量（飞行不受地面障碍物影响）。
-func _compute_obstacle_avoidance(move_dir: Vector2) -> Vector2:
+## 获取当前移动的下一个路径点。地面单位使用 A* 寻路绕过静态障碍物（塔/建筑/河道），
+## 路径定期重算以适应障碍物变化（如新部署的建筑）。空中单位直线飞。
+func _get_move_waypoint(target_pos: Vector2, delta: float) -> Vector2:
+	# 空中单位不需要寻路，直线飞向目标
 	if movement_type == "air":
-		return Vector2.ZERO
+		return target_pos
 
-	var look_ahead := collision_radius + BattleConstants.px(OBSTACLE_LOOK_AHEAD_CELLS)
-	var steering := Vector2.ZERO
-	var obstacles := EntityRegistry.get_static_obstacles()
+	_path_repath_timer -= delta
+	# 目标变化超过 1 格 → 立即重算；或定时重算
+	var target_moved := target_pos.distance_to(_path_target) > BattleConstants.CELL_SIZE
+	if _path.is_empty() or target_moved or _path_repath_timer <= 0.0:
+		_recompute_path(target_pos)
 
-	for obs in obstacles:
-		# 跳过当前攻击目标——单位需要接近正在攻击的塔
-		var attack = get_primary_attack()
-		if attack and attack.current_target == obs:
-			continue
-		# 跳过当前移动目标（无攻击目标时向最近的塔推进）
-		if _move_target == obs:
-			continue
-
-		var obs_pos := BattlePathing.game_position_of(obs)
-		var obs_r_raw = obs.get("collision_radius")
-		var obs_r: float = float(obs_r_raw) if obs_r_raw != null else 10.0
-
-		var to_obs := obs_pos - position
-		var dist := to_obs.length()
-		if dist > look_ahead + obs_r:
-			continue  # 超出探测范围
-
-		# 前方距离：障碍物在移动方向上的投影
-		var forward_dist := move_dir.dot(to_obs)
-		if forward_dist < -collision_radius:
-			continue  # 障碍物在身后
-
-		# 横向距离：障碍物到移动路径的垂直距离（2D 叉积标量）
-		var cross_z := move_dir.x * to_obs.y - move_dir.y * to_obs.x
-		var lateral_dist := absf(cross_z)
-		var total_radius := collision_radius + obs_r
-		if lateral_dist >= total_radius:
-			continue  # 障碍物在路径侧面之外，不会碰撞
-
-		# 确定避让方向：始终从障碍物同一侧绕过（叉积符号决定），减少抖动
-		var perp: Vector2
-		if cross_z >= 0:
-			# 障碍物偏右 → 向左偏转
-			perp = Vector2(move_dir.y, -move_dir.x)
+	# 沿路径前进：跳过已到达的路径点
+	while _path.size() > 1:
+		if position.distance_to(_path[0]) <= PATH_WAYPOINT_REACHED:
+			_path.pop_front()
 		else:
-			# 障碍物偏左 → 向右偏转
-			perp = Vector2(-move_dir.y, move_dir.x)
+			break
 
-		# 强度：横向越近越强 × 前方越近越强
-		var lateral_factor := 1.0 - lateral_dist / total_radius
-		var forward_factor := 1.0 - clampf(forward_dist / look_ahead, 0.0, 1.0)
-		steering += perp * (lateral_factor * forward_factor)
+	if _path.is_empty():
+		return target_pos
+	return _path[0]
 
-	return steering
+
+## 重新计算 A* 路径。
+func _recompute_path(target_pos: Vector2) -> void:
+	_path = AStarPathfinder.find_path(
+		position, target_pos, collision_radius / BattleConstants.CELL_SIZE
+	)
+	_path_target = target_pos
+	_path_repath_timer = PATH_REPATH_INTERVAL
 
 
 ## 计算与附近同层单位的分离转向向量。
@@ -718,6 +697,47 @@ func is_attacking() -> bool:
 	return attack != null and attack.is_firing()
 
 
+# ============================================================================
+# 联机攻击视觉同步（事件型 reliable RPC）
+# ============================================================================
+# 背景：从 MultiplayerSynchronizer 迁移到手动 RPC 时，攻击触发状态（_net_is_firing）
+# 与攻击朝向的同步通道被遗漏，client 端单位进入攻击时无动画（表现为"僵在原地"）。
+# 此处补一条事件型 RPC：host 每次出手时通知 client 播放攻击动画 + 朝向 + 翻转。
+# 攻击是低频事件（间隔 0.4~1.4s），用 reliable 保证不漏播，与 _rpc_spawn_projectile 同模式。
+
+## AttackComponent 出手时调用（host 端）：把本次攻击的朝向/翻转同步给 client。
+## 无帧动画的单位（ColorRect 兜底）跳过——它们没有 attack 动画可播。
+func _on_attack_triggered() -> void:
+	if not NetworkManager.is_networked() or not NetworkManager.is_server():
+		return
+	# 无帧动画的单位不需要同步攻击视觉
+	if sprite_animator == null or not sprite_animator._has_animation:
+		return
+	_rpc_attack_trigger.rpc(get_attack_facing(), get_flip_h())
+
+
+## Host → Client：同步一次攻击触发。
+## attack_facing / flip_h 在 client 端按 180° 镜像规则翻转：
+##   side 不变（|dx| 在镜像下不变）；front↔back 互换（dy 变号）；flip_h 取反（左右翻转）。
+@rpc("authority", "call_remote", "reliable")
+func _rpc_attack_trigger(attack_facing: String, flip_h: bool) -> void:
+	if NetworkManager.is_server():
+		return
+	var mirrored := attack_facing
+	if attack_facing == "front":
+		mirrored = "back"
+	elif attack_facing == "back":
+		mirrored = "front"
+	_net_attack_facing = mirrored
+	_net_flip_h = not flip_h
+	_net_is_firing = true
+
+
+## SpriteAnimator 检测到攻击动画播完后调用，清除一次性攻击标记。
+func _clear_attack_flag() -> void:
+	_net_is_firing = false
+
+
 ## 覆写视觉状态：移动中返回 "walk"，否则返回 "idle"。
 ## SpriteAnimator 每帧轮询此方法决定播放什么动画。
 func get_visual_state() -> String:
@@ -765,6 +785,9 @@ func get_facing() -> String:
 ## 覆写水平翻转：目标在右侧时翻转为 true（素材默认面朝左）。
 func get_flip_h() -> bool:
 	if _is_remote():
+		# 攻击期间单位静止（位置不变，移动方向推断失效），用 host 同步的翻转值
+		if _net_is_firing:
+			return _net_flip_h
 		# Client 端本地推断：用 RPC 目标位置的 X 变化判断左右移动
 		var dx := _sync_target_pos.x - _last_sync_target.x
 		var flip := dx > 0.3
@@ -782,7 +805,8 @@ func get_flip_h() -> bool:
 ## 无攻击目标时回退到 get_facing()（仅 front/back）。
 func get_attack_facing() -> String:
 	if _is_remote():
-		return "back" if team == "player" else "front"
+		# Client 端：读 host 同步的攻击朝向（已在 _rpc_attack_trigger 接收时做过镜像翻转）
+		return _net_attack_facing
 	var tx := _get_target_x()
 	var ty := _get_target_y()
 	var dx := absf(tx - position.x)

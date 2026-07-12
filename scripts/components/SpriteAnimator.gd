@@ -128,6 +128,9 @@ func _update_animation() -> void:
 		if _sprite.is_playing():
 			return
 		_attack_anim_playing = false
+		# 攻击动画播完：清除宿主一次性攻击标记，避免下一帧重复触发
+		if combatant.has_method("_clear_attack_flag"):
+			combatant._clear_attack_flag()
 
 	# 检查攻击触发（只有存在攻击动画时才进入不可打断模式）
 	# 联机 client 端：优先从 combatant.is_attacking() 读取网络同步值
