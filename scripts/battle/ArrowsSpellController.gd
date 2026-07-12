@@ -106,5 +106,8 @@ func _spawn_wave(wave_idx: int) -> void:
 
 
 func _deal_wave_damage() -> void:
+	# 联机 client 端：不造成伤害（由 host 计算），仅保留箭矢飞行视觉
+	if NetworkManager.is_networked_client():
+		return
 	DamageSystem.deal_area_damage(_target, _radius, _damage, _team, _tower_damage)
 	SignalBus.projectile_hit.emit(_target, _team)

@@ -41,13 +41,9 @@ func setup(p_card_id: String, p_hand_index: int) -> void:
 	var card := DataRegistry.get_card_data(p_card_id)
 	_card_cost = int(card.get("cost", 0))
 	if name_label:
-		# 已有模型动画的单位不显示名称
-		var unit_id: String = card.get("unit_id", "")
-		var has_model := false
-		if unit_id != "":
-			var unit := DataRegistry.get_unit_data(unit_id)
-			has_model = unit.has("animation") and not unit["animation"].is_empty()
-		name_label.visible = not has_model
+		# 有卡面的卡牌不显示名称（图片即标识）
+		var icon_path: String = card.get("icon", "")
+		name_label.visible = (icon_path == "")
 		name_label.text = card.get("display_name", p_card_id)
 	if cost_label:
 		cost_label.text = str(_card_cost)

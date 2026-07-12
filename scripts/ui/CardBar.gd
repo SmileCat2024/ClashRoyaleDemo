@@ -30,10 +30,15 @@ const SLOT_ROW_Y := 29    ## 卡槽行顶部 y（CardBar 本地坐标）
 const SLOT_XS := [103, 187, 270, 354]  ## 4 张手牌的左上角 x
 
 ## ── 预告牌（下一张）区域 ──
-const NEXT_W := 65        ## 预告牌区域宽度
-const NEXT_H := 100       ## 预告牌区域高度
-const NEXT_X  := 14       ## 预告牌区域左上角 x
-const NEXT_Y  := 65       ## 预告牌区域左上角 y
+## 对齐底板预告牌框；"下一张"标题已印在底板图上，无需再显示文字。
+const NEXT_W := 46        ## 预告牌区域宽度
+const NEXT_H := 128       ## 预告牌区域高度（底板框 30~158）
+const NEXT_X  := 22       ## 预告牌区域左上角 x
+const NEXT_Y  := 30       ## 预告牌区域左上角 y
+## 预告牌卡面定位：左右填满框宽，卡面坐进底板预告牌卡槽内（下半区）。
+## 这样卡面只比手牌卡面小（预告牌框本身较窄），不会被压缩成一小块。
+const NEXT_ICON_TOP := 58.0      ## 卡面顶部偏移（卡面落进底板卡槽）
+const NEXT_ICON_BOTTOM := 8.0    ## 卡面底部偏移
 
 ## ── 圣水条（底板桥是 11 格，实际圣水只占右侧 10 格） ──
 ## 以桥的右侧为锚点，宽度只覆盖右侧 10 格，跳过最左边的空格。
@@ -79,6 +84,11 @@ func _ready() -> void:
 	next_card_panel.size = Vector2(NEXT_W, NEXT_H)
 	var panel_sb := StyleBoxEmpty.new()
 	next_card_panel.add_theme_stylebox_override("panel", panel_sb)
+	# 预告牌卡面：左右填满预告牌框，上下让出底板标题区和名称区
+	next_icon_rect.offset_left = 0.0
+	next_icon_rect.offset_top = NEXT_ICON_TOP
+	next_icon_rect.offset_right = 0.0
+	next_icon_rect.offset_bottom = -NEXT_ICON_BOTTOM
 
 	# 定位圣水条
 	elixir_bar.position = Vector2(ELIXIR_X, ELIXIR_Y)
@@ -103,14 +113,9 @@ func _on_hand_updated(hand: Array, next_card: String) -> void:
 		next_icon_rect.texture = null
 	else:
 		var card := DataRegistry.get_card_data(next_card)
-		var next_uid: String = card.get("unit_id", "")
-		var next_has_model := false
-		if next_uid != "":
-			var next_unit := DataRegistry.get_unit_data(next_uid)
-			next_has_model = next_unit.has("animation") and not next_unit["animation"].is_empty()
-		next_name_label.visible = not next_has_model
-		next_name_label.text = card.get("display_name", next_card)
 		var icon_path: String = card.get("icon", "")
+		next_name_label.visible = (icon_path == "")
+		next_name_label.text = card.get("display_name", next_card)
 		if icon_path != "":
 			next_icon_rect.texture = load(icon_path) as Texture2D
 		else:
