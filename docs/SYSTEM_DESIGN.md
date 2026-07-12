@@ -353,7 +353,7 @@ func _process(delta):
 
 当前只有 `hog_rider` 配置 `can_jump_river = true`。后续单位复用该能力，只需要在 `unit_data` 增加同名字段；如果单位已经在桥线上跨河，会正常走桥，不进入跳跃状态。
 
-**不用 NavigationRegion2D**：地图只有两桥和一种跳河能力，条件判断足够，更可控更省性能。
+**不用 NavigationRegion2D**：地图只有两桥和一种跳河能力，过桥/跳河路由用条件判断足够，更可控更省性能。但**绕塔/建筑避障**已升级为 A* 网格寻路（见 6.4.2），替代早期的 steering 避让方案。
 
 ### 6.4.1 碰撞分离系统（0.8.3，已实现）
 
@@ -400,6 +400,34 @@ resolve_overlaps(entities)
 - **DamageSystem**：范围伤害命中判定 = `spell_radius + target.hurt_radius >= distance`
 
 `hurt_radius` 与 `collision_radius` 分开：可以单独调节法术蹭塔、建筑受击等细节，而不影响碰撞体大小。
+
+### 6.4.2 A* 网格寻路系统（替代 steering 避让）
+
+**AStarPathfinder**（`scripts/battle/AStarPathfinder.gd`）对地面单位做动态网格寻路，绕开塔和可部署建筑（mass=0 的静态障碍物）。空中单位跳过 A*，直接走 BattlePathing 给的直线/过桥路径。
+
+**为什么从 steering 升级到 A\***：早期版本（0.8.8）用 `_compute_obstacle_avoidance`（前方障碍物垂直偏转）+ `_compute_unit_separation`（boids 式分离）做轻量避让。但在塔群密集区域（如双公主塔 + 国王塔 + 敌方建筑挤在一起）会出现单位卡死、绕不出来的问题。A* 网格寻路从全局规划路径，彻底解决。
+
+**单位移动三层架构**（当前）：
+
+```
+路径路由（BattlePathing）          → 河道/桥/跳河的大方向路由
+  ↓ 给出"下一目标点"
+A* 网格寻路（AStarPathfinder）     → 地面单位绕塔/建筑规划局部路径
+  ↓ 返回像素路径点数组
+同类分离 + 碰撞分离                → UnitBase._compute_unit_separation + CollisionSystem
+  ↓ 最终位置修正
+```
+
+**关键接口**：
+- `AStarPathfinder.find_path(from: Vector2, to: Vector2, mover_radius_cells: float) -> Array[Vector2]`
+  - `from` / `to`：World 本地游戏空间坐标
+  - `mover_radius_cells`：单位的碰撞半径（格），用于障碍物膨胀，避免单位贴着塔边卡住
+  - 返回值：像素路径点数组（包括起点和终点），空数组表示无可达路径
+- `UnitBase._recompute_path()`：目标切换时调用 A* 重新规划，缓存路径逐点移动
+
+**障碍物来源**：`EntityRegistry.get_static_obstacles()` 返回所有 `mass=0` 的实体（塔 + 可部署建筑如迫击炮/地狱塔）。新增建筑卡牌（mass=0）会自动成为寻路障碍，无需额外注册。
+
+**不做动态重规划**：单位只在目标切换时重新算路径，不会每帧重算。这意味着如果障碍物在单位移动中途出现（如敌方在路径上部署建筑），单位会在撞到障碍时才重新规划。
 
 ### 6.5 2.5D 渲染系统（已实现）
 
@@ -988,7 +1016,7 @@ DataRegistry._ready() 时自动运行 `_validate_all_data()`：
 
 ## 十五、当前版本实现局限
 
-1. **寻路用条件判断而非 NavMesh**：地图只有两桥，航点足够
+1. **过桥/跳河用条件判断，绕障用 A\***：地图只有两桥，过桥路由用条件判断足够；地面单位绕塔/建筑用 A* 网格寻路（AStarPathfinder），空中单位走直线。A* 不做动态重规划（目标切换才重算）
 2. **状态效果用简单属性修改**（P2）：不支持状态免疫、叠加规则
 3. **溅射无衰减**：范围内全额伤害
 4. **数据用字典硬编码**：未用 Godot Resource (.tres)
@@ -999,7 +1027,7 @@ DataRegistry._ready() 时自动运行 `_validate_all_data()`：
 9. **altitude 离地高度仅视觉**：不影响逻辑，飞行单位和地面单位在索敌时仍按 2D 距离计算
 10. **死亡炸弹爆炸无独立动画**：引信期间有脉冲指示圈，但到期瞬间 queue_free，无爆炸闪帧
 11. **DebugBattle.tscn 无 EffectManager**：该场景主要用于单位移动调试，死亡炸弹仅在 BattleScene 中生效
-12. **帧动画系统仅 P1 骨架**：仅支持 idle/walk 状态轮询，无攻击/朝向/死亡/受击动画。仅弓箭手接入移动帧、气球兵接入静态图
+12. **帧动画系统 P2 已完成**：支持 idle/walk/attack 状态 + front/back/side 朝向 + flip_h 水平翻转。当前 knight / hog_rider / giant / archers / balloon / goblins / mortar / mini_pekka 已接入帧动画。仍缺死亡/受击动画状态
 
 ---
 
