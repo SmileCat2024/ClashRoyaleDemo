@@ -46,7 +46,7 @@
 
 ### 明确不做
 
-- 联网/回放/确定性同步
+- ~~联网/回放/确定性同步~~ ✅ 联机已实现（0.19.1：Listen-Server 手动 RPC 方案，见 [6.10](#610-联机同步系统0191已实现)）；回放/确定性同步仍不做
 - ~~单位碰撞挤压（接受重叠）~~ ✅ 已实现（0.8.3：CollisionSystem 碰撞分离，非物理引擎方案）
 - 卡牌养成/商店
 - 精确数值复刻
@@ -614,6 +614,184 @@ SpriteAnimator `_update_animation()` 先尝试匹配完整状态名（如 `walk_
 - P2：攻击动画状态（AttackComponent 加 `is_firing()` 只读标记）+ 朝向系统（front/back + flip_h 水平翻转）
 - P3：死亡动画 opt-in 延迟销毁 + 受击闪白
 - P4：逐单位配置完善 + 美术素材批量接入
+
+### 6.10 联机同步系统（0.19.1，已实现）
+
+联机采用 **Listen-Server 架构**：Host（开房方）运行完整的战斗逻辑，Client（加入方）只负责渲染 + 转发输入。Host 是唯一权威，Client 不做任何战斗判定。
+
+#### 6.10.1 架构总览
+
+```
+┌─────────────────────────────┐                ┌─────────────────────────────┐
+│         Host（权威端）        │                │        Client（影子端）       │
+│                             │                │                             │
+│  BattleManager.is_host=true │   RPC 下行 ▶   │  BattleManager.is_host=false│
+│  ┌───────────────────────┐  │                │  ┌───────────────────────┐  │
+│  │ 全部战斗逻辑            │  │  30Hz unreliable│  │ 仅渲染 + 输入转发      │  │
+│  │ 索敌/攻击/伤害/移动    │  │  + 事件 reliable│  │ 位置 lerp 插值        │  │
+│  │ 碰撞/寿命/胜负         │  │                │  │ 本地推断动画/朝向     │  │
+│  └───────────────────────┘  │                │  └───────────────────────┘  │
+│           ▲                 │                │           │                 │
+│           └──── 输入转发 ◀──┼────────────────┤  点击/选牌 → reliable RPC  │
+└─────────────────────────────┘                └─────────────────────────────┘
+```
+
+**职责切分**：
+
+| 关注点 | Host | Client |
+|---|---|---|
+| 索敌 / 攻击 / 伤害 | ✅ 唯一计算 | ❌ 不跑 |
+| 移动 / 碰撞 / 寿命 | ✅ 唯一计算 | ❌ 不跑 |
+| 能量 / 时间 / 胜负 | ✅ 唯一计算 | ❌ 只接收展示 |
+| 单位 `position` | ✅ 真实位置 | lerp 插值追 Host 同步目标 |
+| walk/idle 动画 | ✅ 真实状态 | **本地推断**（移动方向） |
+| front/back 朝向 | ✅ 真实状态 | **本地推断**（按 team） |
+| flip_h 水平翻转 | ✅ 真实状态 | **本地推断**（X 位移） |
+| 攻击动画 / 朝向 | ✅ 出手即发 RPC | **RPC 同步**（事件型） |
+| 投射物 / 法术创建 | ✅ 创建即发 RPC | **RPC 同步**（事件型） |
+
+**关键决策**：放弃 Godot 内置的 `MultiplayerSynchronizer`（节点命名时序导致路径不匹配，地狱塔光束等持续视觉无法同步），改为**手动 RPC**。Host 每帧打包状态字典通过 unreliable 通道广播，Client 端按节点名查表应用。
+
+`BattleManager.is_host` 在 `_ready()` 中根据 `NetworkManager.is_server()` 设定，联机模式（`is_network_mode`）下决定哪些逻辑路径执行、哪些 RPC 接收后直接 return（防回环）。
+
+#### 6.10.2 双轨同步通道
+
+同步分两类：**定频状态**（每 33ms 一包，可丢包可外推）和**事件**（必须到达，reliable）。
+
+##### A. 30Hz unreliable 定频状态同步
+
+```gdscript
+const SYNC_INTERVAL: float = 0.033  # ≈30Hz
+```
+
+Host 在 `_process()` 中累加 `_sync_timer`，到达阈值后调用 `_sync_state_to_client()` 单次遍历收集所有状态并广播。
+
+| RPC | 传输内容 | 数据格式 | Client 处理 |
+|---|---|---|---|
+| `_rpc_sync_units` | 所有单位/塔位置、血量、护盾、死亡 | `[[name, x, y, hp, shield, is_dead], ...]` | 位置镜像 + lerp 插值目标 + 血量直写 + 死亡触发视觉 |
+| `_rpc_sync_state` | 能量、圣水进度、战斗时间、阶段 | `(p_energy, e_energy, p_progress, e_progress, time, phase)` | team 翻转映射能量 + 阶段切换信号 |
+| `_rpc_sync_beams` | 地狱塔光束（激活/目标/阶段） | `[[name, active, target_x, target_y, stage], ...]` | 目标位置镜像 + `update_beam_from_sync()` |
+| `_rpc_sync_hand` | 手牌 + 预告牌 | `(hand, next_card)` | 刷新本地牌库 |
+
+**单位位置插值 + 外推**：Client 端收到 `_sync_target_pos` 后，`_process()` 用 lerp（`SYNC_LERP_SPEED`）平滑追上目标位置，消除 30Hz 同步包之间的卡顿。同时记录最近两个包的位移作为 `_sync_velocity`，丢包时按速度外推预测位置。
+
+**节点查找缓存**：`_sync_node_cache`（Dictionary）缓存节点名→节点引用，避免每个 RPC 包重复 `get_node_or_null` 字符串匹配。
+
+##### B. 事件型 reliable RPC（创建/触发型）
+
+低频但必须到达的事件用 reliable 通道，Host 创建时立即广播，Client 端独立实例化并按确定性规则运行。
+
+| RPC | 触发时机 | Client 处理 |
+|---|---|---|
+| `_rpc_spawn_unit` | SpawnManager 生成单位 | team 翻转 + 位置镜像后实例化（独立确定性移动） |
+| `_rpc_spawn_projectile` | ProjectileManager 发射投射物 | 坐标镜像后实例化（独立确定性飞行） |
+| `_rpc_spawn_mortar_shell` | 迫击炮发射炮弹 | 同上 |
+| `_rpc_cast_spell` | SpellManager 施放法术 | 坐标镜像后实例化效果 |
+| `_rpc_attack_trigger` | AttackComponent 出手瞬间（0.19.1 新增） | 朝向镜像翻转 + 播放攻击动画 |
+| `_rpc_battle_end` | 战斗结束 | `end_battle(result)` |
+
+**事件型 RPC 的共性**：投射物/炮弹/单位一旦实例化，后续飞行/移动就是确定性的（速度+目标已知），不再需要逐帧同步。这正是用 reliable 而非定频的原因——一次性事件，不能漏。
+
+#### 6.10.3 坐标镜像 — BattleConstants.mirror()
+
+Client 端要把 Host 的逻辑坐标系翻转 180°，让每个玩家都看到自己的塔在屏幕下方。
+
+```gdscript
+# BattleConstants.gd
+## 联机 client 端 180 度镜像：以竞技场中心为对称点，同时翻转 X 和 Y。
+## 用途：每个玩家屏幕上都看到自己的塔在下方。
+## Host 用逻辑坐标，Client 渲染/输入用镜像坐标。
+## 镜像是自反的：mirror(mirror(p)) == p。
+static func mirror(pos: Vector2) -> Vector2:
+    return Vector2(ARENA_WIDTH - pos.x, ARENA_HEIGHT - pos.y)
+```
+
+**应用规则**：
+
+- **所有 RPC 下行的坐标**，Client 接收时调 `BattleConstants.mirror()`（单位位置、光束目标、法术落点、投射物起止点）
+- **Client 端上行输入**（点击部署位置），上行前 mirror 还原回 Host 逻辑坐标，Host 收到的是未翻转坐标
+- **塔初始位置**：Host 在创建塔时若 `not is_host`，直接对塔位 mirror
+- **team 翻转**：Client 视角下，自己的 `player` = Host 的 `enemy`，反之亦然。能量同步、单位生成都做此翻转
+
+**自反性**是关键：`mirror(mirror(p)) == p`，所以 Host↔Client 双向传递坐标时各自 mirror 一次即可还原，不会累积误差。
+
+#### 6.10.4 攻击动画镜像规则
+
+攻击触发 RPC（`_rpc_attack_trigger`）携带 `attack_facing`（三态：front/back/side）和 `flip_h`，Client 接收时按 180° 镜像规则翻转：
+
+| 维度 | Host 值 | Client 翻转后 | 原理 |
+|---|---|---|---|
+| **facing** | `front` | `back` | dy 在镜像下变号（目标从下方变上方） |
+| **facing** | `back` | `front` | 同上 |
+| **facing** | `side` | `side`（不变） | \|dx\| 在镜像下不变（水平偏移不翻转） |
+| **flip_h** | `true` | `false` | 左右镜像，翻转取反 |
+
+```gdscript
+@rpc("authority", "call_remote", "reliable")
+func _rpc_attack_trigger(attack_facing: String, flip_h: bool) -> void:
+    if NetworkManager.is_server():
+        return
+    var mirrored := attack_facing
+    if attack_facing == "front":
+        mirrored = "back"
+    elif attack_facing == "back":
+        mirrored = "front"
+    _net_attack_facing = mirrored
+    _net_flip_h = not flip_h
+    _net_is_firing = true
+```
+
+**为何攻击用 RPC 而非本地推断**：攻击期间单位静止（位置不变），靠"移动方向推断朝向"会失效。攻击是低频事件（间隔 0.4~1.4s），用 reliable RPC 保证不漏播，与 `_rpc_spawn_projectile` 同模式。无帧动画的单位（ColorRect 兜底）跳过——没有 attack 动画可播。
+
+#### 6.10.5 Client 端视觉推断
+
+> **判断标准**：能从已同步数据（position / team）数学推导的状态用本地推断；依赖 Host 独立运行时变量（如攻击锁定、冲锋）的状态必须显式 RPC。
+
+| 视觉状态 | 推断依据 | 实现位置 |
+|---|---|---|
+| **walk/idle 动画** | `_sync_target_pos` 与 `_last_sync_target` 距离差 > 阈值 = 在移动 | `UnitBase.get_visual_state()` client 分支 |
+| **front/back 朝向** | 按 team（player→back，enemy→front） | `UnitBase.get_facing()` client 分支 |
+| **flip_h 水平翻转** | `_sync_target_pos.x - _last_sync_target.x > 0.3`（向右移动翻转） | `UnitBase.get_flip_h()` client 分支 |
+| **攻击动画/朝向** | ❌ 不推断，走 `_rpc_attack_trigger`（出手期间单位静止，方向推断失效） | `UnitBase.is_attacking()` / `get_attack_facing()` |
+
+**朝向推断的巧思**：Client 端坐标已 mirror，team 已翻转。镜像后 player 单位向上走（屏幕下方→上方），其素材朝向恰好应是 back（背身向上）；enemy 单位向下走，朝向应是 front（面朝镜头）。所以**只看 team 就能定朝向**，无需额外同步移动方向。
+
+**flip_h 在攻击期间的例外**：攻击触发时单位位置不变，X 位移推断失效，故 `get_flip_h()` 在 `_net_is_firing` 期间改读 RPC 同步的 `_net_flip_h`。
+
+**国王塔激活**：不显式 RPC。Client 检测到塔 `current_hp < max_hp` 即视为已激活（受击激活的副产物），恢复 sprite 亮度。
+
+#### 6.10.6 Client 端 _process 提前 return
+
+为防止 Client 端误跑战斗逻辑，所有实体 `_process()` 开头检查 `_is_remote()`：
+
+```gdscript
+func _process(delta):
+    if not initialized or is_dead: return
+    if _is_remote():
+        # Client 端仅做：位置 lerp 插值 + 部署动画 + 光束视觉更新
+        _process_remote(delta)
+        return
+    # Host 端跑完整战斗逻辑
+    ...
+```
+
+`_is_remote()`（在 CombatantBase）返回 `NetworkManager.is_networked() and not NetworkManager.is_server()`。新增任何视觉效果时，若需 Client 每帧更新，必须在 `_is_remote()` 的 return 之前调用更新方法——否则 Client 端看不到该效果。
+
+**典型教训**：地狱塔光束（InfernoBeam）最初依赖 Host 端 AttackComponent 的 `_lock_target` 状态，未同步到 Client，导致 Client 看不到光束。修复方案是新增 `_rpc_sync_beams` 定频通道，把 `has_beam_target()` / `get_beam_target()` / `get_ramp_stage_index()` 三个 Host 独有状态打包同步。
+
+#### 6.10.7 新增视觉效果/战斗机制的同步检查清单
+
+1. **这个效果依赖什么数据？**
+   - 只依赖 position / hp → 已被 `_rpc_sync_units` 覆盖
+   - 依赖 Host 独有运行时状态（攻击目标、锁定时间、冷却、冲锋） → **必须 RPC 同步**
+2. **持续性还是瞬时？**
+   - 持续性（光束、光环、粒子）→ 加 30Hz 定频 RPC，参考 `_rpc_sync_beams`
+   - 瞬时（投射物、爆炸、一次性特效）→ 创建时发一次 reliable RPC，参考 `_rpc_spawn_projectile`
+3. **Client 端 `_process` 能驱动吗？**
+   - 需要每帧更新的视觉，必须在 `_is_remote()` return 之前调用更新方法
+4. **坐标和 team 是否需要镜像？**
+   - 所有 RPC 下行坐标，Client 接收时 `BattleConstants.mirror()`
+   - 所有 RPC 下行 team，Client 接收时翻转 player↔enemy
 
 ---
 
