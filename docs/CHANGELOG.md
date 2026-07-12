@@ -1,5 +1,37 @@
 # CHANGELOG
 
+## [0.20.0] - 2026-07-12 — A* 网格寻路替代 steering 避让 + mini_pekka 帧动画 + UI 预告牌优化
+
+### 新增
+- **A* 网格寻路系统**：新增 `AStarPathfinder`（class_name 全局类型），对地面单位做格系统 A* 动态网格寻路，绕开塔和可部署建筑（`mass=0` 的静态障碍物），替代早期 0.8.8 的 steering 避让方案（`_compute_obstacle_avoidance`），彻底解决塔群密集区域（双公主塔 + 国王塔 + 敌方建筑挤在一起）单位卡死、绕不出来的问题。空中单位跳过 A\* 直接走 BattlePathing 的直线/过桥路径。单位移动升级为三层架构：**路径路由**（BattlePathing：河道/桥/跳河）→ **A\* 网格寻路**（绕塔/建筑）→ **同类分离 + 碰撞分离**（UnitBase._compute_unit_separation + CollisionSystem）。
+  - 关键接口 `find_path(from, to, mover_radius_cells)` 返回像素路径点数组，按单位碰撞半径膨胀障碍物留出缓冲，含 line-of-sight 路径平滑。
+  - 不做动态重规划：单位仅在目标切换时重新算路径（`UnitBase._recompute_path`）；障碍物在移动中途出现时，单位会在撞到时才重算。
+- **mini_pekka 帧动画接入**：mini_pekka 首次接入帧动画，walk/attack × front/back/side 三方向。攻击动画三态按目标相对方向选择（水平偏移为主→side，正下→front，正上→back），side 素材默认朝左、目标在右侧时 `flip_h` 自动镜像。新增 `damage_delay: 0.2s` 对齐"劈下"动画关键帧。
+- **部署吸附系统测试**：新增 `test_deploy_snapping` 测试套件，覆盖建筑冲突检测、可部署区域综合判定、非法位置自动吸附到最近合法格、法术全图（含河道）可施放。
+
+### 变更
+- **5 单位美术校准**：knight / hog_rider / musketeer / archers / goblins 添加 `hide_placeholder`（校准后隐藏 ColorRect 占位方块）；5 单位 `shadow_size` 增大约 0.2 格（knight 0.5→0.75、hog_rider 0.55→0.8、musketeer 0.5→0.75、archers 0.35→0.55、goblins 0.3→0.5）使影子更明显。
+- **预告牌卡面对齐底板**：预告牌卡面重新定位，左右填满底板预告牌框（不再被压成小块）；删除 `NextTitleLabel` 节点（"下一张"标题已印在底板图上）。
+- **卡名显示逻辑调整**：CardSlot / CardBar 的卡牌名称显示判断从「单位有动画模型」改为「卡牌有卡面图片」——有卡面时图片即标识、不再显示文字，更合理。
+
+### 修复
+- **联机万箭齐发 client 端重复伤害**：`ArrowsSpellController._deal_wave_damage` 在联机 client 端会重复执行伤害结算（client 只应渲染箭矢飞行视觉，伤害由 host 计算）。修复：client 端提前 return 跳过 `deal_area_damage`。
+
+### 文档
+- 删除 6 份废弃文档（ARCHITECTURE / GODOT_LEARNING_NOTES / PROJECT_OVERVIEW / TODO / TWO_WEEK_PLAN / VISUAL_HANDOFF），均与 CLAUDE.md 职责重叠或已过时。
+- `docs/SYSTEM_DESIGN.md`：新增 6.4.2 A\* 网格寻路系统章节 + 更新当前局限性（寻路 / 帧动画两条）。
+
+### 修改
+- `scripts/battle/AStarPathfinder.gd`（新增，330 行）：A\* 网格寻路核心
+- `scripts/tests/test_astar_pathfinder.gd`（新增）：A\* 寻路测试（无障碍直线 / 绕塔 / 河道阻挡+桥通行 / 目标在障碍内修正 / 窄通道 / 路径平滑 / 起点在障碍内 / 无路径兜底）
+- `scripts/tests/test_obstacle_avoidance.gd`（删除）：旧 steering 避让测试
+- `scripts/tests/test_deploy_snapping.gd`（新增）：部署吸附测试
+- `scripts/tests/TestRunner.gd`：替换 obstacle_avoidance→astar_pathfinder，新增 deploy_snapping
+- `scripts/autoload/DataRegistry.gd`：mini_pekka +animation 三方向 / 5 单位 +hide_placeholder / 5 单位 shadow_size 调整
+- `scripts/ui/CardBar.gd` + `scenes/ui/CardBar.tscn`：预告牌卡面定位 / 删 NextTitleLabel / 名称显示逻辑
+- `scripts/ui/CardSlot.gd`：名称显示判断改用卡面
+- `scripts/battle/ArrowsSpellController.gd`：client 端跳过伤害结算
+
 ## [0.19.1] - 2026-07-12 — 修复联机攻击动作不同步
 
 ### 修复
