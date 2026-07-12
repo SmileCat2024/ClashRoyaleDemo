@@ -28,7 +28,7 @@ var unit_data := {
 		"collision_radius": 0.5,
 		"hurt_radius": 0.5,
 		"mass": 6,
-		"shadow_size": 0.5,
+		"shadow_size": 0.75,
 		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		"attacks": [
 			{
@@ -50,6 +50,7 @@ var unit_data := {
 		# 素材为高清调色板图：walk 1501×1460 / attack 1755×1579
 		# visual_scale 0.028（再缩小约22%）：walk帧视觉约51px
 		"animation": {
+			"hide_placeholder": true,  # 已校准，隐藏 ColorRect 占位方块
 			"visual_offset_x": 0.0,
 			"visual_offset_y": -25.0,
 			"visual_scale": 0.028,
@@ -102,7 +103,7 @@ var unit_data := {
 		"collision_radius": 0.6,
 		"hurt_radius": 0.6,
 		"mass": 4,
-		"shadow_size": 0.55,
+		"shadow_size": 0.8,
 		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		"attacks": [{
 			"name": "hammer_smash",
@@ -120,6 +121,7 @@ var unit_data := {
 			"damage": 317,
 		}],
 		"animation": {
+			"hide_placeholder": true,  # 已校准，隐藏 ColorRect 占位方块
 			"visual_scale": 0.135,
 			"visual_offset_y": -15.0,
 			"health_bar_y": -90,
@@ -174,7 +176,7 @@ var unit_data := {
 		"collision_radius": 0.5,
 		"hurt_radius": 0.5,
 		"mass": 5,
-		"shadow_size": 0.5,
+		"shadow_size": 0.75,
 		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		"attacks": [{
 			"name": "musket_shot",
@@ -195,6 +197,7 @@ var unit_data := {
 		# 素材为高清图：walk ~710-858px宽 / attack ~747-1121px宽，高度 ~1400-1850px
 		# visual_scale 0.028（与 knight 一致，按角色高度对齐）
 		"animation": {
+			"hide_placeholder": true,  # 已校准，隐藏 ColorRect 占位方块
 			"visual_offset_x": 0.0,
 			"visual_offset_y": -25.0,
 			"visual_scale": 0.028,
@@ -260,12 +263,65 @@ var unit_data := {
 			"attack_range": 0.8,
 			"attack_interval": 1.6,
 			"first_attack_delay": 0.5,
+			"damage_delay": 0.2,  # 对齐攻击动画第3帧（劈下）瞬间
 			"delivery": "instant",
 			"trajectory": "",
 			"impact_type": "single",
 			"impact_radius": 0.0,
 			"damage": 755,
 		}],
+		# ---- 帧动画配置 ----
+		# 素材 2048×1920，原角色整体偏左，已统一右移 345px 校正居中（alpha 质心对齐）
+		# content 高约 940px，visual_scale 0.040 → 屏幕高约 48px；脚底对齐地面
+		"animation": {
+			"hide_placeholder": true,  # 已校准，隐藏 ColorRect 占位方块
+			"visual_offset_x": 0.0,
+			"visual_offset_y": -35.0,
+			"visual_scale": 0.040,
+			"health_bar_y": -60.0,
+			"texture_filter": "linear",
+			"states": {
+				"walk_front": {
+					"frames": ["walk_front_01.png", "walk_front_02.png", "walk_front_03.png"],
+					"duration": [0.2, 0.2, 0.2],
+					"mode": "loop",
+				},
+				"walk_back": {
+					"frames": ["walk_back_01.png", "walk_back_02.png", "walk_back_03.png"],
+					"duration": [0.2, 0.2, 0.2],
+					"mode": "loop",
+				},
+				"idle_front": {
+					"frames": ["walk_front_01.png"],  # 暂用移动第1帧做待机
+					"duration": [0.4],
+					"mode": "loop",
+				},
+				"idle_back": {
+					"frames": ["walk_back_01.png"],  # 暂用移动第1帧做待机
+					"duration": [0.4],
+					"mode": "loop",
+				},
+				# 攻击动画三态：根据目标相对方向选择（UnitBase.get_attack_facing 判定）
+				# - 目标偏水平(|dx|>|dy|, 45°内) → side；正下 → front；正上 → back
+				# side 素材默认朝左，目标在右侧时 get_flip_h()=true 自动镜像成朝右
+				# 三态"劈下"帧均在 0.2s = damage_delay，视觉对齐一致
+				"attack_front": {
+					"frames": ["attack_front_01.png", "attack_front_02.png", "attack_front_03.png"],
+					"duration": [0.1, 0.1, 0.15],  # 举刀→挥→劈下，第3帧(0.2s)对齐 damage_delay
+					"mode": "once",
+				},
+				"attack_back": {
+					"frames": ["attack_back_01.png", "attack_back_02.png", "attack_back_03.png"],
+					"duration": [0.1, 0.1, 0.15],
+					"mode": "once",
+				},
+				"attack_side": {
+					"frames": ["attack_side_01.png", "attack_side_02.png"],
+					"duration": [0.2, 0.15],  # 起手→劈下，第2帧(0.2s)对齐 damage_delay
+					"mode": "once",
+				},
+			},
+		},
 		"sfx": {
 			"deploy": "deploy_mini_pekka",
 			"attack": "attack_mini_pekka",
@@ -340,7 +396,7 @@ var unit_data := {
 		"collision_radius": 0.5,  # 原版0.5/个
 		"hurt_radius": 0.5,
 		"mass": 3,
-		"shadow_size": 0.35,
+		"shadow_size": 0.55,
 		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		"attacks": [{
 			"name": "bow_shot",
@@ -361,6 +417,7 @@ var unit_data := {
 		# 新素材 move_down/up（2帧行走）+ attack_down/up（4帧攻击拉弓→释放）
 		# 素材默认面朝左，向右移动时 flip_h 自动翻转
 		"animation": {
+			"hide_placeholder": true,  # 已校准，隐藏 ColorRect 占位方块
 			"visual_offset_x": 0.0,
 			"visual_offset_y": -24.0,
 			"visual_scale": 0.065,
@@ -634,7 +691,7 @@ var unit_data := {
 		"collision_radius": 0.5,  # 原版0.5/个
 		"hurt_radius": 0.5,
 		"mass": 3,
-		"shadow_size": 0.3,
+		"shadow_size": 0.5,
 		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		"attacks": [{
 			"name": "stab",
@@ -653,6 +710,7 @@ var unit_data := {
 		# ---- 帧动画配置 ----
 		# 素材 3000x2500，已右移510px校正居中
 		"animation": {
+			"hide_placeholder": true,  # 已校准，隐藏 ColorRect 占位方块
 			"visual_offset_x": 0.0,
 			"visual_offset_y": -8.0,
 			"visual_scale": 0.016,
