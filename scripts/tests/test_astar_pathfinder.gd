@@ -59,7 +59,7 @@ func _path_avoids_center(path: Array, center: Vector2, min_dist: float, skip_las
 # ============================================================
 
 func test_open_path_returns_target() -> void:
-	# 格 (3,20)→(3,10)，x=70 在左桥中心（收紧后唯一桥格）→ 河道格可通行 → 无障碍直线
+	# 格 (3,20)→(3,10)，x=70 是左桥格 3（桥格 2/3/4 之一）→ 河道格可通行 → 无障碍直线
 	var path := AStarPathfinder.find_path(Vector2(70, 400), Vector2(70, 200), 0.5)
 	assert_false(path.is_empty(), "无障碍时路径不应为空")
 	assert_eq(path[-1], Vector2(70, 200), "路径终点应等于目标")
@@ -175,18 +175,17 @@ func test_bridge_entry_no_cross_off_bridge_river() -> void:
 		"敌方半场过右桥路径不得斜穿桥面外水域")
 
 
-## 收紧桥格判定后，左桥只有格 3（x=70），右桥只有格 14（x=290）。
-## 验证 A* 路径确实经过桥中心 x，而非桥面边界（x=50/90 等）。
-func test_bridge_path_goes_through_center() -> void:
+## 桥格保持 3 格宽（格 2/3/4），A* 会选离起点最近的桥格过河。
+## 验证跨河路径在河道 y 区间内的离散路径点始终落在桥面 x 范围内。
+## 注：平滑后路径可能无顶点落在河道内（垂直过桥段被简化），连续段不斜穿桥面外
+## 水域由 test_bridge_entry_no_cross_off_bridge_river 覆盖。
+func test_bridge_path_stays_on_bridge() -> void:
 	var path := AStarPathfinder.find_path(Vector2(110, 410), Vector2(110, 200), 0.5)
 	assert_false(path.is_empty(), "路径不应为空")
-	# 路径中应至少有一个点在左桥中心 x=70 附近（±5px 容差）
-	var has_center_point := false
 	for p in path:
-		if absf(p.x - 70.0) < 5.0 and BattlePathing.is_in_river(p):
-			has_center_point = true
-			break
-	assert_true(has_center_point, "左桥路径应经过桥中心 x=70（实际路径：%s）" % str(path))
+		if BattlePathing.is_in_river(p):
+			assert_true(BattlePathing.is_bridge_x(p.x),
+				"河道内的路径点必须在桥面 x 范围内（实际 x=%f，路径：%s）" % [p.x, str(path)])
 
 
 # ============================================================
