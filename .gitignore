@@ -1,3 +1,53 @@
-# Godot 4+ specific ignores
+# === Godot 编辑器缓存 ===
 .godot/
+
+# === Android: Gradle 自定义构建目录(Godot 导出时生成)===
 /android/
+/build/
+
+# === Android: Gradle / Android Studio 缓存 ===
+.gradle/
+local.properties
+*.iml
+.idea/
+
+# === Android: 导出产物(APK / AAB / 签名块)===
+*.apk
+*.aab
+*.dex
+*.idsig
+
+# === 签名文件(私钥,绝对禁止提交!)===
+*.keystore
+*.jks
+*.p12
+*.pfx
+keystore.properties
+
+# === Web 导出产物(Godot 默认导出名 game.*,散落在项目根)===
+/game.html
+/game.pck
+/game.wasm
+/game.js
+/game.png
+/game.icon.png
+/game.apple-touch-icon.png
+/game.audio.worklet.js
+/game.audio.position.worklet.js
+/game.apple-touch-icon.png.import
+/game.icon.png.import
+/game.png.import
+
+# === 桌面导出产物 ===
+*.exe
+
+# === 备份文件 ===
+*.bak
+*.bak_*
+*.orig
+*.tmp
+
+# === 操作系统垃圾 ===
+.DS_Store
+Thumbs.db
+desktop.ini
