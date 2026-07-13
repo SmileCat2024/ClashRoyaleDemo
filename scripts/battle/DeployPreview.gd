@@ -42,10 +42,8 @@ var _min_attack_range: float = 0.0
 ## 预览方块半边长（匹配 UnitBase body size 16px → 半边 8）
 const PREVIEW_HALF := 8.0
 
-## 射程/法术范围圆统一样式：白色边框 + 极浅白填充
+## 法术中心十字瞄准标记颜色（范围圆样式统一由 RangeVfx.draw_gradient_ring 提供）
 const RANGE_BORDER_COLOR := Color(1.0, 1.0, 1.0, 0.85)
-const RANGE_FILL_COLOR := Color(1.0, 1.0, 1.0, 0.1)
-const RANGE_BORDER_WIDTH := 1.5
 
 ## Arena 引用，用于校验部署位置
 @onready var _arena: Node2D = get_node_or_null("../Arena")
@@ -183,30 +181,13 @@ func _draw() -> void:
 			draw_rect(border_rect, border_color, false, 1.5)
 
 
-## 绘制范围圆/环（统一白色样式：白圈边框 + 极浅白填充）。
-## inner_radius=0 时为实心圆；>0 时中心掏空成环形（迫击炮盲区）。
+## 绘制范围圆/环（统一白色渐变环样式，由 RangeVfx 提供）。
+## inner_radius>0 时额外画迫击炮盲区内圈边界（简单白线标记）。
 func _draw_range_circle(center: Vector2, outer_radius: float, inner_radius: float) -> void:
 	if outer_radius <= 0.0:
 		return
-	if inner_radius <= 0.0:
-		# 实心圆填充
-		draw_circle(center, outer_radius, RANGE_FILL_COLOR)
-	else:
-		# 环形填充：分段梯形拼出环形区域
-		var seg := 64
-		for i in seg:
-			var a1 := i * TAU / seg
-			var a2 := (i + 1) * TAU / seg
-			var d1 := Vector2(cos(a1), sin(a1))
-			var d2 := Vector2(cos(a2), sin(a2))
-			var pts := PackedVector2Array([
-				center + d1 * inner_radius,
-				center + d1 * outer_radius,
-				center + d2 * outer_radius,
-				center + d2 * inner_radius,
-			])
-			draw_colored_polygon(pts, RANGE_FILL_COLOR)
-		# 内圈边框
-		draw_arc(center, inner_radius, 0, TAU, seg, RANGE_BORDER_COLOR, RANGE_BORDER_WIDTH)
-	# 外圈边框
-	draw_arc(center, outer_radius, 0, TAU, 64, RANGE_BORDER_COLOR, RANGE_BORDER_WIDTH)
+	# 外圈：白色渐变环
+	RangeVfx.draw_gradient_ring(self, center, outer_radius, RangeVfx.COLOR_PREVIEW)
+	# 迫击炮盲区内圈边界标记
+	if inner_radius > 0.0:
+		draw_arc(center, inner_radius, 0, TAU, 64, RANGE_BORDER_COLOR, 1.5)
