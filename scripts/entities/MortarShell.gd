@@ -14,6 +14,8 @@ extends ProjectileBase
 
 # ---- 炮弹参数 ----
 var _splash_radius: float = 0.0  ## 溅射半径（像素）
+var _attack_ground: bool = true  ## 是否伤害地面单位（继承自攻击方 AttackComponent）
+var _attack_air: bool = true     ## 是否伤害空中单位
 
 # ---- 炮弹贴图 ----
 # 美术提供的迫击炮炮弹 PNG（263×284）。加载一次缓存，找不到时退回圆形绘制。
@@ -34,7 +36,7 @@ const EXPLODE_DURATION := 0.3
 ## target_node: 目标节点（取其当前位置为落点，此后不追踪）
 ## dmg: 范围伤害 | splash_px: 溅射半径（像素）| speed_px: 飞行速度（像素/秒）
 ## team_name: 阵营 | arc_grids: 弧高峰值（格），决定抛物线视觉高度
-func setup_shell(spawn_pos: Vector2, target_node, dmg: int, splash_px: float, speed_px: float, team_name: String, arc_grids: float) -> void:
+func setup_shell(spawn_pos: Vector2, target_node, dmg: int, splash_px: float, speed_px: float, team_name: String, arc_grids: float, attack_ground: bool = true, attack_air: bool = true) -> void:
 	position = spawn_pos
 	_start_pos = spawn_pos
 	target = target_node
@@ -44,6 +46,8 @@ func setup_shell(spawn_pos: Vector2, target_node, dmg: int, splash_px: float, sp
 	team = team_name
 	homing = false  # 范围型，不追踪
 	arc_height = arc_grids
+	_attack_ground = attack_ground
+	_attack_air = attack_air
 
 	# 落点 = 目标当前位置（发射时固定）
 	if target and is_instance_valid(target):
@@ -88,7 +92,7 @@ func _on_impact() -> void:
 	body_rect.visible = false
 	# 联机 client 端：不造成伤害（由 host 计算），只显示爆炸视觉
 	if not NetworkManager.is_networked_client():
-		DamageSystem.deal_area_damage(_last_target_pos, _splash_radius, damage, team)
+		DamageSystem.deal_area_damage(_last_target_pos, _splash_radius, damage, team, -1, _attack_ground, _attack_air)
 
 
 func _draw() -> void:

@@ -22,9 +22,16 @@ static func resolve_impact(target: Node, damage: int) -> void:
 ## 通过 EntityRegistry 查询，不遍历场景树。
 ## center 使用 World 本地游戏空间坐标。
 ## tower_damage >= 0 时，塔（有 tower_type 属性的实体）受 tower_damage 而非 damage（法术对塔减伤）。
-static func deal_area_damage(center: Vector2, radius: float, damage: int, attacker_team: String, tower_damage: int = -1) -> void:
+static func deal_area_damage(center: Vector2, radius: float, damage: int, attacker_team: String, tower_damage: int = -1, attack_ground: bool = true, attack_air: bool = true) -> void:
 	var enemies = EntityRegistry.get_enemies_of(attacker_team)
 	for e in enemies:
+		# ground/air 过滤：单位攻击范围限定（如瓦基里仅地面）；法术默认打所有
+		var mt = e.get("movement_type")
+		var is_air: bool = mt == "air"
+		if is_air and not attack_air:
+			continue
+		if not is_air and not attack_ground:
+			continue
 		# 受击半径偏移：大体积目标更容易被范围伤害命中
 		var hr = e.get("hurt_radius")
 		var hurt_r: float = float(hr) if hr != null else 0.0

@@ -675,8 +675,130 @@ var unit_data := {
 			"damage": 312,
 			"projectile_speed": 14.0,
 		}],
+		# ---- 帧动画配置 ----
+		# 重甲亡灵：飞行单位，中性单套贴图（2200×2240，linear 过滤）
+		# 行走仅 front/back 各 1 帧（侧面移动回退 front/back）；攻击三方向 front/back/side
+		# 注：projectile 单位不加 damage_delay（伤害由投射物命中结算，同 archers/musketeer）
+		"animation": {
+			"hide_placeholder": true,  # 已校准，隐藏 ColorRect 占位方块
+			"visual_offset_x": 0.0,
+			"visual_offset_y": -25.0,  # 校准：放大后同步下移保持底部对齐
+			"visual_scale": 0.0225,  # 校准：放大 0.5 格（显示高度 40px→50px）
+			"health_bar_y": -50.0,  # 校准完成
+			"texture_filter": "linear",
+			"states": {
+				"walk_front": {
+					"frames": ["walk_front_01.png"],
+					"duration": [0.3],
+					"mode": "loop",
+				},
+				"walk_back": {
+					"frames": ["walk_back_01.png"],
+					"duration": [0.3],
+					"mode": "loop",
+				},
+				"idle_front": {
+					"frames": ["walk_front_01.png"],  # 暂用移动第 1 帧做待机
+					"duration": [0.3],
+					"mode": "loop",
+				},
+				"idle_back": {
+					"frames": ["walk_back_01.png"],  # 暂用移动第 1 帧做待机
+					"duration": [0.3],
+					"mode": "loop",
+				},
+				"attack_front": {
+					"frames": ["attack_front_01.png", "attack_front_02.png", "attack_front_03.png"],
+					"duration": [0.06, 0.10, 0.07],  # 校准：快起手→命中停顿→收势，缓解 3 帧低帧率卡顿
+					"mode": "once",
+				},
+				"attack_back": {
+					"frames": ["attack_back_01.png", "attack_back_02.png"],
+					"duration": [0.07, 0.11],  # 校准：2 帧动画，命中帧稍长表现力道
+					"mode": "once",
+				},
+				"attack_side": {
+					"frames": ["attack_side_01.png", "attack_side_02.png", "attack_side_03.png"],
+					"duration": [0.06, 0.10, 0.07],  # 校准：快起手→命中停顿→收势
+					"mode": "once",
+				},
+			},
+		},
 		"sfx": {
 			"deploy": "deploy_mega_minion",
+		},
+	},
+	"valkyrie": {
+		"id": "valkyrie",
+		"display_name": "瓦基里武神",
+		"max_hp": 1500,  # 用户要求加2倍（750→1500）
+		"shield": 0,
+		"move_speed": 1.0,  # 中速（Medium 60）
+		"movement_type": "ground",
+		"sight_range": 5.0,
+		"movement_targeting": "any",
+		"collision_radius": 0.5,
+		"hurt_radius": 0.5,
+		"mass": 6,
+		"shadow_size": 0.5,
+		"deploy_time": 1.0,
+		"attacks": [{
+			"name": "axe_spin",
+			"targeting": "any",
+			"attack_ground": true,
+			"attack_air": false,
+			"attack_range": 1.0,  # 用户要求：0.5→1.0 格
+			"attack_interval": 1.8,
+			"first_attack_delay": 0.6,
+			"delivery": "instant",
+			"impact_type": "splash",
+			"impact_radius": 2.0,  # 用户要求：2格半径（以自身为中心）
+			"damage": 169,
+			"damage_delay": 0.08,  # 对齐转斧命中帧（前段出手即命中，第 2 帧）
+		}],
+		# ---- 帧动画配置 ----
+		# 瓦基里武神：地面近战，中性单套贴图（2335×1856 横向，linear 过滤）
+		# walk/attack × front/back 两方向（无 side，侧面回退 front/back）；down=front/up=back
+		# 转斧命中在前段（第 2 帧），damage_delay=0.08 对齐
+		"animation": {
+			"hide_placeholder": true,  # 已校准，隐藏 ColorRect 占位方块
+			"visual_offset_x": 0.0,
+			"visual_offset_y": -39.0,  # 校准：再缩小1格，保持底部位置
+			"visual_scale": 0.038,  # 校准：再缩小1格（0.049→0.038）
+			"health_bar_y": -100.0,  # 校准：缩小后重估
+			"texture_filter": "linear",
+			"states": {
+				"walk_front": {
+					"frames": ["walk_front_01.png", "walk_front_02.png"],
+					"duration": [0.25, 0.25],
+					"mode": "loop",
+				},
+				"walk_back": {
+					"frames": ["walk_back_01.png", "walk_back_02.png"],
+					"duration": [0.25, 0.25],
+					"mode": "loop",
+				},
+				"idle_front": {
+					"frames": ["walk_front_01.png"],  # 暂用移动第 1 帧做待机
+					"duration": [0.3],
+					"mode": "loop",
+				},
+				"idle_back": {
+					"frames": ["walk_back_01.png"],
+					"duration": [0.3],
+					"mode": "loop",
+				},
+				"attack_front": {
+					"frames": ["attack_front_01.png", "attack_front_02.png", "attack_front_03.png", "attack_front_04.png"],
+					"duration": [0.08, 0.08, 0.08, 0.08],
+					"mode": "once",
+				},
+				"attack_back": {
+					"frames": ["attack_back_01.png", "attack_back_02.png", "attack_back_03.png"],
+					"duration": [0.08, 0.08, 0.08],
+					"mode": "once",
+				},
+			},
 		},
 	},
 	"goblins": {
@@ -981,6 +1103,17 @@ var card_data := {
 		"spawn_spread": 0.0,
 		"icon": "res://assets/ui/cards/mega_minion.png",
 		"description": "飞行单位，对空对地，中等射程。",
+	},
+	"card_valkyrie": {
+		"id": "card_valkyrie",
+		"display_name": "瓦基里武神",
+		"cost": 4,
+		"card_type": "troop",
+		"unit_id": "valkyrie",
+		"spawn_count": 1,
+		"spawn_spread": 0.0,
+		"icon": "res://assets/ui/cards/valkyrie.png",
+		"description": "地面近战，转斧范围伤害，清兵利器。",
 	},
 	"card_goblins": {
 		"id": "card_goblins",

@@ -50,10 +50,10 @@ func spawn_projectile(spawn_pos: Vector2, target_node, damage: int, speed: float
 ## damage: 范围伤害 | splash_px: 溅射半径（像素）| speed_px: 飞行速度（像素/秒）
 ## team_name: 阵营 | arc_grids: 弧高峰值（格）
 ## 返回: 生成的炮弹节点
-func spawn_mortar_shell(spawn_pos: Vector2, target_node, damage: int, splash_px: float, speed_px: float, team_name: String, arc_grids: float) -> Node2D:
+func spawn_mortar_shell(spawn_pos: Vector2, target_node, damage: int, splash_px: float, speed_px: float, team_name: String, arc_grids: float, attack_ground: bool = true, attack_air: bool = true) -> Node2D:
 	var shell = MORTAR_SHELL_SCENE.instantiate()
 	projectiles_root.add_child(shell)
-	shell.setup_shell(spawn_pos, target_node, damage, splash_px, speed_px, team_name, arc_grids)
+	shell.setup_shell(spawn_pos, target_node, damage, splash_px, speed_px, team_name, arc_grids, attack_ground, attack_air)
 	SignalBus.projectile_spawned.emit(shell, team_name)
 	# 联机 host 端：通知 client 也创建炮弹（两端独立运行确定性飞行）
 	if NetworkManager.is_server():
