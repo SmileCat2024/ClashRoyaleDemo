@@ -16,6 +16,11 @@ const SAFETY_MARGIN := 0.25
 ## 对角线移动代价（√2）。
 const DIAG_COST := 1.41421
 
+## 桥面边界格移动惩罚。河道内桥边界格（格中心恰在桥面 x 边界上）增加此代价，
+## 引导 A* 优先走桥中心格（格 3/14，x=70/290）。相当于桥入口逻辑倒角——
+## 让单位自然拐进桥中心，远离脆弱的桥面边界，避免碰撞分离推入水域触发回弹。
+const BRIDGE_EDGE_PENALTY := 3.0
+
 ## line-of-sight 采样步长（格），用于路径平滑检查。
 const LOS_SAMPLE_STEP := 0.3
 
@@ -137,6 +142,21 @@ static func _is_bridge_cell(cell: Vector2i) -> bool:
 	return on_left or on_right
 
 
+## 河道内的桥面边界格：格中心 x 恰好等于桥面 x 边界值（LEFT/RIGHT_BRIDGE_X_MIN/MAX），
+## 且格中心 y 在河道范围内。这些格的中心点在桥面边界上，单位沿此 x 过桥时
+## 碰撞分离极易将中心点推到桥面外（仅需偏移 0.001px），触发河道回弹死锁。
+## A* 对这些格施加 BRIDGE_EDGE_PENALTY 额外代价，引导单位走桥中心格（格 3/14）。
+static func _is_river_bridge_edge_cell(cx: int, cy: int) -> bool:
+	var center_y := (cy + 0.5) * BattleConstants.CELL_SIZE
+	if center_y < BattleConstants.RIVER_Y_MIN or center_y > BattleConstants.RIVER_Y_MAX:
+		return false
+	var center_x := (cx + 0.5) * BattleConstants.CELL_SIZE
+	return absf(center_x - BattleConstants.LEFT_BRIDGE_X_MIN) < 1.0 \
+		or absf(center_x - BattleConstants.LEFT_BRIDGE_X_MAX) < 1.0 \
+		or absf(center_x - BattleConstants.RIGHT_BRIDGE_X_MIN) < 1.0 \
+		or absf(center_x - BattleConstants.RIGHT_BRIDGE_X_MAX) < 1.0
+
+
 # ============================================================
 #  A* 搜索
 # ============================================================
@@ -189,6 +209,9 @@ static func _astar(start: Vector2i, goal: Vector2i, grid: Dictionary) -> Array:
 				continue
 
 			var move_cost := DIAG_COST if (neighbor.x != current.x and neighbor.y != current.y) else 1.0
+			# 桥面边界格加权：河道内的桥边界格增加移动代价，引导 A* 优先走桥中心格。
+			if _is_river_bridge_edge_cell(neighbor.x, neighbor.y):
+				move_cost += BRIDGE_EDGE_PENALTY
 			var tentative_g: float = g_score[current] + move_cost
 
 			if not open_set.has(neighbor):

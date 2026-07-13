@@ -188,6 +188,32 @@ func test_bridge_path_stays_on_bridge() -> void:
 				"河道内的路径点必须在桥面 x 范围内（实际 x=%f，路径：%s）" % [p.x, str(path)])
 
 
+## 桥面边界格加权验证：A* 应优先走桥中心格（x=70/290），而非桥边界格（x=90/270）。
+## 从 x=110（靠近左桥右边界格 4）出发过桥，路径在河道 y 区间的 x 应接近 70（桥中心），
+## 而非 90（桥边界）。这是桥入口逻辑倒角的体现——单位被引导拐进桥中心，
+## 远离脆弱的桥面边界，避免碰撞分离推入水域。
+func test_bridge_path_prefers_center_over_edge() -> void:
+	var path := AStarPathfinder.find_path(Vector2(110, 410), Vector2(110, 200), 0.5)
+	assert_false(path.is_empty(), "路径不应为空")
+	# 采样路径折线，找出河道 y 区间内的最大 x 值（离桥右边界 x=90 越近越危险）
+	var prev := Vector2(110, 410)
+	var max_river_x := 0.0
+	for curr in path:
+		var dist := prev.distance_to(curr)
+		if dist > 1.0:
+			var steps := maxi(2, int(dist / 4.0))
+			for i in range(1, steps):
+				var t := float(i) / float(steps)
+				var p := prev.lerp(curr, t)
+				if BattlePathing.is_in_river(p):
+					max_river_x = maxf(max_river_x, p.x)
+		prev = curr
+	# 桥中心 x=70，桥右边界 x=90。路径在河道内的 x 不应超过 85（对角线进出桥面有轻微偏移，
+	# 但仍远离桥边界 x=90 至少 5px），确保单位走桥中心而非贴着桥边界
+	assert_true(max_river_x <= 85.0,
+		"过桥路径应走桥中心（河道内 x≤85），实际最大 x=%f" % max_river_x)
+
+
 # ============================================================
 #  目标/起点在障碍物内
 # ============================================================

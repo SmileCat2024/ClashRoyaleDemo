@@ -112,19 +112,40 @@ static func _resolve_pair(a: Node2D, b: Node2D) -> void:
 ## 后处理：河道回弹 + 边界钳制。对所有实体执行，保证不会出现卡河道或飞出地图的情况。
 static func _post_process(entities: Array) -> void:
 	for e in entities:
-		# 河道回弹：地面单位被推入河道（非桥面）时拉回最近岸
+		# 河道回弹：地面单位被推入河道（非桥面）时处理
 		if _get_layer(e) == "ground":
 			if BattlePathing.is_in_river(e.position) and not BattlePathing.is_on_bridge(e.position):
-				var river_mid := (BattleConstants.RIVER_Y_MIN + BattleConstants.RIVER_Y_MAX) * 0.5
-				if e.position.y < river_mid:
-					e.position.y = BattleConstants.RIVER_Y_MIN - RIVER_BOUNCE_MARGIN
+				# 桥面边缘吸附：单位被碰撞分离推到桥面外缘（≤ 碰撞半径距离）时，
+				# 把 x 拉回桥面边缘，而非弹回岸。避免在桥面边界处反复"入水→弹回→再入水"震荡。
+				# A* 路径经过桥格 4（中心 x=90 = 桥面右边界），单位沿 x=90 过桥时
+				# 任何微小推力都会让中心点越界触发回弹，形成死锁。
+				var snap_x := _try_bridge_snap_x(e.position.x, _get_collision_radius(e))
+				if snap_x >= 0.0:
+					e.position.x = snap_x
 				else:
-					e.position.y = BattleConstants.RIVER_Y_MAX + RIVER_BOUNCE_MARGIN
+					# 离桥面太远：正常弹回最近岸
+					var river_mid := (BattleConstants.RIVER_Y_MIN + BattleConstants.RIVER_Y_MAX) * 0.5
+					if e.position.y < river_mid:
+						e.position.y = BattleConstants.RIVER_Y_MIN - RIVER_BOUNCE_MARGIN
+					else:
+						e.position.y = BattleConstants.RIVER_Y_MAX + RIVER_BOUNCE_MARGIN
 
 		# 边界钳制
 		var r := _get_collision_radius(e)
 		e.position.x = clampf(e.position.x, r, BattleConstants.ARENA_WIDTH - r)
 		e.position.y = clampf(e.position.y, r, BattleConstants.ARENA_HEIGHT - r)
+
+
+## 检查 x 是否在某个桥面边缘的容差范围内。是则返回钳制到桥面边缘的 x，否则返回 -1。
+## tolerance 通常为单位碰撞半径——单位中心可以越出桥面边缘最多一个半径距离（身体仍接触桥面）。
+static func _try_bridge_snap_x(x: float, tolerance: float) -> float:
+	# 左桥 [LEFT_BRIDGE_X_MIN, LEFT_BRIDGE_X_MAX]
+	if x >= BattleConstants.LEFT_BRIDGE_X_MIN - tolerance and x <= BattleConstants.LEFT_BRIDGE_X_MAX + tolerance:
+		return clampf(x, BattleConstants.LEFT_BRIDGE_X_MIN, BattleConstants.LEFT_BRIDGE_X_MAX)
+	# 右桥 [RIGHT_BRIDGE_X_MIN, RIGHT_BRIDGE_X_MAX]
+	if x >= BattleConstants.RIGHT_BRIDGE_X_MIN - tolerance and x <= BattleConstants.RIGHT_BRIDGE_X_MAX + tolerance:
+		return clampf(x, BattleConstants.RIGHT_BRIDGE_X_MIN, BattleConstants.RIGHT_BRIDGE_X_MAX)
+	return -1.0
 
 
 # ============================================================
