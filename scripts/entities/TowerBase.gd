@@ -24,6 +24,9 @@ var _tower_sprite: Sprite2D = null
 # ---- 血条数值标签（精灵塔专用）----
 var _hp_label: Label = null
 
+## 战斗 UI 共用的 Clash Royale 风格数字字体（塔血量与右上倒计时保持一致）。
+const CLASH_FONT: FontFile = preload("res://assets/fonts/Clash_Regular.otf")
+
 
 ## 初始化塔属性。由 DebugBattle / BattleManager 在场景启动时调用。
 func setup(tower_data: Dictionary, team_name: String, tower_name: String) -> void:
@@ -133,7 +136,7 @@ func _create_tower_sprite(sprite_data: Dictionary) -> void:
 
 
 ## 创建血条数值标签。我方在血条下方（重叠），敌方在血条上方（重叠）。
-## 粗体 + 队伍色描边 + 极浅队伍色填充（整体偏白）。
+## Clash 字体 + 队伍色描边 + 极浅队伍色填充（整体偏白）。
 func _create_hp_label() -> void:
 	_hp_label = Label.new()
 	_hp_label.name = "HPLabel"
@@ -143,21 +146,18 @@ func _create_hp_label() -> void:
 	_hp_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_hp_label)
 
-	# 粗体：FontVariation embolden
-	var fv := FontVariation.new()
-	fv.base_font = ThemeDB.fallback_font
-	fv.variation_embolden = 0.8
-	_hp_label.add_theme_font_override("font", fv)
-	_hp_label.add_theme_font_size_override("font_size", 14)
+	# 与右上倒计时使用同一套 Clash Royale 风格数字字体。
+	_hp_label.add_theme_font_override("font", CLASH_FONT)
+	_hp_label.add_theme_font_size_override("font_size", 12)
 
 	# 描边色 + 填充色（队伍差异化）
 	var outline_c: Color
 	var fill_c: Color
 	if team == "player":
-		outline_c = Color(0.08, 0.42, 0.92)     # 正蓝描边
+		outline_c = Color(0.02, 0.20, 0.52)     # 深皇家蓝描边
 		fill_c = Color(0.92, 0.96, 1.0)          # 极浅蓝白
 	else:
-		outline_c = Color(0.88, 0.12, 0.08)     # 正红描边
+		outline_c = Color(0.62, 0.02, 0.04)     # 深皇家红描边
 		fill_c = Color(1.0, 0.94, 0.92)          # 极浅红白
 	_hp_label.add_theme_color_override("font_color", fill_c)
 	_hp_label.add_theme_color_override("font_outline_color", outline_c)
@@ -166,7 +166,7 @@ func _create_hp_label() -> void:
 
 	# 尺寸与定位：相对血条居中，按队伍上下偏移并重叠
 	var label_w: float = health_bar.size.x + 10.0
-	var label_h: float = 16.0
+	var label_h: float = 14.0
 	_hp_label.size = Vector2(label_w, label_h)
 	var label_x: float = health_bar.position.x + health_bar.size.x / 2.0 - label_w / 2.0
 	if team == "player":

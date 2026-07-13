@@ -20,11 +20,20 @@ var current_state: GameState = GameState.MENU
 ## 是否处于联机模式（true = 联机对战 / false = 单机 vs AI）
 var network_mode: bool = false
 
+## 对局规则：极速模式维持原有 7 倍圣水；经典模式采用官方 1v1 时间与倍率节奏。
+enum MatchMode { FAST_7X, CLASSIC_1V1 }
+var match_mode: int = MatchMode.FAST_7X
+
 
 ## 设置联机模式（由 MainMenu 在进入战斗前调用）
 func set_network_mode(enabled: bool) -> void:
 	network_mode = enabled
 	print("[Game] network_mode =", enabled)
+
+
+func set_match_mode(mode: int) -> void:
+	match_mode = mode
+	print("[Game] match_mode =", mode)
 
 
 ## 进入战斗场景

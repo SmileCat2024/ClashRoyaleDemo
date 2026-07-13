@@ -17,6 +17,9 @@ signal battle_ended(result: String)
 ## 战斗阶段变化（"regular" → "overtime"），time_remaining 为当前阶段剩余秒
 signal battle_phase_changed(phase: String, time_remaining: float)
 
+## 圣水倍率变更（1 / 2 / 3 / 7）。用于战斗 HUD 的倍率与阶段播报。
+signal elixir_multiplier_changed(multiplier: int)
+
 # ---- 卡牌相关 ----
 
 ## 玩家点击了一张卡牌槽位（点击卡牌进入部署待命状态）。

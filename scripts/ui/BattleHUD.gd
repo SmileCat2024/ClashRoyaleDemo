@@ -6,6 +6,19 @@
 
 extends Control
 
+const TIMER_NORMAL_COLOR := Color.WHITE
+const TIMER_WARNING_COLOR := Color(0.95, 0.12, 0.08)
+const DARK_OUTLINE_COLOR := Color.BLACK
+const COUNTDOWN_COLOR := Color(1.0, 0.68, 0.16)
+
+var _announcement_time_left: float = 0.0
+var _announcement_persistent: bool = false
+var _presentation_initialized: bool = false
+var _last_phase: String = ""
+var _last_multiplier: int = -1
+var _last_countdown_second: int = -1
+var _final_countdown_announced: bool = false
+
 
 func _ready() -> void:
 	SignalBus.energy_changed.connect(_on_energy_changed)
@@ -19,6 +32,9 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_disable_mouse_filter_recursive($TopBar)
 	_disable_mouse_filter_recursive($BottomInfo)
+	_disable_mouse_filter_recursive($TimerPanel)
+	_disable_mouse_filter_recursive($MultiplierIcon)
+	_disable_mouse_filter_recursive($BattleAnnouncement)
 	$CenterMessageLabel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	print("[BattleHUD] ready")
 
@@ -32,25 +48,92 @@ func _disable_mouse_filter_recursive(control: Control) -> void:
 
 
 func _process(_delta: float) -> void:
-	# 更新顶部时间显示
+	if _announcement_time_left > 0.0 and not _announcement_persistent:
+		_announcement_time_left -= _delta
+		if _announcement_time_left <= 0.0:
+			$BattleAnnouncement.visible = false
+	# 右上角倒计时：常规时间与加时赛均显示当前阶段剩余时间。
 	var bm = get_node_or_null("../../Managers/BattleManager")
 	if bm and bm.battle_running:
-		var time_left = int(bm.max_battle_time - bm.battle_time)
-		$TopBar/TimerLabel.text = "时间: %d" % time_left
+		var phase_end: float = bm.max_battle_time
+		if bm.battle_phase == "overtime":
+			phase_end += bm.overtime_duration
+		var time_left: int = max(0, int(ceil(phase_end - bm.battle_time)))
+		$TimerPanel/TimeLabel.text = "%d:%02d" % [int(time_left / 60), time_left % 60]
+		# 最后十秒按 10 红、9 白、8 红……交替提醒。
+		var is_warning_second := time_left > 0 and time_left <= 10 and time_left % 2 == 0
+		$TimerPanel/TimeLabel.add_theme_color_override(
+			"font_color", TIMER_WARNING_COLOR if is_warning_second else TIMER_NORMAL_COLOR)
+		_update_match_presentation(bm, time_left)
 
-	# 更新单位数量
-	var units_root = get_node_or_null("../../UnitsRoot")
-	if units_root:
-		var count = units_root.get_child_count()
-		$BottomInfo/UnitCountLabel.text = "场上单位: %d" % count
+
+func _update_match_presentation(bm: Node, time_left: int) -> void:
+	if not _presentation_initialized:
+		_presentation_initialized = true
+		_last_phase = bm.battle_phase
+		_last_multiplier = bm.current_elixir_multiplier
+		_update_multiplier_label(_last_multiplier)
+		return
+
+	if _last_phase != bm.battle_phase:
+		_last_phase = bm.battle_phase
+		if bm.battle_phase == "overtime":
+			_show_announcement("OVERTIME")
+
+	if _last_multiplier != bm.current_elixir_multiplier:
+		var old_multiplier: int = _last_multiplier
+		_last_multiplier = bm.current_elixir_multiplier
+		_update_multiplier_label(_last_multiplier)
+		# 经典模式的 1→2、2→3 切换均以“60 秒”中央播报提示。
+		if old_multiplier > 0 and _last_multiplier > old_multiplier and _last_multiplier <= 3:
+			_show_announcement("60 SECONDS LEFT", "X%d ELIXIR" % _last_multiplier)
+
+	if time_left > 12:
+		_final_countdown_announced = false
+		_last_countdown_second = -1
+		return
+	if not _final_countdown_announced and time_left > 10:
+		_final_countdown_announced = true
+		_show_announcement("BATTLE ENDS IN...", "", 1.4)
+	if time_left <= 10 and time_left > 0 and time_left != _last_countdown_second:
+		_last_countdown_second = time_left
+		_show_countdown(time_left)
+
+
+func _update_multiplier_label(multiplier: int) -> void:
+	$MultiplierIcon.visible = multiplier != 1
+	if multiplier != 1:
+		$MultiplierIcon/ValueLabel.text = "X%d" % multiplier
+
+
+func _show_announcement(title: String, subtitle: String = "", duration: float = 2.2) -> void:
+	_announcement_persistent = duration < 0.0
+	_announcement_time_left = duration
+	$BattleAnnouncement/TitleLabel.add_theme_font_size_override("font_size", 24)
+	$BattleAnnouncement/TitleLabel.add_theme_constant_override("outline_size", 7)
+	$BattleAnnouncement/TitleLabel.add_theme_color_override("font_color", Color(1, 0.96, 0.75))
+	$BattleAnnouncement/TitleLabel.add_theme_color_override("font_outline_color", DARK_OUTLINE_COLOR)
+	$BattleAnnouncement/TitleLabel.text = title
+	$BattleAnnouncement/SubtitleLabel.text = subtitle
+	$BattleAnnouncement/SubtitleLabel.visible = not subtitle.is_empty()
+	$BattleAnnouncement.visible = true
+
+
+func _show_countdown(second: int) -> void:
+	_announcement_persistent = false
+	_announcement_time_left = 1.05
+	$BattleAnnouncement/TitleLabel.add_theme_font_size_override("font_size", 48)
+	$BattleAnnouncement/TitleLabel.add_theme_constant_override("outline_size", 8)
+	$BattleAnnouncement/TitleLabel.add_theme_color_override("font_color", COUNTDOWN_COLOR)
+	$BattleAnnouncement/TitleLabel.add_theme_color_override("font_outline_color", DARK_OUTLINE_COLOR)
+	$BattleAnnouncement/TitleLabel.text = str(second)
+	$BattleAnnouncement/SubtitleLabel.visible = false
+	$BattleAnnouncement.visible = true
 
 
 ## 能量变化时更新显示
-func _on_energy_changed(team_name: String, current: int, max_value: int) -> void:
-	if team_name == "player":
-		$TopBar/EnergyLabel.text = "能量: %d / %d" % [current, max_value]
-	else:
-		$TopBar/EnemyEnergyLabel.text = "敌方: %d / %d" % [current, max_value]
+func _on_energy_changed(_team_name: String, _current: int, _max_value: int) -> void:
+	pass
 
 
 ## 单位生成
@@ -64,19 +147,14 @@ func _on_unit_died(_unit: Node, _team: String) -> void:
 
 
 ## 塔被摧毁
-func _on_tower_destroyed(tower_id: String, _team: String, _tower_type: String) -> void:
-	$BottomInfo/EventLog.text = "塔被摧毁: " + tower_id
+func _on_tower_destroyed(_tower_id: String, _team: String, _tower_type: String) -> void:
+	pass
 
 
 ## 战斗结束
 func _on_battle_ended(result: String) -> void:
-	var text = "胜利！" if result == "victory" else "失败..."
-	if result == "draw":
-		text = "平局"
-	elif result == "disconnect":
-		text = "对手已断线"
-	$CenterMessageLabel.text = text
-	$CenterMessageLabel.visible = true
+	_show_announcement("MATCH OVER!", "", -1.0)
+	$CenterMessageLabel.visible = false
 	$EndPanel.visible = true
 	# 结束面板可见时，恢复按钮的鼠标响应
 	$EndPanel.mouse_filter = Control.MOUSE_FILTER_STOP
