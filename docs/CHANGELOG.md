@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## [0.20.2] - 2026-07-13 — 范围伤害爆炸视觉统一 + 拖动预览渐变环
+
+### 新增
+- **范围伤害爆炸瞬间视觉**：所有范围伤害（除毒药和普通投射物溅射外）在生效瞬间统一显示红色渐变环（外圈实线勾边 + 内侧较短距离内渐变到透明），出现后快速渐隐消失（0.35 秒）。新增 `RangeVfx`（class_name 静态工具类，渐变环绘制原语 `draw_gradient_ring`，红色/白色双配色常量）和 `BlastRingEffect`（纯视觉临时节点，static spawn 工厂 + 渐隐自毁，z_index 60 高于投射物）。
+  - **迫击炮炮弹**（MortarShell）：exploding 状态由灰褐色尘土扩散圆改为红色固定半径渐变环。
+  - **火球法术**（SpellProjectile）：exploding 状态由橙红色扩散圆改为红色固定半径渐变环。
+  - **万箭齐发**（ArrowsSpellController）：每波伤害新增 BlastRingEffect 爆炸环（此前波次伤害无范围视觉）。
+  - **死亡延迟炸弹**（DelayedDamageEffect）：爆炸瞬间新增 BlastRingEffect（引信期间的脉冲预警圈保留不变）；重写 `_process` 接管生命周期，在 `is_networked_client()` 检查前 spawn 视觉确保两端均显示。
+
+### 变更
+- **拖动部署预览范围圆统一样式**：DeployPreview 的法术半径圆和建筑（地狱塔/迫击炮）攻击范围圆由「白圈边框 + 极浅白填充」改为白色渐变环（复用 `RangeVfx.draw_gradient_ring`，`COLOR_PREVIEW` 配色）。迫击炮盲区内圈（min_attack_range）保留简单白线边界标记。
+
+### 联机
+- BlastRingEffect 为纯视觉节点。ArrowsSpellController `_deal_wave_damage` 和 DelayedDamageEffect `_process` 均在 `is_networked_client()` 检查之前 spawn，确保 Host 和 Client 两端都看到爆炸环；无需额外 RPC 通道。MortarShell / SpellProjectile 在两端均已存在（通过现有 `_rpc_spawn_projectile` / `_rpc_spawn_mortar_shell`），exploding 状态 `_draw` 两端独立执行。
+
 ## [0.20.1] - 2026-07-13 — 战斗界面去调试化 + 原版风格倒计时
 
 ### 变更

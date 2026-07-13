@@ -72,7 +72,6 @@ func setup(tower_data: Dictionary, team_name: String, tower_name: String) -> voi
 		_create_tower_sprite(sprite_data)
 
 	initialized = true
-	queue_redraw()
 	print("[TowerBase] setup:", tower_id, team, tower_type, "hp:", max_hp)
 
 
@@ -204,32 +203,7 @@ func activate_king() -> void:
 	# 启用攻击组件
 	for comp in attack_components:
 		comp.set_process(true)
-	queue_redraw()
 	print("[TowerBase] king tower activated:", tower_id)
-
-
-## _draw()：绘制攻击范围圆圈（调试用）
-func _draw() -> void:
-	if not initialized or is_dead:
-		return
-	# 国王塔未激活时不绘制射程圆
-	if tower_type == "king" and not king_activated:
-		return
-	if attacks_data.is_empty():
-		return
-	var range_val = BattleConstants.px(float(attacks_data[0].get("attack_range", 0)))
-	if range_val <= 0:
-		return
-	# 射程填充色（很淡）
-	var fill_color: Color
-	if team == "player":
-		fill_color = Color(0.3, 0.6, 1.0, 0.05)
-	else:
-		fill_color = Color(1.0, 0.3, 0.2, 0.05)
-	draw_circle(Vector2.ZERO, range_val, fill_color)
-	# 射程边线
-	var ring_color = Color(1, 1, 1, 0.08)
-	draw_arc(Vector2.ZERO, range_val, 0, TAU, 64, ring_color, 1.0)
 
 
 func _process(delta: float) -> void:
@@ -255,7 +229,6 @@ func die() -> void:
 			health_bar.visible = false
 		if _hp_label:
 			_hp_label.visible = false
-		queue_redraw()
 		return
 	EntityRegistry.unregister(self)
 	if _tower_sprite:
@@ -264,7 +237,6 @@ func die() -> void:
 		health_bar.visible = false
 	if _hp_label:
 		_hp_label.visible = false
-	queue_redraw()
 	SignalBus.tower_destroyed.emit(tower_id, team, tower_type)
 	print("[TowerBase] tower destroyed:", tower_id, team, tower_type)
 
@@ -277,4 +249,3 @@ func _on_remote_death() -> void:
 		health_bar.visible = false
 	if _hp_label:
 		_hp_label.visible = false
-	queue_redraw()
