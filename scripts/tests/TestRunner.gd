@@ -30,6 +30,7 @@ const SUITES := [
 	preload("res://scripts/tests/test_status_combatant.gd"),
 	preload("res://scripts/tests/test_projectile_base.gd"),
 	preload("res://scripts/tests/test_inferno_tower.gd"),
+	preload("res://scripts/tests/test_instant_splash.gd"),
 ]
 
 

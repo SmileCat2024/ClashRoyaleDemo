@@ -1,5 +1,39 @@
 # CHANGELOG
 
+## [0.21.0] - 2026-07-13 — 瓦基里武神新卡 + instant+splash 近战溅射机制 + splash ground/air 过滤修复
+
+### 新增
+- **瓦基里武神（valkyrie）新单位/卡牌**：4 费地面近战，以自身为中心的转斧范围伤害，清兵利器。HP 1500 / 中速 1.0 / 碰撞 0.5 / 质量 6 / 视野 5.0。攻击 `axe_spin`：射程 1.0 格 / 溅射半径 **2.0 格**（以自身为中心）/ 间隔 1.8 秒 / 起手 0.6 秒 / 伤害延迟 0.08 秒（对齐转斧命中第 2 帧）/ 仅地面 / 伤害 169。帧动画接入（11 帧 walk/attack × front/back，横向 2335×1856 中性贴图）+ 卡面 `valkyrie.png`。
+- **instant+splash 近战溅射机制（新）**：首个 `instant`（近战即时命中）+ `splash`（范围溅射）组合单位。此前所有 instant 单位都是 single（单体），splash 只有迫击炮（projectile）。`AttackComponent._execute_attack` 的 instant 分支扩展：`impact_type=splash` 时以攻击者自身位置为中心调 `DamageSystem.deal_area_damage`；`impact_type=single` 的现有单位走原逻辑不受影响。
+
+### 修复
+- **splash 范围伤害 ground/air 过滤缺失**：`DamageSystem.deal_area_damage` 此前只按距离判定，不区分地面/空中，导致 `attack_air=false` 的单位（瓦基里、迫击炮）splash 会误伤空中单位。修复：`deal_area_damage` 加 `attack_ground/attack_air` 可选参数（默认 true/true，法术行为不变），AttackComponent instant+splash 和 MortarShell（迫击炮炮弹）调用时传入攻击方的过滤条件。迫击炮沿 `AttackComponent → ProjectileManager.spawn_mortar_shell → MortarShell.setup_shell → _on_impact` 链路传参（5 处改动）。注：`ProjectileBase` 通用 splash 分支当前无单位使用，未改动。
+
+### 修改
+- `scripts/autoload/DataRegistry.gd`：+unit_data.valkyrie（含 animation + damage_delay）/ +card_data.card_valkyrie（含 icon）
+- `scripts/components/AttackComponent.gd`：_execute_attack instant 分支 +splash 判定；_fire_projectile 迫击炮调用传 attack_ground/attack_air
+- `scripts/systems/DamageSystem.gd`：deal_area_damage +attack_ground/attack_air 参数 + ground/air 过滤
+- `scripts/entities/MortarShell.gd`：+_attack_ground/_attack_air 成员 + setup_shell 接收 + _on_impact 传参
+- `scripts/battle/ProjectileManager.gd`：spawn_mortar_shell +参数透传给 setup_shell
+- `scripts/tests/test_instant_splash.gd`（新增，4 用例）：范围内多目标命中 / 中心是攻击者自身 / attack_air=false 跳过空中 / single 回归
+- `scripts/tests/TestRunner.gd`：+test_instant_splash 套件
+- `assets/sprites/valkyrie/`（新增 11 PNG）+ `assets/ui/cards/valkyrie.png`（卡面）
+- `docs/兵种数据.md`：+§3.13 瓦基里卡片 + 数据规模（12→13 单位/15→16 卡）/ 三个横向对比表 / 卡牌总表加行
+
+## [0.20.1] - 2026-07-13 — 重甲亡灵帧动画接入（首个飞行单位动画）
+
+### 新增
+- **重甲亡灵（mega_minion）帧动画接入**：首个接入序列帧动画的飞行单位。中性单套贴图（10 张 PNG，2200×2240，linear 过滤）：walk front/back 各 1 帧 + attack front 3 帧 / back 2 帧 / side 3 帧。攻击三方向由 `UnitBase.get_attack_facing()` 按目标相对方向自动选择（水平偏移为主→side，正下→front，正上→back），侧面移动回退 front/back 行走帧（SpriteAnimator 降级链自动处理）。idle 复用 walk 首帧。
+- **攻击 duration 节奏校准**：快起手→命中帧停顿→收势（front/side `[0.06,0.10,0.07]`、back `[0.07,0.11]`），缓解 3 帧素材低帧率（≈10fps）卡顿感。3 帧是素材固有限制，duration 调整为缓解手段，治本需美术补帧。
+
+### 设计决策
+- **projectile 单位不加 damage_delay**：重甲亡灵是投射物单位，伤害由投射物飞行命中结算（非攻击动画某帧），与 archers/musketeer 一致，不配置 damage_delay。
+
+### 修改
+- `scripts/autoload/DataRegistry.gd`：mega_minion +animation 配置（states: walk/idle/attack × front/back/side；visual_scale 0.0225 / visual_offset_y -25 / health_bar_y -50 / hide_placeholder true / texture_filter linear）
+- `assets/sprites/mega_minion/`（新增 10 PNG）：walk_front_01 / walk_back_01 / attack_front_01~03 / attack_back_01~02 / attack_side_01~03（源自美术素材「重甲幽灵」，规范命名后复制）
+- `docs/兵种数据.md`：§3.10 mega_minion 视觉小节由「ColorRect 兜底」更新为帧动画配置
+
 ## [0.20.0] - 2026-07-12 — A* 网格寻路替代 steering 避让 + mini_pekka 帧动画 + UI 预告牌优化
 
 ### 新增
