@@ -31,14 +31,10 @@ const SLOT_XS := [103, 187, 270, 354]  ## 4 张手牌的左上角 x
 
 ## ── 预告牌（下一张）区域 ──
 ## 对齐底板预告牌框；"下一张"标题已印在底板图上，无需再显示文字。
-const NEXT_W := 46        ## 预告牌区域宽度
-const NEXT_H := 128       ## 预告牌区域高度（底板框 30~158）
-const NEXT_X  := 22       ## 预告牌区域左上角 x
-const NEXT_Y  := 30       ## 预告牌区域左上角 y
-## 预告牌卡面定位：左右填满框宽，卡面坐进底板预告牌卡槽内（下半区）。
-## 这样卡面只比手牌卡面小（预告牌框本身较窄），不会被压缩成一小块。
-const NEXT_ICON_TOP := 58.0      ## 卡面顶部偏移（卡面落进底板卡槽）
-const NEXT_ICON_BOTTOM := 8.0    ## 卡面底部偏移
+const NEXT_W := 37        ## 底板金色预告牌内框宽度
+const NEXT_H := 50        ## 底板金色预告牌内框高度
+const NEXT_X  := 28       ## 按卡槽底板原图定位（横向）
+const NEXT_Y  := 115      ## 按卡槽底板原图定位（纵向）
 
 ## ── 圣水条（底板桥是 11 格，实际圣水只占右侧 10 格） ──
 ## 以桥的右侧为锚点，宽度只覆盖右侧 10 格，跳过最左边的空格。
@@ -47,6 +43,17 @@ const ELIXIR_W := 300
 const ELIXIR_X := ELIXIR_RIGHT - ELIXIR_W
 const ELIXIR_Y := 146     ## 圣水条 y
 const ELIXIR_H := 20      ## 圣水条高度
+const ELIXIR_ICON_X := 88
+const ELIXIR_ICON_Y := 133
+const ELIXIR_ICON_SIZE := 45
+const ELIXIR_VALUE_X := 117
+const ELIXIR_VALUE_Y := 136
+const ELIXIR_VALUE_W := 38
+const ELIXIR_VALUE_H := 28
+const ELIXIR_MAX_X := 124
+const ELIXIR_MAX_Y := 153
+const ELIXIR_MAX_W := 66
+const ELIXIR_MAX_H := 18
 
 var _player_energy: int = 5
 var _player_energy_max: int = 10
@@ -60,7 +67,9 @@ var _player_energy_max: int = 10
 @onready var elixir_bar: Control = $ElixirBar
 @onready var elixir_fill: ColorRect = $ElixirBar/ElixirFill
 @onready var elixir_pending: ColorRect = $ElixirBar/ElixirPending
-@onready var elixir_label: Label = $ElixirBar/ElixirLabel
+@onready var elixir_icon: TextureRect = $ElixirIcon
+@onready var elixir_value_label: Label = $ElixirValueLabel
+@onready var elixir_max_label: Label = $ElixirMaxLabel
 
 
 func _ready() -> void:
@@ -84,15 +93,22 @@ func _ready() -> void:
 	next_card_panel.size = Vector2(NEXT_W, NEXT_H)
 	var panel_sb := StyleBoxEmpty.new()
 	next_card_panel.add_theme_stylebox_override("panel", panel_sb)
-	# 预告牌卡面：左右填满预告牌框，上下让出底板标题区和名称区
+	# 预告牌卡面仅覆盖底板左下角的金色内框，不覆盖“下一张”文字区域。
 	next_icon_rect.offset_left = 0.0
-	next_icon_rect.offset_top = NEXT_ICON_TOP
+	next_icon_rect.offset_top = 0.0
 	next_icon_rect.offset_right = 0.0
-	next_icon_rect.offset_bottom = -NEXT_ICON_BOTTOM
+	next_icon_rect.offset_bottom = 0.0
 
 	# 定位圣水条
 	elixir_bar.position = Vector2(ELIXIR_X, ELIXIR_Y)
 	elixir_bar.size = Vector2(ELIXIR_W, ELIXIR_H)
+	# 原版式圣水显示：水滴在左，当前值使用大号数字，最大值置于下方。
+	elixir_icon.position = Vector2(ELIXIR_ICON_X, ELIXIR_ICON_Y)
+	elixir_icon.size = Vector2(ELIXIR_ICON_SIZE, ELIXIR_ICON_SIZE)
+	elixir_value_label.position = Vector2(ELIXIR_VALUE_X, ELIXIR_VALUE_Y)
+	elixir_value_label.size = Vector2(ELIXIR_VALUE_W, ELIXIR_VALUE_H)
+	elixir_max_label.position = Vector2(ELIXIR_MAX_X, ELIXIR_MAX_Y)
+	elixir_max_label.size = Vector2(ELIXIR_MAX_W, ELIXIR_MAX_H)
 
 	# 初始化圣水条显示（start_battle 的 energy_changed 信号可能在 _ready 之前已发出）
 	_update_elixir_bar()
@@ -150,7 +166,8 @@ func _refresh_affordability() -> void:
 func _update_elixir_bar() -> void:
 	var ratio := float(_player_energy) / float(max(_player_energy_max, 1))
 	elixir_fill.size = Vector2(ELIXIR_W * ratio, ELIXIR_H)
-	elixir_label.text = "%d/%d" % [_player_energy, _player_energy_max]
+	elixir_value_label.text = str(_player_energy)
+	elixir_max_label.text = "最多：%d" % _player_energy_max
 	_update_elixir_pending()
 
 ## 更新正在积累的那一滴圣水的半透明填充

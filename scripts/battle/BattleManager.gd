@@ -11,18 +11,20 @@ extends Node
 # ---- 战斗状态 ----
 var battle_running: bool = false
 var battle_time: float = 0.0
-var max_battle_time: float = 180.0       ## 常规时间（秒），参考皇室战争 3 分钟
+var max_battle_time: float = 180.0       ## 常规时间（秒）
 var battle_phase: String = "regular"      ## "regular" | "overtime"
-var overtime_duration: float = 60.0       ## 加时赛时长（秒），参考皇室战争 1 分钟
-var overtime_energy_multiplier: float = 2.0  ## 加时赛圣水加速倍率
+var overtime_duration: float = 60.0       ## 极速 1 分钟 / 经典 2 分钟
+var match_mode: int = Game.MatchMode.FAST_7X
+var current_elixir_multiplier: int = 7
 
 # ---- 能量系统 ----
 var _player_state: PlayerBattleState = null
 var _enemy_state: PlayerBattleState = null
 var max_energy: int = 10
 var energy_timer: float = 0.0
-const BASE_ENERGY_INTERVAL: float = 0.4   ## [临时调试] 常规时间每 0.4 秒恢复 1 点能量（原值 2.8，7x 加速）
-var energy_interval: float = BASE_ENERGY_INTERVAL
+const CLASSIC_ENERGY_INTERVAL: float = 2.8
+var base_energy_interval: float = CLASSIC_ENERGY_INTERVAL
+var energy_interval: float = CLASSIC_ENERGY_INTERVAL / 7.0
 
 # ---- 卡组管理 ----
 var deck_manager: DeckManager = null
@@ -59,6 +61,7 @@ func _ready() -> void:
 	is_network_mode = Game.network_mode
 	is_host = (not is_network_mode) or NetworkManager.is_server()
 	local_team = NetworkManager.local_team() if is_network_mode else "player"
+	_configure_match_mode(Game.match_mode)
 	# 清理上一局的注册表残留（重开时旧实体已被引擎 free，但未调用 unregister）
 	# 必须在 _setup_towers() 之前，否则会清掉刚注册的塔
 	EntityRegistry.clear()
@@ -113,7 +116,7 @@ func start_battle() -> void:
 	battle_running = true
 	battle_time = 0.0
 	battle_phase = "regular"
-	energy_interval = BASE_ENERGY_INTERVAL
+	_set_elixir_multiplier(7 if match_mode == Game.MatchMode.FAST_7X else 1, false)
 	_player_state.reset()
 	_enemy_state.reset()
 	energy_timer = 0.0
@@ -147,13 +150,52 @@ func start_battle() -> void:
 	# Client 联机：手牌由 host 通过 RPC 同步，此处不广播（避免闪烁空手牌）
 	if not (is_network_mode and not is_host):
 		call_deferred("_broadcast_hand_state")
-	print("[BattleManager] battle started (network=%s host=%s)" % [is_network_mode, is_host])
+	print("[BattleManager] battle started (network=%s host=%s mode=%s)" % [is_network_mode, is_host, match_mode])
 
 
 ## 向 UI 广播当前手牌和选中状态（延迟调用，确保 UI 已就绪）
 func _broadcast_hand_state() -> void:
 	SignalBus.hand_updated.emit(deck_manager.get_hand(), deck_manager.get_next())
 	SignalBus.selection_changed.emit(selected_hand_index)
+
+
+## 根据模式设置总时长与基础圣水恢复。联机 client 会由主机状态同步覆盖此配置。
+func _configure_match_mode(mode: int) -> void:
+	match_mode = mode
+	if match_mode == Game.MatchMode.CLASSIC_1V1:
+		max_battle_time = 180.0
+		overtime_duration = 120.0
+		base_energy_interval = CLASSIC_ENERGY_INTERVAL
+	else:
+		match_mode = Game.MatchMode.FAST_7X
+		max_battle_time = 180.0
+		overtime_duration = 60.0
+		# 基础值始终是正常模式的 2.8 秒；x7 后才是 0.4 秒/点。
+		base_energy_interval = CLASSIC_ENERGY_INTERVAL
+	Game.set_match_mode(match_mode)
+
+
+## 切换当前圣水倍率，并让 HUD 有机会更新右上角倍率提示。
+func _set_elixir_multiplier(multiplier: int, emit_signal: bool = true) -> void:
+	multiplier = max(multiplier, 1)
+	var changed := current_elixir_multiplier != multiplier
+	current_elixir_multiplier = multiplier
+	energy_interval = base_energy_interval / float(current_elixir_multiplier)
+	if emit_signal and changed:
+		SignalBus.elixir_multiplier_changed.emit(current_elixir_multiplier)
+
+
+## 经典 1v1：最后一分钟 x2、加时最后一分钟 x3；极速模式全程 x7。
+func _update_match_timing() -> void:
+	if match_mode == Game.MatchMode.FAST_7X:
+		_set_elixir_multiplier(7)
+		return
+	var multiplier := 1
+	if battle_phase == "regular" and battle_time >= max_battle_time - 60.0:
+		multiplier = 2
+	elif battle_phase == "overtime":
+		multiplier = 3 if battle_time >= max_battle_time + overtime_duration - 60.0 else 2
+	_set_elixir_multiplier(multiplier)
 
 
 ## 结束战斗
@@ -182,6 +224,7 @@ func _process(delta: float) -> void:
 	if is_network_mode and not is_host:
 		return
 	battle_time += delta
+	_update_match_timing()
 	update_energy(delta)
 	_check_time_limit()
 	# 碰撞分离：在所有单位移动之后统一执行（场景树顺序保证单位先于 Manager 执行 _process）
@@ -406,14 +449,13 @@ func _check_time_limit() -> void:
 			end_battle(_determine_result_by_stats())
 
 
-## 进入加时赛：圣水加速，广播阶段变化
+## 进入加时赛：极速模式维持 x7；经典模式维持 x2，最后一分钟转 x3。
 func _enter_overtime() -> void:
 	battle_phase = "overtime"
-	energy_interval = BASE_ENERGY_INTERVAL / overtime_energy_multiplier
 	energy_timer = 0.0
-	AudioManager.play("countdown_10s")
+	_update_match_timing()
 	SignalBus.battle_phase_changed.emit("overtime", overtime_duration)
-	print("[BattleManager] overtime started (energy x%.1f)" % overtime_energy_multiplier)
+	print("[BattleManager] overtime started (energy x%d)" % current_elixir_multiplier)
 
 
 ## 统计指定阵营存活的塔数量
@@ -562,11 +604,15 @@ func _rpc_sync_hand(hand: Array, next_card: String) -> void:
 	SignalBus.selection_changed.emit(-1)
 
 
-## Host → Client：定频同步战斗状态（能量 + 时间 + 阶段）
+## Host → Client：定频同步战斗状态（能量 + 时间 + 阶段 + 规则）。
 @rpc("authority", "call_remote", "unreliable")
-func _rpc_sync_state(p_energy: int, e_energy: int, p_progress: float, e_progress: float, time_val: float, phase_val: String) -> void:
+func _rpc_sync_state(p_energy: int, e_energy: int, p_progress: float, e_progress: float, time_val: float, phase_val: String, mode_val: int, multiplier_val: int) -> void:
 	if is_host:
 		return
+	if match_mode != mode_val:
+		_configure_match_mode(mode_val)
+		SignalBus.battle_phase_changed.emit(phase_val, overtime_duration if phase_val == "overtime" else max_battle_time)
+	_set_elixir_multiplier(multiplier_val)
 	# Client 视角翻转：自己(player)=host 的 enemy；敌方(enemy)=host 的 player
 	_player_state.energy = e_energy
 	_enemy_state.energy = p_energy
@@ -604,7 +650,9 @@ func _sync_state_to_client() -> void:
 		p_progress,
 		e_progress,
 		battle_time,
-		battle_phase
+		battle_phase,
+		match_mode,
+		current_elixir_multiplier
 	)
 	# 单次遍历收集单位状态 + 光束状态（合并避免双遍历）
 	var unit_states: Array = []

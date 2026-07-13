@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## [0.21.0] - 2026-07-13 — 瓦基里武神新卡 + instant+splash 近战溅射机制 + splash ground/air 过滤修复
+## [版本待定·笑猫统筹A] - 2026-07-13 — 瓦基里武神新卡 + instant+splash 近战溅射机制 + splash ground/air 过滤修复（协作者 lpj-official 提交，版本号待笑猫定）
 
 ### 新增
 - **瓦基里武神（valkyrie）新单位/卡牌**：4 费地面近战，以自身为中心的转斧范围伤害，清兵利器。HP 1500 / 中速 1.0 / 碰撞 0.5 / 质量 6 / 视野 5.0。攻击 `axe_spin`：射程 1.0 格 / 溅射半径 **2.0 格**（以自身为中心）/ 间隔 1.8 秒 / 起手 0.6 秒 / 伤害延迟 0.08 秒（对齐转斧命中第 2 帧）/ 仅地面 / 伤害 169。帧动画接入（11 帧 walk/attack × front/back，横向 2335×1856 中性贴图）+ 卡面 `valkyrie.png`。
@@ -20,7 +20,7 @@
 - `assets/sprites/valkyrie/`（新增 11 PNG）+ `assets/ui/cards/valkyrie.png`（卡面）
 - `docs/兵种数据.md`：+§3.13 瓦基里卡片 + 数据规模（12→13 单位/15→16 卡）/ 三个横向对比表 / 卡牌总表加行
 
-## [0.20.1] - 2026-07-13 — 重甲亡灵帧动画接入（首个飞行单位动画）
+## [版本待定·笑猫统筹B] - 2026-07-13 — 重甲亡灵帧动画接入（首个飞行单位动画）（协作者 lpj-official 提交，版本号待笑猫定）
 
 ### 新增
 - **重甲亡灵（mega_minion）帧动画接入**：首个接入序列帧动画的飞行单位。中性单套贴图（10 张 PNG，2200×2240，linear 过滤）：walk front/back 各 1 帧 + attack front 3 帧 / back 2 帧 / side 3 帧。攻击三方向由 `UnitBase.get_attack_facing()` 按目标相对方向自动选择（水平偏移为主→side，正下→front，正上→back），侧面移动回退 front/back 行走帧（SpriteAnimator 降级链自动处理）。idle 复用 walk 首帧。
@@ -33,6 +33,48 @@
 - `scripts/autoload/DataRegistry.gd`：mega_minion +animation 配置（states: walk/idle/attack × front/back/side；visual_scale 0.0225 / visual_offset_y -25 / health_bar_y -50 / hide_placeholder true / texture_filter linear）
 - `assets/sprites/mega_minion/`（新增 10 PNG）：walk_front_01 / walk_back_01 / attack_front_01~03 / attack_back_01~02 / attack_side_01~03（源自美术素材「重甲幽灵」，规范命名后复制）
 - `docs/兵种数据.md`：§3.10 mega_minion 视觉小节由「ColorRect 兜底」更新为帧动画配置
+
+---
+
+> ℹ️ 以下为笑猫先森已发布的版本（0.20.1 界面 / 0.20.2 爆炸视觉），与上方 lpj-official 的待定版本号存在撞号，合并时请统筹分配。
+
+## [0.20.2] - 2026-07-13 — 范围伤害爆炸视觉统一 + 拖动预览渐变环
+
+### 新增
+- **范围伤害爆炸瞬间视觉**：所有范围伤害（除毒药和普通投射物溅射外）在生效瞬间统一显示红色渐变环（外圈实线勾边 + 内侧较短距离内渐变到透明），出现后快速渐隐消失（0.35 秒）。新增 `RangeVfx`（class_name 静态工具类，渐变环绘制原语 `draw_gradient_ring`，红色/白色双配色常量）和 `BlastRingEffect`（纯视觉临时节点，static spawn 工厂 + 渐隐自毁，z_index 60 高于投射物）。
+  - **迫击炮炮弹**（MortarShell）：exploding 状态由灰褐色尘土扩散圆改为红色固定半径渐变环。
+  - **火球法术**（SpellProjectile）：exploding 状态由橙红色扩散圆改为红色固定半径渐变环。
+  - **万箭齐发**（ArrowsSpellController）：每波伤害新增 BlastRingEffect 爆炸环（此前波次伤害无范围视觉）。
+  - **死亡延迟炸弹**（DelayedDamageEffect）：爆炸瞬间新增 BlastRingEffect（引信期间的脉冲预警圈保留不变）；重写 `_process` 接管生命周期，在 `is_networked_client()` 检查前 spawn 视觉确保两端均显示。
+
+### 变更
+- **拖动部署预览范围圆统一样式**：DeployPreview 的法术半径圆和建筑（地狱塔/迫击炮）攻击范围圆由「白圈边框 + 极浅白填充」改为白色渐变环（复用 `RangeVfx.draw_gradient_ring`，`COLOR_PREVIEW` 配色）。迫击炮盲区内圈（min_attack_range）保留简单白线边界标记。
+
+### 联机
+- BlastRingEffect 为纯视觉节点。ArrowsSpellController `_deal_wave_damage` 和 DelayedDamageEffect `_process` 均在 `is_networked_client()` 检查之前 spawn，确保 Host 和 Client 两端都看到爆炸环；无需额外 RPC 通道。MortarShell / SpellProjectile 在两端均已存在（通过现有 `_rpc_spawn_projectile` / `_rpc_spawn_mortar_shell`），exploding 状态 `_draw` 两端独立执行。
+
+## [0.20.1] - 2026-07-13 — 战斗界面去调试化 + 原版风格倒计时
+
+### 变更
+- **隐藏测试覆盖层**：Arena 默认关闭 `show_debug_grid`，并隐藏敌我部署半场色块、调试河道/桥、双路线标线；地图原有河道与桥的美术仍照常显示，战斗、寻路和部署逻辑不受影响。
+- **移除战斗状态播报**：顶部的时间/双方能量/操作提示，以及我方国王塔左侧的单位数与事件播报，保留节点但默认隐藏。
+- **Clash 风格数字字体**：右上角倒计时与所有防御塔血量数字均接入 `Clash_Regular.otf`。倒计时显示为 `3:00` 样式，最后 10 秒按 10 红、9 白、8 红……交替提示；加时赛自动切换为加时剩余时间。
+- **塔血数字视觉校准**：字号 14→12，描边改为更深的皇家蓝 / 皇家红并加粗至 3px，缩小后的数字仍保持原版式高对比可读性。
+- **下一张牌对齐**：预告卡面改为严格覆盖卡槽底板左下角金色内框，避免遮住“下一张”标题并修正原有偏高、偏宽的问题。
+- **圣水与费用显示**：新增圣水水滴图标；当前圣水改为大号数值 + “最多：10”布局；手牌费用圆标直接复用同一张圣水水滴美术并叠加费用数字。
+- **圣水读数对齐**：水滴、当前值与“最多：10”均以圣水条左端为基准重新校正，当前值缩小，最大值移至当前值正下方。
+- **圣水图标校准**：水滴图标放大至 45px；右移后再向左微调 3px，垂直中心保持不变。
+- **底部 HUD 描边统一**：费用、当前圣水和最大值统一使用近黑紫粗描边，避免浅色文字在蓝色底板上发虚。
+- **双对局模式**：主菜单新增模式选择，单机、建房与加入联机均支持「7× 圣水模式（极速）」和「经典 1v1」。极速模式维持原有 0.4 秒/点（x7）与 3:00 + 1:00 加时；经典模式采用 3:00 常规 + 2:00 加时，圣水依次为常规前两分钟 x1、常规最后一分钟 x2、加时前一分钟 x2、加时最后一分钟 x3。联机由主机权威同步模式、阶段、时间与当前倍率。
+- **中央战斗播报**：新增 Clash 字体中央播报层，经典模式进入 x2/x3 时显示 `60 SECONDS LEFT` + 倍率，进入加时显示 `OVERTIME`，每个阶段最后 12 秒显示 `BATTLE ENDS IN...`，随后居中显示 10→1，战斗结束显示 `MATCH OVER!`。
+- **右上圣水倍率**：倍率不是 x1 时，计时框下方显示 `X2 ELIXIR` / `X3 ELIXIR` / `X7 ELIXIR`。
+- **战斗 HUD 对齐与倍率图标**：修正受 CanvasLayer 横向偏移影响的中央播报和结算按钮位置；所有新战斗文字统一黑色描边。右上倍率改为复用圣水水滴图标，并在图标内显示 `X2` / `X3` / `X7`。
+- **倍率与描边修正**：修复极速模式错误地将 0.4 秒再次除以 7、实际变为约 x49 的问题；现在严格为正常 2.8 秒/点 ÷ 7 = 0.4 秒/点。新加 HUD 的黑色描边同步加粗（计时 4px、倍率 3px、中央播报 5px、最终倒数 6px）。
+- **HUD 二次视觉校准**：黑色描边继续加粗（计时 6px、倍率 5px、中央播报 7px、最终倒数 8px）；倒计时数字缩小为 26px；倍率水滴扩大为 46px 并保持在计时框正下方居中。
+
+### 资源
+- 新增 `assets/fonts/Clash_Regular.otf`。
+- 新增 `assets/ui/圣水.png`。
 
 ## [0.20.0] - 2026-07-12 — A* 网格寻路替代 steering 避让 + mini_pekka 帧动画 + UI 预告牌优化
 

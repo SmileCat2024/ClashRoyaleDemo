@@ -60,6 +60,15 @@ func _draw() -> void:
 
 
 func _process(delta: float) -> void:
-	super._process(delta)
-	if initialized:
-		queue_redraw()  # 每帧重绘脉冲效果
+	if not initialized:
+		return
+	_elapsed += delta
+	if _elapsed >= lifetime:
+		# 爆炸瞬间范围视觉（两端都显示，在 is_client 检查之前）
+		BlastRingEffect.spawn(get_parent(), position, blast_radius)
+		# 仅 host：造成伤害（与父类 BattlefieldEffect._process 逻辑一致）
+		if not NetworkManager.is_networked_client():
+			_on_expire()
+		queue_free()
+		return
+	queue_redraw()  # 引信期间每帧重绘脉冲预警圈

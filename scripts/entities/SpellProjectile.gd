@@ -122,8 +122,7 @@ func _draw() -> void:
 		var sh := 4.0
 		draw_rect(Rect2(-sw / 2.0, -sh / 2.0, sw, sh), Color(0, 0, 0, 0.3))
 	elif _state == "exploding":
-		# 爆炸扩散圆（橙红色，逐渐淡出）
+		# 爆炸范围视觉：红色渐变环（固定半径，alpha 随爆炸进度渐隐）
 		var t: float = _explode_timer / EXPLODE_DURATION
-		var r := lerpf(0.0, _radius, t)
-		draw_circle(Vector2.ZERO, r, Color(1.0, 0.45, 0.1, 0.5 * (1.0 - t)))
-		draw_arc(Vector2.ZERO, r, 0.0, TAU, 48, Color(1.0, 0.3, 0.05, 0.9 * (1.0 - t)), 2.0)
+		RangeVfx.draw_gradient_ring(self, Vector2.ZERO, _radius,
+				RangeVfx.COLOR_BLAST, 1.0 - t)

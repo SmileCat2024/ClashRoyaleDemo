@@ -59,10 +59,10 @@ func _path_avoids_center(path: Array, center: Vector2, min_dist: float, skip_las
 # ============================================================
 
 func test_open_path_returns_target() -> void:
-	# 格 (4,20)→(4,10)，x=90 在左桥范围 → 河道格可通行 → 无障碍直线
-	var path := AStarPathfinder.find_path(Vector2(90, 400), Vector2(90, 200), 0.5)
+	# 格 (3,20)→(3,10)，x=70 是左桥格 3（桥格 2/3/4 之一）→ 河道格可通行 → 无障碍直线
+	var path := AStarPathfinder.find_path(Vector2(70, 400), Vector2(70, 200), 0.5)
 	assert_false(path.is_empty(), "无障碍时路径不应为空")
-	assert_eq(path[-1], Vector2(90, 200), "路径终点应等于目标")
+	assert_eq(path[-1], Vector2(70, 200), "路径终点应等于目标")
 	# 无障碍直线 → 平滑后应只有 1 个点
 	assert_eq(path.size(), 1, "无障碍直线应平滑为单点路径")
 
@@ -108,6 +108,110 @@ func test_bridge_x_direct_cross() -> void:
 	var path := AStarPathfinder.find_path(Vector2(70, 400), Vector2(70, 200), 0.5)
 	assert_false(path.is_empty(), "桥上直行路径不应为空")
 	assert_eq(path[-1], Vector2(70, 200), "路径终点应等于目标")
+
+
+# ============================================================
+#  桥入口卡兵回归（路径不得斜穿桥面外水域）
+# ============================================================
+
+## 检查从 from 出发、依次经过 path 各点的折线，是否穿过"河道 y 区间但不在桥面 x 区间"的区域。
+## 这是 CollisionSystem 河道回弹的触发条件——单位中心点进入此区域会被反复推回，形成死锁。
+func _path_crosses_off_bridge_river(from: Vector2, path: Array) -> bool:
+	var prev := from
+	for curr in path:
+		if _segment_crosses_off_bridge_river(prev, curr):
+			return true
+		prev = curr
+	return false
+
+
+## 检查线段 [a, b] 是否穿过桥面外水域。采样步长 4 像素。
+func _segment_crosses_off_bridge_river(a: Vector2, b: Vector2) -> bool:
+	var dist := a.distance_to(b)
+	if dist < 1.0:
+		return false
+	var steps := maxi(2, int(dist / 4.0))
+	for i in range(1, steps):
+		var t := float(i) / float(steps)
+		var p := a.lerp(b, t)
+		if BattlePathing.is_in_river(p) and not BattlePathing.is_bridge_x(p.x):
+			return true
+	return false
+
+
+## 中场单位（x 偏离桥中心）过左桥时，路径不得斜穿桥面外水域。
+## 这是桥入口卡兵死锁的核心场景：A* 桥格判定若过宽（格 2/4 也算桥格），
+## 平滑会生成 (110,410)→(90,270) 这样的大斜线，在 y∈[300,340] 段 x∈[94,100]
+## 全部落在桥面外水域，单位走到此处被河道回弹反复推回 y=341，形成死锁。
+func test_bridge_entry_no_cross_off_bridge_river() -> void:
+	# 场景 1：中场过左桥（从桥内侧斜进）
+	var path1 := AStarPathfinder.find_path(Vector2(110, 410), Vector2(110, 200), 0.5)
+	assert_false(path1.is_empty(), "中场过左桥路径不应为空")
+	assert_false(_path_crosses_off_bridge_river(Vector2(110, 410), path1),
+		"中场过左桥路径不得斜穿桥面外水域")
+
+	# 场景 2：中场过右桥（对称）
+	var path2 := AStarPathfinder.find_path(Vector2(250, 410), Vector2(250, 200), 0.5)
+	assert_false(path2.is_empty(), "中场过右桥路径不应为空")
+	assert_false(_path_crosses_off_bridge_river(Vector2(250, 410), path2),
+		"中场过右桥路径不得斜穿桥面外水域")
+
+	# 场景 3：紧贴桥内侧 x=95（最严苛——起点 x 已在桥面外）
+	var path3 := AStarPathfinder.find_path(Vector2(95, 410), Vector2(95, 200), 0.5)
+	assert_false(path3.is_empty(), "紧贴桥内侧过桥路径不应为空")
+	assert_false(_path_crosses_off_bridge_river(Vector2(95, 410), path3),
+		"紧贴桥内侧过桥路径不得斜穿桥面外水域")
+
+	# 场景 4：大半径单位（巨人 0.8 格）
+	var path4 := AStarPathfinder.find_path(Vector2(110, 410), Vector2(110, 200), 0.8)
+	assert_false(path4.is_empty(), "大半径单位过桥路径不应为空")
+	assert_false(_path_crosses_off_bridge_river(Vector2(110, 410), path4),
+		"大半径单位过桥路径不得斜穿桥面外水域")
+
+	# 场景 5：敌方半场对称（从上往下过右桥）
+	var path5 := AStarPathfinder.find_path(Vector2(250, 200), Vector2(250, 410), 0.5)
+	assert_false(path5.is_empty(), "敌方半场过右桥路径不应为空")
+	assert_false(_path_crosses_off_bridge_river(Vector2(250, 200), path5),
+		"敌方半场过右桥路径不得斜穿桥面外水域")
+
+
+## 桥格保持 3 格宽（格 2/3/4），A* 会选离起点最近的桥格过河。
+## 验证跨河路径在河道 y 区间内的离散路径点始终落在桥面 x 范围内。
+## 注：平滑后路径可能无顶点落在河道内（垂直过桥段被简化），连续段不斜穿桥面外
+## 水域由 test_bridge_entry_no_cross_off_bridge_river 覆盖。
+func test_bridge_path_stays_on_bridge() -> void:
+	var path := AStarPathfinder.find_path(Vector2(110, 410), Vector2(110, 200), 0.5)
+	assert_false(path.is_empty(), "路径不应为空")
+	for p in path:
+		if BattlePathing.is_in_river(p):
+			assert_true(BattlePathing.is_bridge_x(p.x),
+				"河道内的路径点必须在桥面 x 范围内（实际 x=%f，路径：%s）" % [p.x, str(path)])
+
+
+## 桥面边界格加权验证：A* 应优先走桥中心格（x=70/290），而非桥边界格（x=90/270）。
+## 从 x=110（靠近左桥右边界格 4）出发过桥，路径在河道 y 区间的 x 应接近 70（桥中心），
+## 而非 90（桥边界）。这是桥入口逻辑倒角的体现——单位被引导拐进桥中心，
+## 远离脆弱的桥面边界，避免碰撞分离推入水域。
+func test_bridge_path_prefers_center_over_edge() -> void:
+	var path := AStarPathfinder.find_path(Vector2(110, 410), Vector2(110, 200), 0.5)
+	assert_false(path.is_empty(), "路径不应为空")
+	# 采样路径折线，找出河道 y 区间内的最大 x 值（离桥右边界 x=90 越近越危险）
+	var prev := Vector2(110, 410)
+	var max_river_x := 0.0
+	for curr in path:
+		var dist := prev.distance_to(curr)
+		if dist > 1.0:
+			var steps := maxi(2, int(dist / 4.0))
+			for i in range(1, steps):
+				var t := float(i) / float(steps)
+				var p := prev.lerp(curr, t)
+				if BattlePathing.is_in_river(p):
+					max_river_x = maxf(max_river_x, p.x)
+		prev = curr
+	# 桥中心 x=70，桥右边界 x=90。路径在河道内的 x 不应超过 85（对角线进出桥面有轻微偏移，
+	# 但仍远离桥边界 x=90 至少 5px），确保单位走桥中心而非贴着桥边界
+	assert_true(max_river_x <= 85.0,
+		"过桥路径应走桥中心（河道内 x≤85），实际最大 x=%f" % max_river_x)
 
 
 # ============================================================

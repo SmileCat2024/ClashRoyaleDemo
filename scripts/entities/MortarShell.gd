@@ -116,8 +116,7 @@ func _draw() -> void:
 			draw_circle(stone_pos, FALLBACK_SHELL_RADIUS, Color(0.42, 0.38, 0.34))
 			draw_circle(stone_pos + Vector2(-2.5, -2.5), 3.0, Color(0.60, 0.56, 0.50))
 	elif _state == "exploding":
-		# 爆炸扩散圆（灰褐色尘土，逐渐淡出）
+		# 爆炸范围视觉：红色渐变环（固定半径，alpha 随爆炸进度渐隐）
 		var t: float = _explode_timer / EXPLODE_DURATION
-		var r := lerpf(0.0, _splash_radius, t)
-		draw_circle(Vector2.ZERO, r, Color(0.7, 0.6, 0.45, 0.45 * (1.0 - t)))
-		draw_arc(Vector2.ZERO, r, 0.0, TAU, 36, Color(0.5, 0.4, 0.3, 0.8 * (1.0 - t)), 2.0)
+		RangeVfx.draw_gradient_ring(self, Vector2.ZERO, _splash_radius,
+				RangeVfx.COLOR_BLAST, 1.0 - t)

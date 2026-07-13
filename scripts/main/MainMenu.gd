@@ -42,6 +42,8 @@ func _show_main_mode() -> void:
 	$VBoxContainer/StartButton.visible = true
 	$VBoxContainer/HostButton.visible = true
 	$VBoxContainer/JoinButton.visible = true
+	$VBoxContainer/ModeLabel.visible = true
+	$VBoxContainer/ModeSelect.visible = true
 	$StatusLabel.text = ""
 	$StatusLabel.visible = false
 	$HostList.visible = false
@@ -57,6 +59,8 @@ func _show_host_wait_mode() -> void:
 	$VBoxContainer/StartButton.visible = false
 	$VBoxContainer/HostButton.visible = false
 	$VBoxContainer/JoinButton.visible = false
+	$VBoxContainer/ModeLabel.visible = false
+	$VBoxContainer/ModeSelect.visible = false
 	$VBoxContainer/QuitButton.visible = false
 	# 显示本机 IP
 	var addrs := NetworkManager.get_local_addresses()
@@ -76,6 +80,8 @@ func _show_join_mode() -> void:
 	$VBoxContainer/StartButton.visible = false
 	$VBoxContainer/HostButton.visible = false
 	$VBoxContainer/JoinButton.visible = false
+	$VBoxContainer/ModeLabel.visible = false
+	$VBoxContainer/ModeSelect.visible = false
 	$VBoxContainer/QuitButton.visible = false
 	$StatusLabel.text = "正在扫描局域网..."
 	$StatusLabel.visible = true
@@ -100,6 +106,7 @@ func _show_join_mode() -> void:
 func _on_start_ai_pressed() -> void:
 	print("[MainMenu] 单机模式")
 	NetworkManager.leave()
+	Game.set_match_mode($VBoxContainer/ModeSelect.selected)
 	Game.set_network_mode(false)
 	Game.start_battle()
 
@@ -107,6 +114,7 @@ func _on_start_ai_pressed() -> void:
 ## 创建房间（Host）
 func _on_host_pressed() -> void:
 	print("[MainMenu] 创建房间")
+	Game.set_match_mode($VBoxContainer/ModeSelect.selected)
 	var err = NetworkManager.host_game()
 	if err != OK:
 		$StatusLabel.text = "创建房间失败！\n可能是端口被占用或防火墙拦截。"
@@ -119,6 +127,8 @@ func _on_host_pressed() -> void:
 ## 加入房间
 func _on_join_pressed() -> void:
 	print("[MainMenu] 加入房间")
+	# 加入方可预选模式，但进入战斗后以主机同步的规则为准。
+	Game.set_match_mode($VBoxContainer/ModeSelect.selected)
 	Game.set_network_mode(true)
 	_show_join_mode()
 

@@ -139,6 +139,58 @@ func test_river_bounce() -> void:
 	b.free()
 
 
+# 回归：单位被碰撞推到桥面边缘外（≤ 碰撞半径）时，x 应被吸附到桥面边缘，
+# 而非弹回岸。这是桥入口卡兵死锁的根因——A* 路径经过桥格 4（中心 x=90=桥面边界），
+# 单位沿 x=90 过桥时碰撞分离推到 x=91 就触发河道回弹，反复震荡。
+func test_river_bounce_bridge_edge_snap() -> void:
+	var a := MockScript.new()
+	var dummy := MockScript.new()
+	a.collision_radius = 10.0  # 标准 0.5 格
+	a.movement_type = "ground"
+	# 单位在河道内，x=92 略超左桥右边界 x=90（2px = 0.1 格，在碰撞半径 10px 内）
+	a.position = Vector2(92, 330)
+	a.mass = 5
+	# dummy 远离 A，不产生碰撞交互，仅让 resolve_overlaps 进入后处理
+	dummy.collision_radius = 10.0
+	dummy.movement_type = "ground"
+	dummy.position = Vector2(180, 580)
+	dummy.mass = 5
+
+	CollisionSystem.resolve_overlaps([a, dummy])
+
+	# 应被吸附到桥面边缘 x=90（而非弹回岸 y=341）
+	assert_approx(a.position.x, 90.0, 0.01, "桥面边缘外的单位应被吸附到 x=90")
+	assert_true(BattlePathing.is_in_river(a.position),
+		"吸附后单位仍应在河道 y 区间内（未被弹回岸）")
+	assert_true(BattlePathing.is_on_bridge(a.position),
+		"吸附后单位应在桥面上")
+	a.free()
+	dummy.free()
+
+
+# 对照：单位离桥面太远（超出碰撞半径）时仍正常弹回岸
+func test_river_bounce_far_from_bridge() -> void:
+	var a := MockScript.new()
+	var dummy := MockScript.new()
+	a.collision_radius = 10.0
+	a.movement_type = "ground"
+	# x=120 离左桥右边界 x=90 有 30px，远超碰撞半径 10px
+	a.position = Vector2(120, 330)
+	a.mass = 5
+	dummy.collision_radius = 10.0
+	dummy.movement_type = "ground"
+	dummy.position = Vector2(180, 580)
+	dummy.mass = 5
+
+	CollisionSystem.resolve_overlaps([a, dummy])
+
+	# 应被弹回岸（y 回到河道外）
+	assert_false(BattlePathing.is_in_river(a.position),
+		"远离桥面的河道单位应被弹回岸")
+	a.free()
+	dummy.free()
+
+
 func test_boundary_clamp() -> void:
 	var a := MockScript.new()
 	var b := MockScript.new()

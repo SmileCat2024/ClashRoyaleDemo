@@ -15,7 +15,7 @@ var _selected: bool = false
 var _affordable: bool = true
 
 @onready var name_label: Label = $NameLabel
-@onready var cost_label: Label = $CostLabel
+@onready var cost_label: Label = $CostBadge/CostLabel
 @onready var icon_rect: TextureRect = $CardIcon
 
 # 缓存已加载的卡面纹理，避免重复 load
