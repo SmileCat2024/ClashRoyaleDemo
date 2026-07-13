@@ -119,11 +119,19 @@ static func _build_blocked_grid(mover_radius_cells: float) -> Dictionary:
 	return blocked
 
 
-## 格中心是否在桥 x 范围内。
+## 格是否完全落在桥面 x 范围内（左右边界都在桥面区间）。
+## 收紧判定：不再用"格中心 x"，而要求格的整个 x 区间都被桥面覆盖。
+## 原因：桥面 x∈[50,90] 落在半格边界（2.5 格和 4.5 格），按"格中心 x"判定会让
+## 格 2（x∈[40,60]）和格 4（x∈[80,100]）也当桥格——但它们各有一半在水里。
+## A* 会生成"陆地格→桥格"的对角线（如 (5,17)→(4,16)），这条边斜穿 (100,340) 等
+## 桥面外水域点，单位走过去中心点入水，被河道回弹死锁。
+## 收紧后左桥只剩格 3（x∈[60,80]），右桥只剩格 14（x∈[280,300]），
+## 单位过桥时 A* 强制对齐到桥中心 x，垂直进出桥面，不再斜穿水域。
 static func _is_bridge_cell(cell: Vector2i) -> bool:
-	var center_x := (cell.x + 0.5) * BattleConstants.CELL_SIZE
-	var on_left := center_x >= BattleConstants.LEFT_BRIDGE_X_MIN and center_x <= BattleConstants.LEFT_BRIDGE_X_MAX
-	var on_right := center_x >= BattleConstants.RIGHT_BRIDGE_X_MIN and center_x <= BattleConstants.RIGHT_BRIDGE_X_MAX
+	var x_min := float(cell.x) * BattleConstants.CELL_SIZE
+	var x_max := float(cell.x + 1) * BattleConstants.CELL_SIZE
+	var on_left := x_min >= BattleConstants.LEFT_BRIDGE_X_MIN and x_max <= BattleConstants.LEFT_BRIDGE_X_MAX
+	var on_right := x_min >= BattleConstants.RIGHT_BRIDGE_X_MIN and x_max <= BattleConstants.RIGHT_BRIDGE_X_MAX
 	return on_left or on_right
 
 
@@ -253,6 +261,14 @@ static func _smooth_path(from_pos: Vector2, cell_path: Array, grid: Dictionary) 
 
 
 ## 两点之间是否有无障碍直线视线。超采样检查路径上每个采样点。
+## 除了 A* 格阻塞判定，还要检测"桥面外河道"——采样点在河道 y 区间但不在桥面 x 区间时，
+## 视为不可通行，强制路径平滑在桥入口附近保留原始格点（先对齐到桥 x，再垂直过桥）。
+##
+## 原因：A* 桥格判定基于格中心 x（格 2/4 中心在桥面边界 x=50/90，但格内接区域部分在水里），
+## 而碰撞河道回弹（CollisionSystem._post_process）基于桥面精确几何 x∈[50,90]/[270,310]。
+## 两者粒度不一致——若平滑时不识别桥面外河道，会生成斜穿桥面外水域的直线（如
+## (110,410)→(90,270) 在 y∈[300,340] 段的 x∈[94,100]，全部在桥面外），
+## 单位走到 y≈340、x>90 时中心点入水，被河道回弹反复推回 y=341，形成死锁。
 static func _has_line_of_sight(from: Vector2, to: Vector2, grid: Dictionary) -> bool:
 	var dist := from.distance_to(to)
 	if dist < 1.0:
@@ -262,6 +278,9 @@ static func _has_line_of_sight(from: Vector2, to: Vector2, grid: Dictionary) -> 
 		var t := float(i) / float(steps)
 		var p := from.lerp(to, t)
 		if _is_blocked(_pos_to_cell(p), grid):
+			return false
+		# 桥面外河道检测：采样点在河道 y 区间但不在桥面 x 区间 → 视为阻塞
+		if BattlePathing.is_in_river(p) and not BattlePathing.is_bridge_x(p.x):
 			return false
 	return true
 

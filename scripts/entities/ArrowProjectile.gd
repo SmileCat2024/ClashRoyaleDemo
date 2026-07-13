@@ -14,9 +14,10 @@ const ARROW_LENGTH: float = 10.0       ## 箭杆长度（像素）
 const STUCK_DURATION: float = 2.0      ## 插地停留时间（秒）
 const FADE_DURATION: float = 0.8       ## 渐隐时间（秒）
 const STUCK_VISIBLE_RATIO: float = 0.55 ## 插地后可见部分占箭杆比例
-const FLETCHING_LEN: float = 3.0       ## 羽尾长度（像素）
-const FLETCHING_SPREAD: float = 1.5    ## 羽尾展开宽度（像素）
+const FLETCHING_LEN: float = 5.0       ## 羽尾长度（像素）
+const FLETCHING_SPREAD: float = 2.5    ## 羽尾展开宽度（像素）
 const FLETCHING_ALPHA: float = 0.4     ## 羽尾透明度（弱点缀）
+const FLETCHING_COLOR := Color(0.95, 0.20, 0.18)  ## 羽尾颜色（皇室战争风红色羽尾）
 
 var _state: String = "flying"  ## flying → stuck → fading → queue_free
 
@@ -95,10 +96,10 @@ func _draw_flying() -> void:
 	draw_line(tail, head, Color(1, 1, 1, 1.0), 1.5)
 	# 羽尾：尾部两片淡羽毛（弱点缀）
 	var perp := Vector2(-tangent.y, tangent.x)
-	var fc := Color(0.85, 0.85, 0.92, FLETCHING_ALPHA)
+	var fc := Color(FLETCHING_COLOR, FLETCHING_ALPHA)
 	var fletch_back := tail - tangent * FLETCHING_LEN
-	draw_line(tail, fletch_back + perp * FLETCHING_SPREAD, fc, 1.0)
-	draw_line(tail, fletch_back - perp * FLETCHING_SPREAD, fc, 1.0)
+	draw_line(tail, fletch_back + perp * FLETCHING_SPREAD, fc, 1.5)
+	draw_line(tail, fletch_back - perp * FLETCHING_SPREAD, fc, 1.5)
 
 
 func _draw_stuck() -> void:
@@ -108,7 +109,7 @@ func _draw_stuck() -> void:
 	# 羽尾：顶端两片淡羽毛（弱点缀）
 	var dir := head.normalized() if head.length() > 0.5 else Vector2.UP
 	var perp := Vector2(-dir.y, dir.x)
-	var fc := Color(0.85, 0.85, 0.92, _alpha * FLETCHING_ALPHA)
+	var fc := Color(FLETCHING_COLOR, _alpha * FLETCHING_ALPHA)
 	var fletch_tip := head + dir * FLETCHING_LEN
-	draw_line(head, fletch_tip + perp * FLETCHING_SPREAD, fc, 1.0)
-	draw_line(head, fletch_tip - perp * FLETCHING_SPREAD, fc, 1.0)
+	draw_line(head, fletch_tip + perp * FLETCHING_SPREAD, fc, 1.5)
+	draw_line(head, fletch_tip - perp * FLETCHING_SPREAD, fc, 1.5)
