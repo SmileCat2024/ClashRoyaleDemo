@@ -514,7 +514,7 @@ SpellManager.cast_spell() 按 `card_data.spell_type` 三分支分流：
 
 | spell_type | 弹道 | 效果 | 对应类 |
 |---|---|---|---|
-| **fireball** | SpellProjectile 2.5D 抛物线（红球+地面影子+弧高随距离自适应） | 落地即时范围伤害（塔减伤）+ 击退 + 爆炸扩散圆 | SpellProjectile |
+| **fireball** | SpellProjectile 2.5D 抛物线（三帧火球动画 + 地面影子 + 弧高随距离自适应；素材向下朝向自动旋转至飞行方向） | 落地即时范围伤害（塔减伤）+ 击退 + 爆炸扩散圆 | SpellProjectile |
 | **poison** | 无弹道，直接在目标位置创建 PoisonField | DOT 持续伤害（每 tick_interval 一跳，共 duration/tick 跳）+ 区域内减速 | PoisonField |
 | **arrows** | ArrowsSpellController 编排 3 波箭雨（每波 15 支 ArrowProjectile） | 每波落地范围伤害，确定性向日葵分布 | ArrowsSpellController + ArrowProjectile |
 
@@ -899,6 +899,7 @@ signal card_played(card_id: String, team: String, position: Vector2)
 
 # 能量
 signal energy_changed(team: String, current: int, max_value: int)
+signal elixir_generated(position: Vector2, team: String, amount: int, is_death: bool)  # 圣水收集器产出 / 死亡返还
 
 # 实体
 signal unit_spawned(unit: Node, team: String)
@@ -924,7 +925,7 @@ signal impact_resolved(position: Vector2, impact_type: String, radius: float, te
 
 DataRegistry._ready() 时自动运行 `_validate_all_data()`：
 - 校验所有卡牌（id、cost、card_type、unit_id 引用是否存在）
-- 校验所有单位（max_hp > 0、attacks 非空、每个 attack 有 damage/range/interval/targeting/delivery）
+- 校验所有单位（max_hp > 0；非被动单位的 attacks 非空且每个 attack 有 damage/range/interval/targeting/delivery）
 - 校验所有塔（tower_type 合法、max_hp > 0）
 - **一次性输出所有错误**，不遇错即停
 

@@ -44,6 +44,13 @@ func gain_energy() -> bool:
 	return false
 
 
+## 增加指定数量的能量，返回实际增加量（满圣水时为 0）。
+func gain_energy_amount(amount: int) -> int:
+	var before := energy
+	energy = mini(max_energy, energy + maxi(0, amount))
+	return energy - before
+
+
 ## 重置到初始状态
 func reset() -> void:
 	energy = 5

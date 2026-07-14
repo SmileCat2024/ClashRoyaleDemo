@@ -49,36 +49,47 @@ func spawn_unit(card_id: String, team_name: String, pos: Vector2, awakening_effe
 	# 5. 循环生成
 	var last_unit: Node = null
 	for i in range(count):
-		var unit = UNIT_SCENE.instantiate()
-
 		# 计算部署偏移（与 DeployPreview 共用同一套逻辑）
 		var offset = _get_spawn_offset(i, count, spread, offsets_data)
-		unit.position = pos + offset
-
-		# 先 add_child（触发 _ready，@onready 解析）
-		units_root.add_child(unit)
-
-		# 再 setup（配置属性，创建 AttackComponent 等；elite_skill 从卡牌数据透传）
-		unit.setup(u_data, team_name, awakening_effects, card.get("elite_skill", {}))
-
-		# 注册到 EntityRegistry
-		EntityRegistry.register(unit)
-
-		# 联机模式：Host 分配唯一名字并通知 Client 创建同名单位
-		# 同名节点让 BattleManager 手动 RPC 状态同步正确配对
-		var final_pos: Vector2 = pos + offset
-		if NetworkManager.is_networked() and NetworkManager.is_server():
-			var net_name := "U%d" % _next_net_id
-			_next_net_id += 1
-			unit.name = net_name
-			_rpc_spawn_unit.rpc(net_name, unit_id, team_name, final_pos)
-
-		# 发出信号
-		SignalBus.unit_spawned.emit(unit, team_name)
-		last_unit = unit
+		var visual_overrides: Dictionary = card.get("visual_overrides", {})
+		last_unit = _spawn_single_unit(unit_id, u_data, team_name, pos + offset, awakening_effects,
+				card.get("elite_skill", {}), visual_overrides)
 
 	print("[SpawnManager] spawn: %s x%d %s @ %s" % [unit_id, count, team_name, pos])
 	return last_unit
+
+
+## 按单位 id 直接生成一只单位，不经过卡牌的 spawn_count / 圣水 / 出牌流程。
+## 供觉醒迫击炮等战场效果使用；仍复用统一实体注册和联机生成同步。
+func spawn_unit_by_id(unit_id: String, team_name: String, pos: Vector2) -> Node:
+	var u_data: Dictionary = DataRegistry.get_unit_data(unit_id)
+	if u_data.is_empty():
+		push_error("[SpawnManager] Unknown summoned unit id: " + unit_id)
+		return null
+	var unit := _spawn_single_unit(unit_id, u_data, team_name, pos)
+	print("[SpawnManager] summon: %s %s @ %s" % [unit_id, team_name, pos])
+	return unit
+
+
+## 统一创建一个战场单位，供卡牌部署和战场召唤复用。
+func _spawn_single_unit(unit_id: String, u_data: Dictionary, team_name: String, pos: Vector2,
+		awakening_effects: Dictionary = {}, elite_skill_data: Dictionary = {}, visual_overrides: Dictionary = {}) -> Node:
+	var unit = UNIT_SCENE.instantiate()
+	unit.position = pos
+	# 先 add_child（触发 _ready，@onready 解析），再 setup 配置属性和攻击组件。
+	units_root.add_child(unit)
+	unit.setup(u_data, team_name, awakening_effects, elite_skill_data, visual_overrides)
+	EntityRegistry.register(unit)
+
+	# Host 分配唯一名字并通知 Client 创建同名单位，保证后续状态同步可配对。
+	if NetworkManager.is_networked() and NetworkManager.is_server():
+		var net_name := "U%d" % _next_net_id
+		_next_net_id += 1
+		unit.name = net_name
+		_rpc_spawn_unit.rpc(net_name, unit_id, team_name, pos, visual_overrides)
+
+	SignalBus.unit_spawned.emit(unit, team_name)
+	return unit
 
 
 ## 计算第 index 个单位的部署偏移（像素，World 本地游戏空间）。
@@ -114,7 +125,7 @@ static func _calc_one_offset(index: int, total: int, spread_px: float, offsets_d
 
 ## Host → Client：通知 Client 创建同名单位。两端节点名一致，Synchronizer 自动配对。
 @rpc("authority", "call_remote", "reliable")
-func _rpc_spawn_unit(unit_name: String, unit_id: String, team_name: String, world_pos: Vector2) -> void:
+func _rpc_spawn_unit(unit_name: String, unit_id: String, team_name: String, world_pos: Vector2, visual_overrides: Dictionary = {}) -> void:
 	if NetworkManager.is_server():
 		return  # Host 自己已创建
 	var u_data = DataRegistry.get_unit_data(unit_id)
@@ -127,7 +138,7 @@ func _rpc_spawn_unit(unit_name: String, unit_id: String, team_name: String, worl
 	# Client 端 team 翻转：host 的 player → client 的 enemy，反之亦然。
 	# 这样 client 自己始终是 player（蓝方），对方始终是 enemy（红方）。
 	var local_team := "enemy" if team_name == "player" else "player"
-	unit.setup(u_data, local_team)
+	unit.setup(u_data, local_team, {}, {}, visual_overrides)
 	# Client 端：镜像初始位置（后续由 BattleManager 手动 RPC 持续同步镜像坐标）
 	unit.position = BattleConstants.mirror(world_pos)
 	# Client 不注册到 EntityRegistry（不跑索敌/攻击逻辑）

@@ -16,11 +16,15 @@ extends ProjectileBase
 var _splash_radius: float = 0.0  ## 溅射半径（像素）
 var _attack_ground: bool = true  ## 是否伤害地面单位（继承自攻击方 AttackComponent）
 var _attack_air: bool = true     ## 是否伤害空中单位
+## 非空时，在落点伤害结算完成后召唤该 unit_id 对应的一只单位（觉醒迫击炮）。
+var _impact_summon_unit_id: String = ""
 
 # ---- 炮弹贴图 ----
-# 美术提供的迫击炮炮弹 PNG（263×284）。加载一次缓存，找不到时退回圆形绘制。
+# 美术提供的普通/觉醒迫击炮炮弹 PNG。按是否携带落点召唤效果选择贴图，找不到时退回圆形绘制。
 var _shell_texture: Texture2D = null
-const SHELL_TEX_SCALE := 0.075    ## 贴图基础缩放（屏幕约 20×23px）
+const SHELL_TEX_SCALE := 0.075    ## 普通炮弹（263×284）显示约 20×21px
+const AWAKENED_SHELL_TEX_SCALE := 0.035  ## 觉醒炮弹（可见本体约 29px，接近原版大号炮弹体积）
+var _shell_texture_scale: float = SHELL_TEX_SCALE
 const FALLBACK_SHELL_RADIUS := 8.0  ## 无贴图时圆形兜底绘制半径（像素）
 
 # ---- 状态 ----
@@ -36,7 +40,8 @@ const EXPLODE_DURATION := 0.3
 ## target_node: 目标节点（取其当前位置为落点，此后不追踪）
 ## dmg: 范围伤害 | splash_px: 溅射半径（像素）| speed_px: 飞行速度（像素/秒）
 ## team_name: 阵营 | arc_grids: 弧高峰值（格），决定抛物线视觉高度
-func setup_shell(spawn_pos: Vector2, target_node, dmg: int, splash_px: float, speed_px: float, team_name: String, arc_grids: float, attack_ground: bool = true, attack_air: bool = true) -> void:
+## impact_summon_unit_id: 非空时，落点伤害结算后召唤一只该单位
+func setup_shell(spawn_pos: Vector2, target_node, dmg: int, splash_px: float, speed_px: float, team_name: String, arc_grids: float, attack_ground: bool = true, attack_air: bool = true, impact_summon_unit_id: String = "") -> void:
 	position = spawn_pos
 	_start_pos = spawn_pos
 	target = target_node
@@ -48,6 +53,7 @@ func setup_shell(spawn_pos: Vector2, target_node, dmg: int, splash_px: float, sp
 	arc_height = arc_grids
 	_attack_ground = attack_ground
 	_attack_air = attack_air
+	_impact_summon_unit_id = impact_summon_unit_id
 
 	# 落点 = 目标当前位置（发射时固定）
 	if target and is_instance_valid(target):
@@ -60,11 +66,15 @@ func setup_shell(spawn_pos: Vector2, target_node, dmg: int, splash_px: float, sp
 	# body_rect 仅作为弧线偏移锚点（基类 _apply_arc_offset 操作其 position），
 	# 炮弹本体由 _draw() 用贴图绘制，因此设为不可见
 	body_rect.visible = false
-	# 加载炮弹贴图（load 失败返回 null 时 _draw 退回圆形兜底）
-	if _shell_texture == null:
-		var tex_path := "res://assets/sprites/mortar/mortar_shell.png"
-		if ResourceLoader.exists(tex_path):
-			_shell_texture = load(tex_path)
+	# 觉醒迫击炮（带落点召唤）使用专属炮弹；普通迫击炮继续使用原石块炮弹。
+	# load 失败返回 null 时 _draw() 退回圆形绘制。
+	var tex_path := "res://assets/sprites/mortar/mortar_shell.png"
+	_shell_texture_scale = SHELL_TEX_SCALE
+	if not _impact_summon_unit_id.is_empty():
+		tex_path = "res://assets/sprites/mortar/mortar_shell_awakened.png"
+		_shell_texture_scale = AWAKENED_SHELL_TEX_SCALE
+	if ResourceLoader.exists(tex_path):
+		_shell_texture = load(tex_path)
 	_state = "flying"
 	z_index = 45
 	queue_redraw()
@@ -93,6 +103,22 @@ func _on_impact() -> void:
 	# 联机 client 端：不造成伤害（由 host 计算），只显示爆炸视觉
 	if not NetworkManager.is_networked_client():
 		DamageSystem.deal_area_damage(_last_target_pos, _splash_radius, damage, team, -1, _attack_ground, _attack_air)
+		_summon_impact_unit()
+
+
+## 觉醒迫击炮炮弹专用：先完成落地伤害，再在同一落点生成一只友方单位。
+## 单位经 SpawnManager 创建，因而复用实体注册、部署状态及 Host→Client 生成同步。
+func _summon_impact_unit() -> void:
+	if _impact_summon_unit_id.is_empty():
+		return
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	var spawn_manager := scene.get_node_or_null("Managers/SpawnManager")
+	if spawn_manager and spawn_manager.has_method("spawn_unit_by_id"):
+		spawn_manager.spawn_unit_by_id(_impact_summon_unit_id, team, _last_target_pos)
+	else:
+		push_error("[MortarShell] Missing SpawnManager for impact summon")
 
 
 func _draw() -> void:
@@ -107,8 +133,8 @@ func _draw() -> void:
 		var stone_pos := Vector2(0.0, stone_y)
 		if _shell_texture != null:
 			# 贴图绘制：Y 方向补偿 World 压缩保持原始宽高比
-			var w: float = _shell_texture.get_width() * SHELL_TEX_SCALE
-			var h: float = _shell_texture.get_height() * SHELL_TEX_SCALE / BattleConstants.Y_COMPRESS
+			var w: float = _shell_texture.get_width() * _shell_texture_scale
+			var h: float = _shell_texture.get_height() * _shell_texture_scale / BattleConstants.Y_COMPRESS
 			var tex_rect := Rect2(stone_pos - Vector2(w / 2.0, h / 2.0), Vector2(w, h))
 			draw_texture_rect(_shell_texture, tex_rect, false)
 		else:

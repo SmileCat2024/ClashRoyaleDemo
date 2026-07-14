@@ -92,6 +92,7 @@ func _ready() -> void:
 	# 连接全局信号
 	SignalBus.tower_destroyed.connect(_on_tower_destroyed)
 	SignalBus.card_selected.connect(_on_card_selected)
+	SignalBus.elixir_generated.connect(_on_elixir_generated)
 	# 联机断线处理
 	if is_network_mode:
 		NetworkManager.peer_disconnected.connect(_on_peer_disconnected)
@@ -308,7 +309,9 @@ func _select_hand_card(hand_index: int) -> void:
 	else:
 		selected_hand_index = hand_index
 		if deploy_preview:
-			deploy_preview.show_preview(DataRegistry.get_card_data(card_id))
+			# 拖动预览也要使用当前轮次的觉醒状态；觉醒火枪手就绪时显示狙击扫描预警。
+			var preview_effects := awakening_tracker.peek_next_effects("player", card_id)
+			deploy_preview.show_preview(DataRegistry.get_card_data(card_id), preview_effects)
 		print("[BattleManager] 选手牌[%d]: %s" % [hand_index, card_id])
 	# 通知 UI 更新高亮
 	SignalBus.selection_changed.emit(selected_hand_index)
@@ -405,7 +408,7 @@ func try_play_card(card_id: String, team_name: String, world_position: Vector2) 
 	# 更新觉醒计数（出牌成功后提交状态变更，广播进度给 UI）
 	awakening_tracker.record_play(team_name, card_id)
 
-	SignalBus.card_played.emit(card_id, team_name, world_position)
+	SignalBus.card_played.emit(card_id, team_name, world_position, not awakening_effects.is_empty())
 	print("[BattleManager] card played:", card_id, team_name, world_position)
 	return true
 
@@ -440,6 +443,36 @@ func add_energy(team_name: String, amount: int) -> void:
 	state.energy = mini(max_energy, state.energy + amount)
 	SignalBus.energy_changed.emit(team_name, state.energy, max_energy)
 	print("[Cheat] %s energy +%d -> %d" % [team_name, amount, state.energy])
+
+
+## 接收圣水收集器的定时产出或死亡返还。满圣水时直接舍弃，不使用缓存机制。
+func _on_elixir_generated(world_pos: Vector2, team_name: String, amount: int, is_death: bool) -> void:
+	if not battle_running or amount <= 0:
+		return
+	# Client 不运行 UnitBase 的权威逻辑；视觉与能量由 RPC 接收。
+	if is_network_mode and not is_host:
+		return
+	var gained := _get_state(team_name).gain_energy_amount(amount)
+	if gained <= 0:
+		return
+	SignalBus.energy_changed.emit(team_name, _get_state(team_name).energy, max_energy)
+	ElixirGainEffect.spawn(units_root, world_pos, gained, is_death)
+	if is_network_mode and is_host:
+		_rpc_elixir_generated.rpc(world_pos, team_name, gained, is_death)
+
+
+## Host → Client：同步圣水收集器的即时产出（能量状态仍由 30Hz 状态包兜底）。
+@rpc("authority", "call_remote", "reliable")
+func _rpc_elixir_generated(world_pos: Vector2, host_team: String, amount: int, is_death: bool) -> void:
+	if is_host or amount <= 0:
+		return
+	# Client 视角翻转：host 的 enemy 是本地 player。
+	var local_team := "enemy" if host_team == "player" else "player"
+	var gained := _get_state(local_team).gain_energy_amount(amount)
+	if gained <= 0:
+		return
+	SignalBus.energy_changed.emit(local_team, _get_state(local_team).energy, max_energy)
+	ElixirGainEffect.spawn(units_root, BattleConstants.mirror(world_pos), gained, is_death)
 
 
 # ==============================================================================

@@ -4,6 +4,7 @@
 extends TestBase
 
 const TEST_CARD := "card_knight"  # DataRegistry 中已有 awakening 配置（trigger_count=2）
+const ONE_CYCLE_CARDS := ["card_mortar", "card_musketeer"]
 
 
 func _new_tracker() -> AwakeningTracker:
@@ -100,3 +101,18 @@ func test_peek_no_mutation() -> void:
 	var p := t.get_progress("player", TEST_CARD)
 	assert_eq(p["count"], 0, "peek 不应改变 count")
 	assert_false(p["next_awakened"], "peek 不应改变 next_awakened")
+
+
+func test_one_cycle_awakening_cards() -> void:
+	for card_id in ONE_CYCLE_CARDS:
+		var t := _new_tracker()
+		assert_true(t.peek_next_effects("player", card_id).is_empty(),
+			"%s 第一次打出前应显示普通卡面" % card_id)
+		t.record_play("player", card_id)
+		assert_true(t.is_next_awakened("player", card_id),
+			"%s 打出 1 次后下一次应为觉醒版" % card_id)
+		assert_false(t.peek_next_effects("player", card_id).is_empty(),
+			"%s 觉醒就绪时应返回觉醒效果" % card_id)
+		t.record_play("player", card_id)
+		assert_false(t.is_next_awakened("player", card_id),
+			"%s 打出觉醒版后应重新回到普通版" % card_id)

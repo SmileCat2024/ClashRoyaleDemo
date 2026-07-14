@@ -111,6 +111,12 @@ var _lifespan_timer: float = 0.0
 ## 自然掉血速率（HP/秒）。建筑存在期间持续掉血，寿命到时血量恰好归零。
 var _burn_rate: float = 0.0
 var _burn_accumulator: float = 0.0
+## 被动圣水生产（圣水收集器）。部署完成后才开始计时。
+var _elixir_generation_interval: float = 0.0
+var _elixir_generation_amount: int = 0
+var _elixir_generation_timer: float = 0.0
+var _elixir_on_death: int = 0
+var _elixir_death_paid: bool = false
 ## 光束发射点 Y 偏移（像素，负=上移）。仅地狱塔配置，其他单位 = 0（无光束）。
 var beam_emit_offset_y: float = 0.0
 var _beam: InfernoBeam = null
@@ -165,7 +171,8 @@ var _altitude_visual_dy: float = 0.0  ## 当前 altitude 离地视觉偏移（px
 ## 初始化单位属性。由 SpawnManager 在生成单位后调用。
 ## awakening_effects: 觉醒效果配置（来自 AwakeningTracker.record_play 返回值），空字典=普通版。
 ## p_elite_skill_data: 精英技能配置（来自 card_data.elite_skill），空字典=无技能。
-func setup(unit_data: Dictionary, team_name: String, awakening_effects: Dictionary = {}, p_elite_skill_data: Dictionary = {}) -> void:
+## p_visual_overrides: 卡牌专属视觉覆盖（目前用于精英变种），只允许覆盖 animation 字段。
+func setup(unit_data: Dictionary, team_name: String, awakening_effects: Dictionary = {}, p_elite_skill_data: Dictionary = {}, p_visual_overrides: Dictionary = {}) -> void:
 	unit_id = unit_data.get("id", "")
 	display_name = unit_data.get("display_name", "")
 	team = team_name
@@ -176,8 +183,17 @@ func setup(unit_data: Dictionary, team_name: String, awakening_effects: Dictiona
 	sight_range = BattleConstants.px(float(unit_data.get("sight_range", 6.0)))
 	movement_targeting = unit_data.get("movement_targeting", "any")
 
+	# 卡牌专属的视觉覆盖只合并到 animation，保证精英变种可调整模型而不改普通单位数值。
+	var visual_data: Dictionary = unit_data
+	var animation_overrides: Dictionary = p_visual_overrides.get("animation", {})
+	if not animation_overrides.is_empty():
+		visual_data = unit_data.duplicate(true)
+		var animation_data: Dictionary = visual_data.get("animation", {}).duplicate(true)
+		animation_data.merge(animation_overrides, true)
+		visual_data["animation"] = animation_data
+
 	# 初始化战斗属性（基类方法）
-	_init_combat_stats(unit_data)
+	_init_combat_stats(visual_data)
 
 	# 冲锋机制配置（王子专属，无 charge 字段则禁用）
 	var charge_cfg: Dictionary = unit_data.get("charge", {})
@@ -205,6 +221,12 @@ func setup(unit_data: Dictionary, team_name: String, awakening_effects: Dictiona
 	if lifespan > 0.0:
 		_lifespan_timer = lifespan
 		_burn_rate = float(unit_data.get("lifespan_damage_per_sec", float(max_hp) / lifespan))
+	# 被动圣水生产。计时器在部署阶段不推进，部署完成后第 interval 秒产出首滴。
+	_elixir_generation_interval = float(unit_data.get("elixir_generation_interval", 0.0))
+	_elixir_generation_amount = int(unit_data.get("elixir_generation_amount", 0))
+	_elixir_generation_timer = _elixir_generation_interval
+	_elixir_on_death = int(unit_data.get("elixir_on_death", 0))
+	_elixir_death_paid = false
 	# 光束发射点偏移（仅地狱塔等递增光束单位配置）
 	beam_emit_offset_y = float(unit_data.get("beam_emit_offset_y", 0.0))
 
@@ -234,7 +256,7 @@ func setup(unit_data: Dictionary, team_name: String, awakening_effects: Dictiona
 	# 默认位置：Body 上方保持 4px 间距（= -size/2 - hb_h - 4）
 	var hb_y: float = -size / 2.0 - hb_h - 4.0
 	# 有动画配置的单位，血条位置可由数据覆盖（贴图较大时需要上移）
-	var anim_cfg: Dictionary = unit_data.get("animation", {})
+	var anim_cfg: Dictionary = visual_data.get("animation", {})
 	if not anim_cfg.is_empty():
 		hb_y = float(anim_cfg.get("health_bar_y", hb_y))
 	health_bar.size = Vector2(hb_w, hb_h)
@@ -249,8 +271,8 @@ func setup(unit_data: Dictionary, team_name: String, awakening_effects: Dictiona
 
 	# 飞行单位设置离地高度（仅视觉，不影响逻辑坐标和索敌）
 	if movement_type == "air":
-		altitude = 2.5
-	_set_visual_altitude(altitude)
+		altitude = float(unit_data.get("altitude", 2.5))
+		_set_visual_altitude(altitude)
 	# 部署虚影初始视觉（deploy_time > 0 时单位以半透明虚影状态出现）
 	if not is_deployed:
 		modulate.a = _deploy_alpha
@@ -275,6 +297,7 @@ func setup(unit_data: Dictionary, team_name: String, awakening_effects: Dictiona
 ##   "death_radius"    - 死亡伤害半径（格，配合 death_damage 使用）
 ##   "death_fuse_time" - 死亡炸弹引信延迟（秒，配合 death_damage 使用）
 ##   "sniper_shots"   - 觉醒狙击弹（持有 N 发，扫描正前方远距离敌方兵种自动发射）
+##   "projectile_impact_summon_unit_id" - 弹道投射物落点在伤害结算后召唤一只指定单位
 ## 未识别的 key 会打印警告但不报错，便于逐步扩展新效果类型。
 func apply_awakening(effects: Dictionary) -> void:
 	if effects.is_empty():
@@ -298,6 +321,11 @@ func apply_awakening(effects: Dictionary) -> void:
 		death_damage = int(effects["death_damage"])
 		death_radius = BattleConstants.px(float(effects.get("death_radius", 1.5)))
 		death_fuse_time = float(effects.get("death_fuse_time", 0.0))
+
+	# 炮弹落点召唤（觉醒迫击炮）：具体召唤时机由 MortarShell 落地时执行，
+	# 这里仅把数据驱动效果保存在攻击者身上，供 AttackComponent 创建炮弹时透传。
+	if effects.has("projectile_impact_summon_unit_id"):
+		projectile_impact_summon_unit_id = str(effects["projectile_impact_summon_unit_id"])
 
 	# 觉醒狙击弹（觉醒女枪专属）
 	if effects.has("sniper_shots"):
@@ -639,6 +667,21 @@ func _process_lifespan(delta: float) -> void:
 		die()
 
 
+## 推进被动圣水生产。满圣水时 BattleManager 不会增加能量，因此本次产出直接舍弃。
+func _process_elixir_generation(delta: float) -> void:
+	if _elixir_generation_interval <= 0.0 or _elixir_generation_amount <= 0:
+		return
+	# 冰冻/眩晕暂停生产；减速和狂暴按当前状态的速度倍率调整生产计时。
+	# 这里复用状态系统的 move_speed_mult：建筑本身不可移动，但该倍率仍准确表达控制效果。
+	var production_speed := get_move_speed_mult()
+	if production_speed <= 0.0:
+		return
+	_elixir_generation_timer -= delta * production_speed
+	while _elixir_generation_timer <= 0.0 and not is_dead:
+		SignalBus.elixir_generated.emit(position, team, _elixir_generation_amount, false)
+		_elixir_generation_timer += _elixir_generation_interval
+
+
 ## 施加减速效果（便捷封装，内部创建 StatusEffect）。
 ## factor: 移动速度乘数（如 0.85 = 减速 15%）
 ## duration: 持续时间（秒）
@@ -711,6 +754,7 @@ func _process(delta: float) -> void:
 		_process_lifespan(delta)
 		if is_dead:
 			return
+	_process_elixir_generation(delta)
 	# 冲锋累计：上一帧未持续移动则清零（已进入冲锋态的等攻击命中退出）
 	if _charge_enabled and not _is_moving:
 		_charge_distance_accum = 0.0
@@ -1106,6 +1150,35 @@ func _rpc_attack_trigger(attack_facing: String, flip_h: bool) -> void:
 	_net_is_firing = true
 
 
+## 显示范围攻击命中时的地面警示环，并同步给联机 client。
+## AttackComponent 在真正结算 instant+splash 伤害的时刻调用，保证和伤害帧对齐。
+func show_splash_impact_vfx(center: Vector2, radius: float) -> void:
+	_spawn_splash_impact_vfx_local(center, radius)
+	if NetworkManager.is_networked() and NetworkManager.is_server():
+		_rpc_splash_impact_vfx.rpc(center, radius)
+
+
+## 在本地 World/EffectsRoot 创建范围攻击视觉。
+func _spawn_splash_impact_vfx_local(center: Vector2, radius: float) -> void:
+	if radius <= 0.0:
+		return
+	var tree := get_tree()
+	if tree == null or tree.current_scene == null:
+		return
+	var effects_root := tree.current_scene.get_node_or_null("World/EffectsRoot") as Node2D
+	if effects_root == null:
+		return
+	BlastRingEffect.spawn(effects_root, center, radius)
+
+
+## Host → Client：同步一次范围攻击命中的纯视觉事件。
+@rpc("authority", "call_remote", "reliable")
+func _rpc_splash_impact_vfx(center: Vector2, radius: float) -> void:
+	if NetworkManager.is_server():
+		return
+	_spawn_splash_impact_vfx_local(BattleConstants.mirror(center), radius)
+
+
 ## SpriteAnimator 检测到攻击动画播完后调用，清除一次性攻击标记。
 func _clear_attack_flag() -> void:
 	_net_is_firing = false
@@ -1221,16 +1294,17 @@ func _get_target_y() -> float:
 ## 锁定规则：扫描到新目标 → 锁定并显示紫色条 → 持续射击该目标直到其死亡/离开扫描区。
 ## 同一锁定目标的后续射击不再重复显示紫色条，仅在切换目标时触发一次。
 func _process_sniper(delta: float) -> void:
-	if not _sniper_enabled or _sniper_shots <= 0:
-		return
-	if is_stunned():
-		return
-	# 紫色锁定条倒计时（计时器归零时需要最后一次 queue_redraw 清除画面残留）
+	# 紫色锁定条倒计时（无条件执行，确保条带即使在被眩晕/弹药耗尽时也不会卡住）
 	var _strip_was_showing := _sniper_strip_timer > 0.0
 	if _sniper_strip_timer > 0.0:
 		_sniper_strip_timer -= delta
 	if _sniper_strip_timer > 0.0 or _strip_was_showing:
 		queue_redraw()
+	# 狙击扫描/射击逻辑需要激活 + 有弹药 + 非眩晕
+	if not _sniper_enabled or _sniper_shots <= 0:
+		return
+	if is_stunned():
+		return
 	_sniper_cooldown_timer -= delta
 	# 检查锁定目标是否仍然有效（存活 + 在扫描区内）
 	if _sniper_locked_target != null:
@@ -1331,8 +1405,8 @@ func _fire_sniper(target) -> void:
 	_sniper_fire_lock = SNIPER_FIRE_LOCK
 	_on_attack_triggered()
 	queue_redraw()
-	# 播放女枪攻击音效（与普攻一致）
-	AudioManager.play_unit_sfx(unit_id, "attack", BattlePathing.game_position_of(self))
+	# 狙击弹使用觉醒专属音效；普通普攻仍沿用火枪手常规攻击音。
+	AudioManager.play_unit_sfx(unit_id, "sniper_attack", BattlePathing.game_position_of(self))
 	# 飞行子弹视觉 + 延迟伤害结算（子弹到达目标时才造成伤害）
 	var dmg := _sniper_damage
 	SniperTracer.spawn(get_parent(), position, target_pos, func():
@@ -1376,7 +1450,12 @@ func _find_nearest_enemy_tower():
 
 ## 死亡：触发死亡范围伤害（super.die），从注册表注销，发出信号，销毁
 func die() -> void:
+	if is_dead:
+		return
 	_clear_passive_mark()
+	if not _is_remote() and _elixir_on_death > 0 and not _elixir_death_paid:
+		_elixir_death_paid = true
+		SignalBus.elixir_generated.emit(position, team, _elixir_on_death, true)
 	super.die()
 	if _is_remote():
 		# Client 端：不注销（未注册）、不触发死亡逻辑链，只播放视觉

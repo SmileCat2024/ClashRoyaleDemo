@@ -57,6 +57,9 @@ const ELIXIR_MAX_H := 18
 
 var _player_energy: int = 5
 var _player_energy_max: int = 10
+## 记录本地玩家每张觉醒牌的就绪状态，避免卡牌轮转离手后丢失状态。
+var _awakening_ready_by_card: Dictionary = {}
+var _next_card_id: String = ""
 
 @onready var slots: Array[Button] = [
 	$CardSlot0, $CardSlot1, $CardSlot2, $CardSlot3,
@@ -76,6 +79,7 @@ func _ready() -> void:
 	SignalBus.hand_updated.connect(_on_hand_updated)
 	SignalBus.energy_changed.connect(_on_energy_changed)
 	SignalBus.selection_changed.connect(_on_selection_changed)
+	SignalBus.awakening_progress_changed.connect(_on_awakening_progress)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	# 定位 CardBar 自身
@@ -122,7 +126,9 @@ func _process(_delta: float) -> void:
 func _on_hand_updated(hand: Array, next_card: String) -> void:
 	for i in range(slots.size()):
 		var card_id: String = hand[i] if i < hand.size() else ""
-		slots[i].setup(card_id, i)
+		var awakening_ready := bool(_awakening_ready_by_card.get(card_id, false))
+		slots[i].setup(card_id, i, awakening_ready)
+	_next_card_id = next_card
 	if next_card == "":
 		next_name_label.text = "—"
 		next_name_label.visible = true
@@ -132,11 +138,37 @@ func _on_hand_updated(hand: Array, next_card: String) -> void:
 		var icon_path: String = card.get("icon", "")
 		next_name_label.visible = (icon_path == "")
 		next_name_label.text = card.get("display_name", next_card)
+		var display_icon_path := _get_card_icon_path(next_card)
+		if display_icon_path != "":
+			next_icon_rect.texture = load(display_icon_path) as Texture2D
+		else:
+			next_icon_rect.texture = null
+	_refresh_affordability()
+
+
+## 觉醒进度变化：缓存状态，并同步更新预告牌卡面。
+## CardSlot 自己也监听该信号，用于更新当前手牌中的觉醒卡面。
+func _on_awakening_progress(team: String, card_id: String, _count: int,
+		_trigger_count: int, next_awakened: bool) -> void:
+	if team != "player":
+		return
+	_awakening_ready_by_card[card_id] = next_awakened
+	if _next_card_id == card_id:
+		var icon_path := _get_card_icon_path(card_id)
 		if icon_path != "":
 			next_icon_rect.texture = load(icon_path) as Texture2D
 		else:
 			next_icon_rect.texture = null
-	_refresh_affordability()
+
+
+## 返回卡牌当前应该展示的卡面。
+func _get_card_icon_path(card_id: String) -> String:
+	var card := DataRegistry.get_card_data(card_id)
+	if bool(_awakening_ready_by_card.get(card_id, false)):
+		var awakening_icon: String = card.get("awakening_icon", "")
+		if awakening_icon != "":
+			return awakening_icon
+	return card.get("icon", "")
 
 
 ## 能量变化：更新圣水条 + 重新评估各卡牌是否可负担

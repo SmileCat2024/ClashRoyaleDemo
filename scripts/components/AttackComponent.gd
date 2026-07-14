@@ -280,6 +280,7 @@ func _execute_attack() -> void:
 				# 近战范围溅射（瓦基里转斧）：以自身位置为中心，对范围内敌方造成伤害
 				# 传 attack_ground/attack_air 让 splash 遵守攻击范围（瓦基里仅地面，不误伤空中）
 				var center := BattlePathing.game_position_of(combatant)
+				_show_splash_impact_vfx(center)
 				DamageSystem.deal_area_damage(center, impact_radius, dmg, combatant.team, -1, attack_ground, attack_air)
 			else:
 				DamageSystem.resolve_impact(current_target, dmg)
@@ -305,7 +306,7 @@ func _fire_projectile() -> void:
 			var tp := BattlePathing.game_position_of(current_target)
 			var ratio := clampf(spawn_pos.distance_to(tp) / attack_range, 0.0, 1.0)
 			dyn_arc = arc_height * ratio
-		pm.spawn_mortar_shell(spawn_pos, current_target, damage, impact_radius, projectile_speed, combatant.team, dyn_arc, attack_ground, attack_air)
+		pm.spawn_mortar_shell(spawn_pos, current_target, damage, impact_radius, projectile_speed, combatant.team, dyn_arc, attack_ground, attack_air, combatant.projectile_impact_summon_unit_id)
 		return
 	# 普通飞行物：splash 类型为非锁定范围溅射，否则锁定单体
 	var is_homing := impact_type != "splash"
@@ -336,6 +337,26 @@ func _play_attack_sfx() -> void:
 	if uid == null:
 		return
 	AudioManager.play_unit_sfx(uid, "attack", BattlePathing.game_position_of(combatant))
+
+
+## 显示瞬发范围攻击的地面警示环。
+## 优先交给 UnitBase 做本地显示 + 联机 RPC；测试桩或其他战斗实体则只尝试本地显示。
+func _show_splash_impact_vfx(center: Vector2) -> void:
+	if combatant != null and combatant.has_method("show_splash_impact_vfx"):
+		combatant.show_splash_impact_vfx(center, impact_radius)
+		return
+	_spawn_splash_impact_vfx_local(center, impact_radius)
+
+
+## 非 UnitBase 的战斗实体兜底路径（例如测试桩）。
+func _spawn_splash_impact_vfx_local(center: Vector2, radius: float) -> void:
+	var tree := get_tree()
+	if tree == null or tree.current_scene == null:
+		return
+	var effects_root := tree.current_scene.get_node_or_null("World/EffectsRoot") as Node2D
+	if effects_root == null:
+		return
+	BlastRingEffect.spawn(effects_root, center, radius)
 
 
 # ============================================================================

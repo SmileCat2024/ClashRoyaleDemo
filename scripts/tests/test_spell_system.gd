@@ -22,6 +22,7 @@ func _make_target(hp: int = 100, is_tower: bool = false) -> CombatantBase:
 	if is_tower:
 		m.tower_type = "guard"
 		m.mass = 0
+		m.knockback_immune = true
 	return m
 
 
@@ -164,10 +165,25 @@ func test_knockback_diagonal() -> void:
 
 
 func test_knockback_tower_immune() -> void:
-	var tower := _make_target(100, true)  # mass = 0
+	var tower := _make_target(100, true)
 	tower.position = Vector2(100, 100)
 	tower.knockback(Vector2(1, 0), 20.0)
-	assert_eq(tower.position, Vector2(100, 100), "塔(mass=0)应免疫击退")
+	assert_eq(tower.position, Vector2(100, 100), "塔应免疫击退")
+
+
+func test_knockback_immunity_is_independent_of_mass() -> void:
+	var heavy_unit := _make_target(100)
+	heavy_unit.mass = 18
+	heavy_unit.position = Vector2(100, 100)
+	heavy_unit.knockback(Vector2(1, 0), 20.0)
+	assert_eq(heavy_unit.position, Vector2(120, 100), "高质量但未免疫的单位仍应被击退")
+
+	var immune_unit := _make_target(100)
+	immune_unit.mass = 5
+	immune_unit.knockback_immune = true
+	immune_unit.position = Vector2(100, 100)
+	immune_unit.knockback(Vector2(1, 0), 20.0)
+	assert_eq(immune_unit.position, Vector2(100, 100), "具有击退免疫的单位不应被击退")
 
 
 func test_knockback_dead_immune() -> void:

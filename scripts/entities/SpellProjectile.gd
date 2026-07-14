@@ -7,7 +7,7 @@
 #
 #       2.5D 实现：
 #         节点 position 在 World 本地游戏空间中线性移动（Y 方向被 World 的 Y_COMPRESS 压缩）。
-#         body_rect（红球）获得基于 sin(progress * PI) 的视觉高度偏移，模拟抛物线弧。
+#         FireballSprite（火球三帧动画）获得基于 sin(progress * PI) 的视觉高度偏移，模拟抛物线弧。
 #         地面影子在 _draw() 中绘制于逻辑位置（Vector2.ZERO），与飞行高度形成视觉纵深。
 #         弧高按飞行距离自适应：距离越远弧越高（上限 4 格），符合 2.5D 透视。
 # 挂载位置：SpellProjectile.tscn 的根节点
@@ -28,7 +28,21 @@ var _state: String = "flying"     ## "flying" | "exploding"
 var _explode_timer: float = 0.0
 const EXPLODE_DURATION := 0.3
 
-# body_rect 继承自 ProjectileBase（SpellProjectile.tscn 有 Body 子节点）
+# 素材的火球头朝向图片正下方；飞行中按速度方向旋转，使火球头始终朝向目标。
+const FIREBALL_FRAMES := [
+	preload("res://assets/sprites/fireball/fireball_01.png"),
+	preload("res://assets/sprites/fireball/fireball_02.png"),
+	preload("res://assets/sprites/fireball/fireball_03.png"),
+]
+const FIREBALL_FRAME_SCALES := [0.0616, 0.0982, 0.1001]
+const FIREBALL_FRAME_SEQUENCE := [0, 1, 2, 1]
+const FIREBALL_FRAME_DURATION := 0.09
+const FIREBALL_SHADOW_RADIUS := 12.0
+const FIREBALL_SHADOW_SQUASH := 0.35
+
+@onready var fireball_sprite: Sprite2D = $FireballSprite
+var _fireball_frame_index := 0
+var _fireball_frame_timer := 0.0
 
 
 ## 初始化法术飞行物。由 SpellManager.cast_spell() 调用。
@@ -55,9 +69,13 @@ func setup_spell(origin: Vector2, target_pos: Vector2, spell_data: Dictionary, t
 	var dist_grids := _total_dist / BattleConstants.CELL_SIZE
 	arc_height = minf(dist_grids * 0.3, 4.0)
 
-	_body_base_y = body_rect.position.y
 	_state = "flying"
 	z_index = 50
+	_fireball_frame_index = 0
+	_fireball_frame_timer = 0.0
+	fireball_sprite.visible = true
+	_set_fireball_frame()
+	_update_fireball_visual(0.0)
 
 	queue_redraw()
 
@@ -74,6 +92,7 @@ func _process_flight(delta: float) -> void:
 	if _fly_toward(_last_target_pos, delta):
 		_on_impact()
 		return
+	_update_fireball_visual(delta)
 	queue_redraw()
 
 
@@ -92,7 +111,7 @@ func _on_impact() -> void:
 
 	_state = "exploding"
 	_explode_timer = 0.0
-	body_rect.visible = false
+	fireball_sprite.visible = false
 	# 联机 client 端：不造成伤害/击退（由 host 计算），只显示爆炸视觉
 	if not NetworkManager.is_networked_client():
 		DamageSystem.deal_area_damage(_last_target_pos, _radius, _damage, team, _tower_damage)
@@ -100,7 +119,7 @@ func _on_impact() -> void:
 			_apply_knockback()
 
 
-## 对爆炸范围内所有敌方单位施加击退（塔免疫，由 knockback 内部判定）
+## 对爆炸范围内所有敌方单位施加击退（免疫判定由 CombatantBase.knockback 统一处理）
 func _apply_knockback() -> void:
 	var enemies = EntityRegistry.get_enemies_of(team)
 	for e in enemies:
@@ -117,12 +136,37 @@ func _apply_knockback() -> void:
 ## 绘制：飞行中画地面影子，爆炸中画扩散圆
 func _draw() -> void:
 	if _state == "flying":
-		# 地面影子（逻辑位置 = Vector2.ZERO，不受弧高偏移影响）
-		var sw := 10.0
-		var sh := 4.0
-		draw_rect(Rect2(-sw / 2.0, -sh / 2.0, sw, sh), Color(0, 0, 0, 0.3))
+		# 地面影子与单位保持一致：扁椭圆，而非方形块。
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, FIREBALL_SHADOW_SQUASH))
+		draw_circle(Vector2.ZERO, FIREBALL_SHADOW_RADIUS, Color(0, 0, 0, 0.18))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	elif _state == "exploding":
 		# 爆炸范围视觉：红色渐变环（固定半径，alpha 随爆炸进度渐隐）
 		var t: float = _explode_timer / EXPLODE_DURATION
 		RangeVfx.draw_gradient_ring(self, Vector2.ZERO, _radius,
 				RangeVfx.COLOR_BLAST, 1.0 - t)
+
+
+## 更新火球三帧往返动画和朝向。
+## 素材默认向下飞行，因此需要用目标方向减去 PI/2 来换算 Sprite2D 旋转角。
+func _update_fireball_visual(delta: float) -> void:
+	var direction := _last_target_pos - position
+	if direction.length_squared() > 0.0:
+		fireball_sprite.rotation = direction.angle() - PI / 2.0
+
+	# 抛物线仅抬高画面中的火球，不改变实际命中位置。
+	fireball_sprite.position = Vector2(0.0,
+			-compute_arc_offset(arc_height, _fly_progress()))
+
+	_fireball_frame_timer += delta
+	while _fireball_frame_timer >= FIREBALL_FRAME_DURATION:
+		_fireball_frame_timer -= FIREBALL_FRAME_DURATION
+		_fireball_frame_index = (_fireball_frame_index + 1) % FIREBALL_FRAME_SEQUENCE.size()
+		_set_fireball_frame()
+
+
+## 原始三帧的画布尺寸不同，按内容高度分别缩放，避免循环时火球忽大忽小。
+func _set_fireball_frame() -> void:
+	var texture_index: int = FIREBALL_FRAME_SEQUENCE[_fireball_frame_index]
+	fireball_sprite.texture = FIREBALL_FRAMES[texture_index]
+	fireball_sprite.scale = Vector2.ONE * FIREBALL_FRAME_SCALES[texture_index]

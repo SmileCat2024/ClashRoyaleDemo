@@ -53,7 +53,7 @@ const RANGE_BORDER_COLOR := Color(1.0, 1.0, 1.0, 0.85)
 
 
 ## 设置当前选中的卡牌数据，计算预览内容并显示。
-func show_preview(card_data: Dictionary) -> void:
+func show_preview(card_data: Dictionary, awakening_effects: Dictionary = {}) -> void:
 	_is_spell = (card_data.get("card_type") == "spell")
 	_attack_range = 0.0
 	_min_attack_range = 0.0
@@ -68,7 +68,7 @@ func show_preview(card_data: Dictionary) -> void:
 		_offsets = SpawnManager.get_spawn_offsets(count, spread_px, offsets_data)
 		_load_unit_texture(card_data)
 		_load_building_range(card_data)
-		_load_sniper_strip(card_data)
+		_load_sniper_strip(card_data, awakening_effects)
 	_active = true
 	queue_redraw()
 
@@ -130,15 +130,17 @@ func _load_building_range(card_data: Dictionary) -> void:
 	_min_attack_range = BattleConstants.px(float(attacks[0].get("min_attack_range", 0.0)))
 
 
-## 检测永久觉醒卡牌（trigger_count=0）是否含狙击弹效果，设置扫描条带宽度。
-func _load_sniper_strip(card_data: Dictionary) -> void:
+## 检测当前这次部署是否为觉醒狙击版，设置扫描条带宽度。
+## awakening_effects 由 AwakeningTracker.peek_next_effects() 提供；保留 trigger_count=0
+## 的数据回退，兼容其他直接调用 show_preview() 的场景。
+func _load_sniper_strip(card_data: Dictionary, awakening_effects: Dictionary = {}) -> void:
 	_sniper_scan_half_width = 0.0
-	var aw: Dictionary = card_data.get("awakening", {})
-	if aw.is_empty():
-		return
-	if int(aw.get("trigger_count", 1)) > 0:
-		return  # 非永久觉醒，不显示扫描条
-	var effects: Dictionary = aw.get("effects", {})
+	var effects: Dictionary = awakening_effects
+	if effects.is_empty():
+		var aw: Dictionary = card_data.get("awakening", {})
+		if aw.is_empty() or int(aw.get("trigger_count", 1)) > 0:
+			return
+		effects = aw.get("effects", {})
 	if not effects.has("sniper_shots"):
 		return
 	_sniper_scan_half_width = BattleConstants.px(

@@ -27,6 +27,8 @@ var _base_offset: Vector2 = Vector2.ZERO   ## 视觉偏移基准值（不含 alt
 var _current_state: String = ""            ## 当前播放的动画名（调试用）
 var _attack_anim_playing: bool = false     ## 攻击动画播放中（不可打断，播完自动清除）
 var _jump_frame: int = 0                    ## 跳河时锁定的帧索引（0-based，从动画配置读取）
+var _idle_uses_attack_facing: bool = false  ## idle 是否按攻击目标选 front/back/side 准备帧
+var _side_flip_inverted: bool = false       ## side 动画是否反转默认左右镜像
 var _altitude_dy: float = 0.0              ## altitude 离地视觉偏移（px，负=上移）
 var _deploy_dy: float = 0.0                ## 部署下落动画偏移（px，负=上移，0=无偏移）
 var _base_scale: Vector2 = Vector2.ONE     ## 精灵基础缩放（visual_scale + Y_COMPRESS 补偿）
@@ -47,6 +49,8 @@ func setup(unit_data: Dictionary, entity: CombatantBase) -> void:
 		float(anim_data.get("visual_offset_y", 0.0))
 	)
 	_jump_frame = int(anim_data.get("jump_frame", 0))
+	_idle_uses_attack_facing = bool(anim_data.get("idle_uses_attack_facing", false))
+	_side_flip_inverted = bool(anim_data.get("side_flip_inverted", false))
 
 	# 从 SpriteRegistry 获取（或构建）SpriteFrames（团队色单位按 team 取对应贴图）
 	var unit_id: String = unit_data.get("id", "")
@@ -116,8 +120,8 @@ func _update_animation() -> void:
 			_enter_jump_state()
 		return
 
-	# 正常状态：每帧更新水平翻转
-	_sprite.flip_h = combatant.get_flip_h()
+	# 正常状态：每帧更新水平翻转；个别素材可仅对 side 动画反转默认方向。
+	_sprite.flip_h = _get_flip_h_for_animation(_current_state)
 
 	# 从跳河退出时重置状态标记
 	if _current_state == "jump":
@@ -163,6 +167,12 @@ func _update_animation() -> void:
 ## 按降级链查找并播放动画。返回是否成功。
 ## 链：state_当前朝向 → state_对侧朝向 → state（无方向）→ idle_当前朝向 → idle_对侧 → idle
 func _play_with_fallback(state: String) -> bool:
+	# 近战单位可选择在攻击冷却/起手阶段，按目标方向定格在准备动作。
+	# 只有显式开启的单位会走此分支，其他单位保持原有 front/back idle 行为。
+	if state == "idle" and _idle_uses_attack_facing and combatant.has_method("get_attack_facing"):
+		if _play_if_exists("idle_" + combatant.get_attack_facing()):
+			return true
+
 	var facing: String = combatant.get_facing()
 	var other: String = "back" if facing == "front" else "front"
 
@@ -186,10 +196,17 @@ func _play_with_fallback(state: String) -> bool:
 func _play_if_exists(anim_name: String) -> bool:
 	if not _sprite.sprite_frames.has_animation(anim_name):
 		return false
+	_sprite.flip_h = _get_flip_h_for_animation(anim_name)
 	if _sprite.animation != anim_name or not _sprite.is_playing():
 		_sprite.play(anim_name)
 	_current_state = anim_name
 	return true
+
+
+## 返回指定动画应使用的水平镜像。side_flip_inverted 仅影响名字以 _side 结尾的帧组。
+func _get_flip_h_for_animation(anim_name: String) -> bool:
+	var flip := combatant.get_flip_h()
+	return not flip if _side_flip_inverted and anim_name.ends_with("_side") else flip
 
 
 ## 传递 altitude 离地偏移。由宿主实体的 altitude 系统调用。

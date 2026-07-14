@@ -53,11 +53,12 @@ func spawn_projectile(spawn_pos: Vector2, target_node, damage: int, speed: float
 ## spawn_pos: 发射位置 | target_node: 目标节点（取其当前位置为落点）
 ## damage: 范围伤害 | splash_px: 溅射半径（像素）| speed_px: 飞行速度（像素/秒）
 ## team_name: 阵营 | arc_grids: 弧高峰值（格）
+## impact_summon_unit_id: 非空时，炮弹落地伤害结算后在落点召唤一只该单位（觉醒效果）
 ## 返回: 生成的炮弹节点
-func spawn_mortar_shell(spawn_pos: Vector2, target_node, damage: int, splash_px: float, speed_px: float, team_name: String, arc_grids: float, attack_ground: bool = true, attack_air: bool = true) -> Node2D:
+func spawn_mortar_shell(spawn_pos: Vector2, target_node, damage: int, splash_px: float, speed_px: float, team_name: String, arc_grids: float, attack_ground: bool = true, attack_air: bool = true, impact_summon_unit_id: String = "") -> Node2D:
 	var shell = MORTAR_SHELL_SCENE.instantiate()
 	projectiles_root.add_child(shell)
-	shell.setup_shell(spawn_pos, target_node, damage, splash_px, speed_px, team_name, arc_grids, attack_ground, attack_air)
+	shell.setup_shell(spawn_pos, target_node, damage, splash_px, speed_px, team_name, arc_grids, attack_ground, attack_air, impact_summon_unit_id)
 	SignalBus.projectile_spawned.emit(shell, team_name)
 	# 联机 host 端：通知 client 也创建炮弹（两端独立运行确定性飞行）
 	if NetworkManager.is_server():
@@ -65,7 +66,7 @@ func spawn_mortar_shell(spawn_pos: Vector2, target_node, damage: int, splash_px:
 		var net_name := "M%d" % _next_net_id
 		_next_net_id += 1
 		shell.name = net_name
-		_rpc_spawn_mortar_shell.rpc(net_name, spawn_pos, target_pos, damage, splash_px, speed_px, team_name, arc_grids)
+		_rpc_spawn_mortar_shell.rpc(net_name, spawn_pos, target_pos, damage, splash_px, speed_px, team_name, arc_grids, impact_summon_unit_id)
 	return shell
 
 
@@ -101,7 +102,7 @@ func _rpc_spawn_projectile(proj_name: String, spawn_pos: Vector2, target_pos: Ve
 
 ## Host → Client：通知 Client 创建迫击炮炮弹。
 @rpc("authority", "call_remote", "reliable")
-func _rpc_spawn_mortar_shell(shell_name: String, spawn_pos: Vector2, target_pos: Vector2, dmg: int, splash_px: float, speed_px: float, team_name: String, arc_grids: float) -> void:
+func _rpc_spawn_mortar_shell(shell_name: String, spawn_pos: Vector2, target_pos: Vector2, dmg: int, splash_px: float, speed_px: float, team_name: String, arc_grids: float, impact_summon_unit_id: String = "") -> void:
 	if NetworkManager.is_server():
 		return
 	# Client 端 180 度镜像 + team 翻转
@@ -112,7 +113,7 @@ func _rpc_spawn_mortar_shell(shell_name: String, spawn_pos: Vector2, target_pos:
 	projectiles_root.add_child(shell)
 	# Client 端：飞向固定位置（迫击炮本来就是非追踪的），team 翻转
 	var local_team := "enemy" if team_name == "player" else "player"
-	shell.setup_shell(m_spawn, null, dmg, splash_px, speed_px, local_team, arc_grids)
+	shell.setup_shell(m_spawn, null, dmg, splash_px, speed_px, local_team, arc_grids, true, true, impact_summon_unit_id)
 	shell._last_target_pos = m_target
 	shell._start_pos = m_spawn
 	shell._total_dist = m_spawn.distance_to(m_target)

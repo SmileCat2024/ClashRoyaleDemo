@@ -26,8 +26,6 @@ var _icon_cache: Dictionary = {}
 const SELECTED_TINT := Color(1.35, 1.15, 0.4)
 # 能量不足时的暗化
 const DIM_COLOR := Color(0.35, 0.35, 0.35)
-# 觉醒就绪时的金色高亮（下一次打出为觉醒版）
-const AWAKENING_TINT := Color(1.0, 0.85, 0.3)
 
 
 func _ready() -> void:
@@ -40,10 +38,11 @@ func _ready() -> void:
 
 
 ## 配置卡牌显示内容。由 CardBar 在 hand_updated 时调用。
-func setup(p_card_id: String, p_hand_index: int) -> void:
+## p_awakening_ready 用于在卡牌离开手牌后又轮转回来时恢复觉醒就绪状态。
+func setup(p_card_id: String, p_hand_index: int, p_awakening_ready: bool = false) -> void:
 	card_id = p_card_id
 	hand_index = p_hand_index
-	_awakening_ready = false  # 重置觉醒状态（卡牌轮转后由信号更新）
+	_awakening_ready = p_awakening_ready
 	var card := DataRegistry.get_card_data(p_card_id)
 	_card_cost = int(card.get("cost", 0))
 	if name_label:
@@ -53,7 +52,17 @@ func setup(p_card_id: String, p_hand_index: int) -> void:
 		name_label.text = card.get("display_name", p_card_id)
 	if cost_label:
 		cost_label.text = str(_card_cost)
-	_load_icon(card.get("icon", ""))
+	_load_icon(_get_icon_path())
+
+
+## 根据当前觉醒状态选择普通卡面或觉醒卡面。
+func _get_icon_path() -> String:
+	var card := DataRegistry.get_card_data(card_id)
+	if _awakening_ready:
+		var awakening_icon: String = card.get("awakening_icon", "")
+		if awakening_icon != "":
+			return awakening_icon
+	return card.get("icon", "")
 
 
 ## 加载卡面图片。无 icon 字段时清空图片。
@@ -93,16 +102,16 @@ func _on_awakening_progress(team: String, p_card_id: String, _count: int, _trigg
 	if team != "player" or p_card_id != card_id:
 		return
 	_awakening_ready = next_awakened
+	_load_icon(_get_icon_path())
 	_update_appearance()
 
 
-## 四态外观：不可负担（暗+禁用）> 觉醒就绪（金色）> 选中（暖色）> 正常
+## 三态外观：不可负担（暗+禁用）> 选中（暖色）> 正常。
+## 觉醒卡面保持原始颜色，不额外叠加高亮染色。
 func _update_appearance() -> void:
 	disabled = not _affordable
 	if not _affordable:
 		modulate = DIM_COLOR
-	elif _awakening_ready:
-		modulate = AWAKENING_TINT
 	elif _selected:
 		modulate = SELECTED_TINT
 	else:

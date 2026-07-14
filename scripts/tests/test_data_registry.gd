@@ -27,6 +27,9 @@ func test_all_units_have_attacks() -> void:
 	for uid in DataRegistry.unit_data:
 		var u: Dictionary = DataRegistry.unit_data[uid]
 		var attacks: Array = u.get("attacks", [])
+		if bool(u.get("is_passive", false)):
+			assert_true(attacks.is_empty(), "被动单位不应配置攻击: " + uid)
+			continue
 		assert_false(attacks.is_empty(), "attacks 不应为空: " + uid)
 
 
@@ -79,6 +82,36 @@ func test_all_units_have_valid_mass() -> void:
 		var u: Dictionary = DataRegistry.unit_data[uid]
 		assert_true(int(u.get("mass", -1)) >= 0,
 			"单位 %s mass 应 >= 0" % uid)
+
+
+func test_flyer_has_elevated_altitude() -> void:
+	var flyer: Dictionary = DataRegistry.unit_data["flyer"]
+	assert_true(float(flyer.get("altitude", 0.0)) > 2.5,
+		"飞行器应高于默认空中单位的 2.5 格离地高度")
+
+
+func test_knockback_immunity_config() -> void:
+	var pekka: Dictionary = DataRegistry.unit_data["pekka"]
+	var valkyrie: Dictionary = DataRegistry.unit_data["valkyrie"]
+	var prince: Dictionary = DataRegistry.unit_data["prince"]
+	assert_eq(int(pekka.get("mass", -1)), 18, "大皮卡质量应为 18")
+	assert_true(bool(pekka.get("knockback_immune", false)), "大皮卡应免疫击退")
+	assert_eq(int(valkyrie.get("mass", -1)), 5, "瓦基丽武神质量应为 5")
+	assert_false(bool(valkyrie.get("knockback_immune", false)), "瓦基丽武神应可被击退")
+	assert_eq(int(prince.get("mass", -1)), 6, "王子质量应为 6")
+	assert_true(bool(prince.get("knockback_immune", false)), "王子应免疫击退")
+
+
+func test_all_static_combatants_are_knockback_immune() -> void:
+	for uid in DataRegistry.unit_data:
+		var u: Dictionary = DataRegistry.unit_data[uid]
+		if int(u.get("mass", -1)) == 0:
+			assert_true(bool(u.get("knockback_immune", false)),
+				"静态单位 %s 应显式免疫击退" % uid)
+	for tid in DataRegistry.tower_data:
+		var t: Dictionary = DataRegistry.tower_data[tid]
+		assert_true(bool(t.get("knockback_immune", false)),
+			"塔 %s 应显式免疫击退" % tid)
 
 
 # ============================================================
@@ -168,6 +201,8 @@ func test_player_deck_has_all_available_cards() -> void:
 	assert_false(deck.has("card_mega_minion"), "精英重甲亡灵应替代默认卡组中的普通重甲亡灵")
 	assert_true(deck.has("card_knight_elite"), "默认卡组应包含精英骑士")
 	assert_true(deck.has("card_mega_minion_elite"), "默认卡组应包含精英重甲亡灵")
+	assert_true(deck.has("card_mortar"), "普通迫击炮应保留在默认卡组，觉醒不应替换牌库卡牌")
+	assert_true(deck.has("card_musketeer"), "普通火枪手应保留在默认卡组，觉醒不应替换牌库卡牌")
 
 
 func test_deck_cards_all_exist() -> void:
@@ -175,6 +210,30 @@ func test_deck_cards_all_exist() -> void:
 	for cid in deck:
 		assert_true(DataRegistry.card_data.has(cid),
 			"默认卡组引用了不存在的卡牌: " + cid)
+
+
+func test_mortar_and_musketeer_awakening_cards() -> void:
+	for card_id in ["card_mortar", "card_musketeer"]:
+		var card: Dictionary = DataRegistry.card_data[card_id]
+		var awakening: Dictionary = card.get("awakening", {})
+		var icon_path: String = card.get("awakening_icon", "")
+		assert_eq(int(awakening.get("trigger_count", 0)), 1,
+			"%s 应打出 1 次普通版后进入觉醒版" % card_id)
+		assert_false(icon_path == "",
+			"%s 应配置觉醒卡面" % card_id)
+		assert_true(FileAccess.file_exists(icon_path),
+			"%s 的觉醒卡面文件不存在" % card_id)
+		var effects: Dictionary = awakening.get("effects", {})
+		assert_false(effects.is_empty(),
+			"%s 应配置觉醒效果" % card_id)
+
+
+func test_awakened_mortar_summons_one_goblin_on_impact() -> void:
+	var effects: Dictionary = DataRegistry.card_data["card_mortar"].get("awakening", {}).get("effects", {})
+	assert_eq(effects.get("projectile_impact_summon_unit_id", ""), "goblins",
+		"觉醒迫击炮炮弹落点应召唤哥布林单位")
+	assert_true(DataRegistry.unit_data.has(effects.get("projectile_impact_summon_unit_id", "")),
+		"觉醒迫击炮落点召唤配置必须引用已存在的单位")
 
 
 # ============================================================

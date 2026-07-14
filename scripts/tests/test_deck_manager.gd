@@ -41,6 +41,12 @@ func test_setup_total_consistency() -> void:
 		unique[c] = true
 
 
+func test_elixir_collector_is_excluded_from_initial_hand() -> void:
+	var dm := DeckManager.new()
+	dm.setup(["card_elixir_collector", "card_knight", "card_hog_rider", "card_musketeer", "card_giant"])
+	assert_false(dm.get_hand().has("card_elixir_collector"), "圣水收集器不能出现在开局四张手牌")
+
+
 # ============================================================
 #  play_card 轮转
 # ============================================================

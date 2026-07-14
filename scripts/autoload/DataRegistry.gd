@@ -239,6 +239,7 @@ var unit_data := {
 		"sfx": {
 			"deploy": "deploy_musketeer",
 			"attack": "attack_musketeer",
+			"sniper_attack": "attack_awakened_musketeer",
 		},
 	},
 	"mini_pekka": {
@@ -363,6 +364,7 @@ var unit_data := {
 		# 原始 PNG 1254×1254px，scale 0.0792 ≈ 99px（0.066 × 1.2）
 		# 气球兵为飞行单位，altitude 系统自动上移 2.5 格（50px），无需额外 visual_offset_y
 		"animation": {
+			"hide_placeholder": true,  # 使用正式气球兵贴图，不显示测试占位格
 			"visual_offset_x": 0.0,
 			"visual_offset_y": -40.0,
 			"visual_scale": 0.0792,
@@ -492,6 +494,7 @@ var unit_data := {
 			"damage": 253,
 		}],
 		"animation": {
+			"hide_placeholder": true,  # 使用正式巨人贴图，不显示测试占位格
 			"visual_offset_y": -35.0,
 			"visual_scale": 0.0768,
 			"health_bar_y": -100,
@@ -544,7 +547,8 @@ var unit_data := {
 		"movement_targeting": "any",
 		"collision_radius": 0.65,  # 原版0.65
 		"hurt_radius": 0.65,
-		"mass": 7,
+		"mass": 6,
+		"knockback_immune": true,
 		"shadow_size": 0.6,
 		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		# 冲锋机制：持续直线移动 min_charge_distance 格后进入冲锋，
@@ -586,6 +590,7 @@ var unit_data := {
 		"collision_radius": 0.6,  # 原版0.6
 		"hurt_radius": 0.6,
 		"mass": 0,  # 不可移动，自动成为寻路障碍
+		"knockback_immune": true,
 		"shadow_size": 0.8,
 		"deploy_time": 3.5,   # 部署时间（秒），建筑部署较慢，期间虚影状态不行动但可受伤
 		"lifespan": 30.0,     # 寿命（秒），建筑存在期间持续掉血，到期自毁（原版最大持续时间30秒）
@@ -658,7 +663,7 @@ var unit_data := {
 		"collision_radius": 0.6,  # 原版0.6
 		"hurt_radius": 0.6,
 		"mass": 3,
-		"shadow_size": 0.4,
+		"shadow_size": 0.7,
 		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		"attacks": [{
 			"name": "claw_strike",
@@ -740,7 +745,8 @@ var unit_data := {
 		"collision_radius": 0.6,
 		"hurt_radius": 0.6,
 		"mass": 3,
-		"shadow_size": 0.6,
+		"shadow_size": 1.0,
+		"altitude": 3.0,  # 飞行器专属离地高度（格），比默认空中单位高 0.5 格
 		"deploy_time": 1.0,
 		"attacks": [{
 			"name": "cannon_shot",
@@ -761,8 +767,8 @@ var unit_data := {
 			"hide_placeholder": true,  # 已校准，隐藏 ColorRect 占位方块
 			"visual_offset_x": 0.0,
 			"visual_offset_y": -25.0,
-			"visual_scale": 0.03,
-			"health_bar_y": -55.0,
+			"visual_scale": 0.05,  # 校准：模型显著增大（相对原始尺寸约 +67%）
+			"health_bar_y": -85.0,  # 随模型增大同步上移
 			"texture_filter": "linear",
 			"states": {
 				"walk_front": { "frames": ["walk_front_01.png"], "duration": [0.4], "mode": "loop" },
@@ -786,7 +792,8 @@ var unit_data := {
 		"movement_targeting": "any",
 		"collision_radius": 1.0,  # 比骑士(0.5)大0.5格
 		"hurt_radius": 1.0,
-		"mass": 8,
+		"mass": 18,
+		"knockback_immune": true,
 		"shadow_size": 1.0,
 		"deploy_time": 1.0,
 		"attacks": [{
@@ -806,19 +813,26 @@ var unit_data := {
 		"animation": {
 			"hide_placeholder": true,  # 已校准，隐藏 ColorRect 占位方块
 			"visual_offset_x": 0.0,
-			"visual_offset_y": -28.0,
-			"visual_scale": 0.034,
-			"health_bar_y": -85.0,
+			"visual_offset_y": -32.0,  # 校准：模型略微上移 0.2 格
+			"visual_scale": 0.0374,  # 校准：模型增大 10%
+			"health_bar_y": -85.0,  # 暂不随模型调整
 			"texture_filter": "linear",
+			"idle_uses_attack_facing": true,  # 攻击间隔按目标方向保持准备动作
+			"side_flip_inverted": true,  # side 素材左右朝向与默认镜像规则相反
 			"states": {
 				"walk_front": { "frames": ["walk_front_01.png", "walk_front_02.png", "walk_front_03.png"], "duration": [0.2, 0.2, 0.2], "mode": "loop" },
 				"walk_back": { "frames": ["walk_back_01.png", "walk_back_02.png", "walk_back_03.png"], "duration": [0.2, 0.2, 0.2], "mode": "loop" },
-				"idle_front": { "frames": ["walk_front_01.png"], "duration": [0.4], "mode": "loop" },
-				"idle_back": { "frames": ["walk_back_01.png"], "duration": [0.4], "mode": "loop" },
-				"attack_front": { "frames": ["attack_front_01.png", "attack_front_02.png", "attack_front_03.png"], "duration": [0.1, 0.1, 0.1], "mode": "once" },
-				"attack_back": { "frames": ["attack_back_01.png", "attack_back_02.png", "attack_back_03.png"], "duration": [0.1, 0.1, 0.1], "mode": "once" },
-				"attack_side": { "frames": ["attack_side_01.png", "attack_side_02.png", "attack_side_03.png"], "duration": [0.1, 0.1, 0.1], "mode": "once" },
+				"idle_front": { "frames": ["attack_front_03.png"], "duration": [1.0], "mode": "loop" },
+				"idle_back": { "frames": ["walk_back_03.png"], "duration": [1.0], "mode": "loop" },
+				"idle_side": { "frames": ["attack_side_03.png"], "duration": [1.0], "mode": "loop" },
+				"attack_front": { "frames": ["attack_front_01.png", "attack_front_02.png", "attack_front_03.png"], "duration": [0.14, 0.14, 0.14], "mode": "once" },
+				"attack_back": { "frames": ["attack_back_01.png", "attack_back_02.png", "attack_back_03.png"], "duration": [0.14, 0.14, 0.14], "mode": "once" },
+				"attack_side": { "frames": ["attack_side_01.png", "attack_side_02.png", "attack_side_03.png"], "duration": [0.14, 0.14, 0.14], "mode": "once" },
 			},
+		},
+		"sfx": {
+			"deploy": "deploy_pekka",
+			"attack": "attack_pekka",
 		},
 	},
 	"valkyrie": {
@@ -832,7 +846,8 @@ var unit_data := {
 		"movement_targeting": "any",
 		"collision_radius": 0.5,
 		"hurt_radius": 0.5,
-		"mass": 6,
+		"mass": 5,
+		"knockback_immune": false,
 		"shadow_size": 0.5,
 		"deploy_time": 1.0,
 		"attacks": [{
@@ -856,9 +871,9 @@ var unit_data := {
 		"animation": {
 			"hide_placeholder": true,  # 已校准，隐藏 ColorRect 占位方块
 			"visual_offset_x": 0.0,
-			"visual_offset_y": -39.0,  # 校准：再缩小1格，保持底部位置
+			"visual_offset_y": -30.0,  # 校准：模型下移 9px，修正视觉偏上
 			"visual_scale": 0.038,  # 校准：再缩小1格（0.049→0.038）
-			"health_bar_y": -100.0,  # 校准：缩小后重估
+			"health_bar_y": -82.0,  # 继续下移 9px
 			"texture_filter": "linear",
 			"states": {
 				"walk_front": {
@@ -892,6 +907,10 @@ var unit_data := {
 					"mode": "once",
 				},
 			},
+		},
+		"sfx": {
+			"deploy": "deploy_valkyrie",
+			"attack": "attack_valkyrie",
 		},
 	},
 	"goblins": {
@@ -980,6 +999,7 @@ var unit_data := {
 		"collision_radius": 0.6,
 		"hurt_radius": 0.6,
 		"mass": 0,  # 不可移动，自动成为寻路障碍
+		"knockback_immune": true,
 		"shadow_size": 0.8,
 		"deploy_time": 1.0,   # 部署时间（秒），期间不能索敌/攻击
 		"lifespan": 30.0,     # 寿命（秒），到期自毁
@@ -1016,6 +1036,52 @@ var unit_data := {
 				},
 				"walk": {
 					"frames": ["inferno_tower.png"],
+					"duration": [1.0],
+					"mode": "loop",
+				},
+			},
+		},
+		"sfx": {
+			"deploy": "deploy_building",
+		},
+	},
+	"elixir_collector": {
+		"id": "elixir_collector",
+		"display_name": "圣水收集器",
+		"max_hp": 1070,
+		"shield": 0,
+		"move_speed": 0.0,
+		"movement_type": "ground",
+		"sight_range": 0.0,
+		"movement_targeting": "any",
+		"collision_radius": 0.6,
+		"hurt_radius": 0.6,
+		"mass": 0,
+		"knockback_immune": true,
+		"shadow_size": 0.6,
+		"deploy_time": 1.0,
+		"lifespan": 93.0,
+		# 被动建筑：部署完成后每 13 秒产 1 点；寿命结束或被摧毁时额外返还 1 点。
+		"is_passive": true,
+		"elixir_generation_interval": 13.0,
+		"elixir_generation_amount": 1,
+		"elixir_on_death": 1,
+		"attacks": [],
+		"animation": {
+			"hide_placeholder": true,
+			"visual_offset_x": 0.0,
+			"visual_offset_y": -18.0,
+			"visual_scale": 0.060,
+			"health_bar_y": -58.0,
+			"texture_filter": "linear",
+			"states": {
+				"idle": {
+					"frames": ["elixir_collector.png"],
+					"duration": [1.0],
+					"mode": "loop",
+				},
+				"walk": {
+					"frames": ["elixir_collector.png"],
 					"duration": [1.0],
 					"mode": "loop",
 				},
@@ -1078,12 +1144,15 @@ var card_data := {
 		"spawn_count": 1,
 		"spawn_spread": 0.0,
 		"icon": "res://assets/ui/cards/musketeer.png",
+		"awakening_icon": "res://assets/ui/cards/musketeer_evolution.png",
+		"awakening_deploy_sfx": "deploy_awakened_musketeer",
 		"description": "远程射手，可对空对地。",
 		# ---- 觉醒配置（打出 1 次普通版后，下一次为觉醒版）----
-		# 觉醒效果在 UnitBase.apply_awakening() 中数据驱动应用，素材不变。
+		# 普通火枪手仍然保留在牌库中；轮转后由 AwakeningTracker 决定下一次是否使用觉醒版。
+		# 觉醒效果在 UnitBase.apply_awakening() 中数据驱动应用。
 		# effects 内的 key 对应已支持的觉醒效果类型，详见 UnitBase.apply_awakening。
 		"awakening": {
-			"trigger_count": 0,       # 0 = 每次打出都是觉醒版
+			"trigger_count": 1,       # 打出 1 次普通版后，下一次为觉醒版
 			"name_suffix": "·觉醒",    # 觉醒版显示后缀
 			"effects": {
 				"sniper_shots": {
@@ -1210,6 +1279,18 @@ var card_data := {
 		"spawn_spread": 0.0,
 		"icon": "res://assets/ui/cards/mortar.png",
 		"description": "远程建筑，发射范围伤害炮弹。不可移动，自动成为障碍。",
+		"awakening_icon": "res://assets/ui/cards/mortar_evolution.png",
+		# ---- 觉醒配置（打出 1 次普通版后，下一次为觉醒版）----
+		# 觉醒迫击炮：炮弹落地先结算范围伤害，随后在同一落点召唤一只哥布林。
+		# 卡牌轮转仍使用普通 card_mortar。
+		"awakening": {
+			"trigger_count": 1,
+			"name_suffix": "·觉醒",
+			"effects": {
+				"max_hp_bonus": 300,
+				"projectile_impact_summon_unit_id": "goblins",
+			},
+		},
 	},
 	"card_flyer": {
 		"id": "card_flyer",
@@ -1278,6 +1359,18 @@ var card_data := {
 		"icon": "res://assets/ui/cards/inferno_tower.png",
 		"description": "防御建筑，发射持续光束。锁定同一目标越久伤害越高，最高可秒杀肉盾。有寿命限制。",
 	},
+	"card_elixir_collector": {
+		"id": "card_elixir_collector",
+		"display_name": "圣水收集器",
+		"cost": 6,
+		"card_type": "troop",  # 建筑卡，通过 unit_id 关联（mass=0 不可移动）
+		"unit_id": "elixir_collector",
+		"spawn_count": 1,
+		"spawn_spread": 0.0,
+		"exclude_from_initial_hand": true,
+		"icon": "res://assets/ui/cards/elixir_collector.png",
+		"description": "被动建筑。部署完成后每 13 秒产出 1 点圣水，93 秒寿命内产出 7 点，死亡时额外返还 1 点。",
+	},
 	"card_knight_elite": {
 		"id": "card_knight_elite",
 		"display_name": "精英骑士",
@@ -1316,6 +1409,13 @@ var card_data := {
 		"spawn_spread": 0.0,
 		"icon": "res://assets/ui/cards/mega_minion.png",
 		"description": "重甲亡灵的精英变种，拥有主动技能「死亡俯冲」。锁定场上血量最低的敌方单位，在其脚下留下黑色标志后高速俯冲。",
+		# 仅精英变种的视觉微调；不影响普通重甲亡灵。
+		"visual_overrides": {
+			"animation": {
+				"visual_scale": 0.027,  # 相比普通版放大 20%
+				"health_bar_y": -60.0,  # 随模型放大上移血条
+			},
+		},
 		# ---- 精英技能配置 ----
 		# 「死亡俯冲」：自动锁敌（instant），2 圣水释放。无需瞄准，按下即生效。
 		# 冲刺期间单位免疫普通 AI（不索敌/攻击/走 A*），直线飞向目标脚下，到达后造成范围伤害。
@@ -1354,6 +1454,7 @@ var tower_data := {
 		"collision_radius": 1.5,  # 内切圆半径 = 3格 / 2
 		"hurt_radius": 1.5,
 		"mass": 0,  # 塔不可移动
+		"knockback_immune": true,
 		"sprite": {
 			"player_texture": "res://assets/sprites/towers/guard_tower_player.png",
 			"enemy_texture": "res://assets/sprites/towers/guard_tower_enemy.png",
@@ -1385,6 +1486,7 @@ var tower_data := {
 		"collision_radius": 2.0,  # 内切圆半径 = 4格 / 2
 		"hurt_radius": 2.0,
 		"mass": 0,  # 塔不可移动
+		"knockback_immune": true,
 		"sprite": {
 			"player_texture": "res://assets/sprites/towers/king_tower_player.png",
 			"enemy_texture": "res://assets/sprites/towers/king_tower_enemy.png",
@@ -1638,6 +1740,27 @@ var sound_data := {
 		"max_polyphony": 2,
 		"priority": 5,
 	},
+	"deploy_awakened_musketeer": {
+		"stream": "res://assets/audio/sfx/觉醒女枪出场.MP3",
+		"volume_db": -3.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+	"deploy_pekka": {
+		"stream": "res://assets/audio/sfx/皮卡出场.MP3",
+		"volume_db": -3.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+	"deploy_valkyrie": {
+		"stream": "res://assets/audio/sfx/女武神出场.MP3",
+		"volume_db": -3.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
 	"deploy_prince": {
 		"stream": "res://assets/audio/sfx/王子部署.MP3",
 		"volume_db": -3.0,
@@ -1686,6 +1809,27 @@ var sound_data := {
 		"stream": "res://assets/audio/sfx/火枪手攻击.MP3",
 		"volume_db": -5.0,
 		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 3,
+		"priority": 4,
+	},
+	"attack_awakened_musketeer": {
+		"stream": "res://assets/audio/sfx/觉醒女枪射击.MP3",
+		"volume_db": -5.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 3,
+		"priority": 4,
+	},
+	"attack_pekka": {
+		"stream": "res://assets/audio/sfx/皮卡攻击.MP3",
+		"volume_db": -5.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 3,
+		"priority": 4,
+	},
+	"attack_valkyrie": {
+		"stream": "res://assets/audio/sfx/女武神攻击.MP3",
+		"volume_db": -5.0,
+		"pitch_range": [1.0, 1.0],
 		"max_polyphony": 3,
 		"priority": 4,
 	},
@@ -1804,7 +1948,8 @@ func get_unit_sfx(unit_id: String) -> Dictionary:
 ## 返回玩家默认卡组（卡牌 id 列表）。开发阶段包含全部卡牌。
 func get_default_player_deck() -> Array:
 	var deck := card_data.keys()
-	# 精英牌替代普通版，避免牌库中出现重复定位的卡牌
+	# 只有精英牌替代同定位的普通版；觉醒牌不另占牌库槽位，
+	# card_mortar / card_musketeer 的普通版本必须保留，由轮次机制触发觉醒。
 	deck.erase("card_knight")
 	deck.erase("card_mega_minion")
 	return deck
@@ -1813,6 +1958,7 @@ func get_default_player_deck() -> Array:
 ## 返回敌方 AI 的默认卡组（卡牌 id 列表）。开发阶段包含全部卡牌。
 func get_default_enemy_deck() -> Array:
 	var deck := card_data.keys()
+	# 觉醒牌与普通牌使用同一个 card_id，敌方也保留普通版本并按轮次觉醒。
 	deck.erase("card_knight")
 	deck.erase("card_mega_minion")
 	return deck
@@ -1878,6 +2024,12 @@ func _validate_all_data() -> void:
 				errors.append("卡牌 '%s' awakening 缺少 effects" % card_id)
 			elif aw["effects"].is_empty():
 				errors.append("卡牌 '%s' awakening.effects 为空" % card_id)
+			else:
+				var effects: Dictionary = aw["effects"]
+				if effects.has("projectile_impact_summon_unit_id"):
+					var summon_unit_id := str(effects["projectile_impact_summon_unit_id"])
+					if summon_unit_id.is_empty() or not unit_data.has(summon_unit_id):
+						errors.append("卡牌 '%s' 的 projectile_impact_summon_unit_id 无效: '%s'" % [card_id, summon_unit_id])
 
 		# 精英技能字段校验（可选字段，存在时校验结构）
 		if c.has("elite_skill"):
@@ -1905,7 +2057,7 @@ func _validate_all_data() -> void:
 			errors.append("单位 '%s' max_hp <= 0" % uid)
 		if not u.has("attacks"):
 			errors.append("单位 '%s' 缺少 attacks 数组" % uid)
-		elif u["attacks"].is_empty():
+		elif u["attacks"].is_empty() and not bool(u.get("is_passive", false)):
 			errors.append("单位 '%s' attacks 为空" % uid)
 		else:
 			for i in range(u["attacks"].size()):
@@ -1939,6 +2091,10 @@ func _validate_all_data() -> void:
 			errors.append("单位 '%s' hurt_radius <= 0" % uid)
 		if int(u.get("mass", -1)) < 0:
 			errors.append("单位 '%s' mass < 0" % uid)
+		if u.has("knockback_immune") and not (u["knockback_immune"] is bool):
+			errors.append("单位 '%s' knockback_immune 必须为 bool" % uid)
+		if int(u.get("mass", -1)) == 0 and not bool(u.get("knockback_immune", false)):
+			errors.append("静态单位 '%s' 必须显式 knockback_immune=true" % uid)
 
 	# ---- 校验塔 ----
 	for tid in tower_data:
@@ -1959,6 +2115,10 @@ func _validate_all_data() -> void:
 			errors.append("塔 '%s' hurt_radius <= 0" % tid)
 		if int(tw.get("mass", -1)) != 0:
 			errors.append("塔 '%s' mass 必须为 0（不可移动）" % tid)
+		if not (tw.get("knockback_immune", null) is bool):
+			errors.append("塔 '%s' knockback_immune 必须为 bool" % tid)
+		elif not bool(tw["knockback_immune"]):
+			errors.append("塔 '%s' 必须 knockback_immune=true" % tid)
 
 	# ---- 校验音效配置（仅结构性校验，stream 允许为空字符串）----
 	for sid in sound_data:

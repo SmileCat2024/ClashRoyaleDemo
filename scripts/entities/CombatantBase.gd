@@ -53,6 +53,11 @@ var death_damage: int = 0          ## 死亡时对周围敌方造成的伤害（
 var death_radius: float = 0.0      ## 死亡伤害范围（像素）
 var death_fuse_time: float = 0.0   ## 死亡炸弹引信时间（秒，0 = 无延迟效果）
 
+# ---- 投射物落点召唤（觉醒效果）----
+## 非空时，弹道投射物落地并完成伤害结算后，在落点召唤该 unit_id 对应的一只单位。
+## 配置由 UnitBase.apply_awakening() 写入，实际生成由 MortarShell 经 SpawnManager 统一处理。
+var projectile_impact_summon_unit_id: String = ""
+
 # ---- 碰撞几何（碰撞体积系统）----
 ## 碰撞半径（px）。推挤分离 + 索敌/攻击边缘判定。setup 时从格值转换。
 ## 大碰撞半径使单位更早进入敌方索敌范围，也更早被攻击到。
@@ -60,8 +65,10 @@ var collision_radius: float = 10.0
 ## 受击半径（px）。法术/溅射/投射物命中判定。默认 = collision_radius。
 ## 与 collision_radius 拆开可单独调法术蹭塔、建筑受击等细节。
 var hurt_radius: float = 10.0
-## 质量（推挤权重）。0 = 不可移动（建筑/塔）。值越大越难被推开。
+## 质量（推挤权重）。0 = 不可移动（建筑/塔）。值越大越难被其他单位推挤。
 var mass: int = 5
+## 是否免疫击退。与质量无关；火球及未来的击退效果均通过此属性判定。
+var knockback_immune: bool = false
 
 # ---- 离地高度 ----
 ## 离地高度（格）。地面单位 = 0，飞行单位 > 0。
@@ -90,6 +97,7 @@ func _init_combat_stats(data: Dictionary) -> void:
 	current_hp = max_hp
 	shield = int(data.get("shield", 0))
 	current_shield = shield
+	knockback_immune = bool(data.get("knockback_immune", false))
 	attacks_data = data.get("attacks", [])
 	_create_attack_components()
 	_create_sprite_animator(data)
@@ -351,10 +359,10 @@ func die() -> void:
 		)
 
 
-## 击退：沿 direction 方向瞬移 distance 像素。mass=0（塔/建筑）免疫。
+## 击退：沿 direction 方向瞬移 distance 像素。是否生效只由 knockback_immune 决定。
 ## 位置钳制到竞技场范围内，CollisionSystem 下一帧处理重叠/河道回弹。
 func knockback(direction: Vector2, distance: float) -> void:
-	if is_dead or mass == 0 or distance <= 0.0:
+	if is_dead or knockback_immune or distance <= 0.0:
 		return
 	position += direction.normalized() * distance
 	# 钳制到竞技场边界（World 本地游戏空间）

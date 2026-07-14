@@ -24,13 +24,16 @@ func setup(deck_card_ids: Array) -> void:
 	var shuffled = deck_card_ids.duplicate()
 	shuffled.shuffle()
 
-	for i in range(shuffled.size()):
-		if i < HAND_SIZE:
-			_hand.append(shuffled[i])
-		elif i == HAND_SIZE:
-			_next = shuffled[i]
-		else:
-			_queue.append(shuffled[i])
+	# 标记了 exclude_from_initial_hand 的卡不能进入最初 4 张手牌（如圣水收集器）。
+	for card_id in shuffled:
+		var card_data: Dictionary = DataRegistry.card_data.get(card_id, {})
+		if _hand.size() < HAND_SIZE and not bool(card_data.get("exclude_from_initial_hand", false)):
+			_hand.append(card_id)
+	for card_id in shuffled:
+		if not _hand.has(card_id):
+			_queue.append(card_id)
+	if not _queue.is_empty():
+		_next = _queue.pop_front()
 
 	print("[DeckManager] hand:", _hand, " next:", _next, " queue:", _queue)
 

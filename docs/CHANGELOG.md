@@ -1,12 +1,34 @@
 # CHANGELOG
 
+## [版本待定] - 2026-07-14 — 觉醒迫击炮落点哥布林
+
+### 新增
+
+- **觉醒迫击炮**：炮弹落地后，先完成原有范围伤害结算，再在精确落点召唤 1 只普通哥布林。效果由 `projectile_impact_summon_unit_id` 觉醒字段驱动；召唤复用 `SpawnManager`，因此会正常注册实体、经历哥布林部署时间，并通过既有 Host→Client 单位生成 RPC 保持联机一致。
+
+## [版本待定] - 2026-07-14 — 圣水收集器
+
+### 新增
+
+- **圣水收集器（elixir_collector）**：6 费被动建筑，11 级 1070 HP，部署完成后存活 93 秒（约 11.5 HP/秒自然掉血），每 13 秒产 1 点圣水共 7 次，死亡时再返还 1 点；完整回收 8 点、净收益 +2。碰撞/受击半径 0.6 格、mass=0，因此可阻挡与拉扯建筑目标单位。
+- **被动圣水生产通道**：`UnitBase` 读取数据驱动的生产/死亡返还字段并发出 `SignalBus.elixir_generated`；`BattleManager` 结算实际可增加的圣水、播放 `ElixirGainEffect`，并以可靠 RPC 同步到联机 Client。满圣水时按需求直接舍弃本次产出，不缓存。
+- **开局手牌排除规则**：`DeckManager` 支持 `exclude_from_initial_hand`；圣水收集器不会进入最初四张手牌。
+- 新增收集器单帧模型、卡面配置与自动化测试套件。
+
 ## [版本待定·笑猫统筹E] - 2026-07-14 — 飞行器+大皮卡美术接入 + 飞行单位投射物发射高度机制（协作者 lpj-official 提交，版本号待笑猫定）
 
 ### 新增
-- **飞行器（flyer）美术接入**：飞行单位帧动画（2592×1650 横向中性单套贴图，linear）。walk front/back 各 1 帧单帧；attack front/back 各 2 帧过渡 [move→attack] duration [0.15,0.3]，side 单帧 duration 0.35；down=front/up=back，attack_side 默认朝左+flip_h。visual_scale 0.03 / offset_y -25 / health_bar_y -55。卡面 `flyer.png`。
-- **大皮卡（pekka）美术接入**：地面单位帧动画（2200×2200 正方形中性单套贴图，linear）。walk front/back 各 3 帧（duration 0.2 慢步态）；attack front/back/side 各 3 帧（duration 0.1，once）；damage_delay 0.05 对齐命中前段第 1 帧。visual_scale 0.034 / offset_y -28 / health_bar_y -85。卡面 `pekka.png`。
+- **瓦基里武神音效接入**：新增女武神出场与攻击 MP3，并绑定到 `valkyrie` 的 `deploy` / `attack` 事件。
+- **飞行器（flyer）美术接入**：飞行单位帧动画（2592×1650 横向中性单套贴图，linear）。walk front/back 各 1 帧单帧；attack front/back 各 2 帧过渡 [move→attack] duration [0.15,0.3]，side 单帧 duration 0.35；down=front/up=back，attack_side 默认朝左+flip_h。visual_scale 0.05 / offset_y -25 / health_bar_y -85。卡面 `flyer.png`。
+- **大皮卡（pekka）美术接入**：地面单位帧动画（2200×2200 正方形中性单套贴图，linear）。walk front/back 各 3 帧（duration 0.2 慢步态）；攻击准备阶段按目标方向定格为 front=`attack_front_03` / back=`walk_back_03` / side=`attack_side_03`；attack front/back/side 各 3 帧（duration 0.14，once，减速播放）；damage_delay 0.05 对齐命中前段第 1 帧。visual_scale 0.0374 / offset_y -32 / health_bar_y -85。卡面 `pekka.png`。
 
 ### 修改
+- **火球飞行特效美术接入**：以 `assets/sprites/fireball/` 的 3 张 PNG 替换 `SpellProjectile` 原红色方块占位。飞行中按 `01→02→03→02` 往返播放；素材火球头默认朝图片下方，Sprite2D 每帧旋转，使其始终朝向实际飞行方向。按各帧内容尺寸单独缩放，避免动画循环时明显跳变；后续视觉校准将火球再增大 15%，其地面投影改为半径 12px 的扁椭圆，与单位影子风格一致。
+- **觉醒女枪狙击弹道防越界**：SniperTracer 在单帧移动距离可跨过目标时直接吸附到命中点并切入爆炸阶段，避免高速弹丸在终点两侧往返，造成特效悬停、叠加和延迟消失；伤害仍在到达命中点时结算。
+- **大皮卡侧面攻击朝向修正**：大皮卡 side 攻击与准备帧素材的左右镜像规则反转，使其按素材实际朝向正确挥砍；新增动画配置 `side_flip_inverted`，仅影响名称以 `_side` 结尾的帧组。
+- **觉醒女枪与大皮卡音效接入**：新增觉醒女枪出场/射击、大皮卡出场/攻击共 4 段 MP3。觉醒女枪部署使用专属出场音，普通普攻沿用火枪手攻击音，仅狙击射击使用专属音效；大皮卡的部署与近战命中前出手均使用专属音效。
+- **大皮卡攻击准备动作**：SpriteAnimator 新增可选 `idle_uses_attack_facing` 配置。大皮卡在攻击间隔/起手前按目标方向定格准备帧，并将攻击动画帧时长从 0.10 秒调整为 0.14 秒；伤害结算时机不变。
+- **模型视觉校准**：飞行器模型增大至原始尺寸的约 1.67 倍，血条同步上移，地面投影半径由 0.6 格扩大至 1.0 格；重甲亡灵地面投影半径由 0.4 格扩大至 0.7 格；大皮卡模型增大 10% 且上移 0.2 格，血条位置暂时保持不变。
 - **飞行单位投射物发射高度（emit_offset_y 机制）**：飞行单位（flyer）投射物此前从地面逻辑位置发射，视觉上子弹从脚下射出与飞行单位脱节。新增 `emit_offset_y` 参数：AttackComponent `_fire_projectile` 按 `(altitude+0.5)×CELL_SIZE` 计算发射点上移量，经 `ProjectileManager.spawn_projectile` → 投射物创建时偏移视觉起点。联机安全：RPC 传地面 spawn_pos（不含 offset）+ emit_offset_y，client 端 `mirror(spawn_pos).y -= emit_offset_y`（mirror 翻转 y 但不改变"上=y减小"方向，两端一致）。地面单位 emit_offset_y=0 行为不变。涉及 AttackComponent（3 处）+ ProjectileManager（spawn_projectile + _rpc_spawn_projectile）。
 - `scripts/autoload/DataRegistry.gd`：flyer/pekka +animation 配置 + hide_placeholder=true；flyer/pekka card_data +icon
 - `docs/兵种数据.md`：§3.14/§3.15 视觉动画小节（ColorRect 兜底→帧动画）+ 卡面

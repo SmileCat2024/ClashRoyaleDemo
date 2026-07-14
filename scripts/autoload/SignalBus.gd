@@ -26,8 +26,9 @@ signal elixir_multiplier_changed(multiplier: int)
 ## hand_index 为手牌索引 0-3，BattleManager 据此切换选中状态。
 signal card_selected(card_id: String, hand_index: int)
 
-## 一张卡牌被成功打出（实体已生成 / 法术已执行）
-signal card_played(card_id: String, team: String, position: Vector2)
+## 一张卡牌被成功打出（实体已生成 / 法术已执行）。
+## is_awakened 用于让部署音效等表现只在觉醒版本生效。
+signal card_played(card_id: String, team: String, position: Vector2, is_awakened: bool)
 
 ## 手牌状态更新（初始分配 / 出牌轮转后发出）。
 ## hand 为当前 4 张手牌 id 数组，next_card 为下一张预告 id。
@@ -61,6 +62,9 @@ signal elite_skill_cooldown_changed(unit: Node, remaining: float, total: float)
 
 ## 某一方能量发生变化
 signal energy_changed(team: String, current: int, max_value: int)
+
+## 被动建筑产出圣水。position 使用 World 本地游戏坐标；is_death 标记死亡返还。
+signal elixir_generated(position: Vector2, team: String, amount: int, is_death: bool)
 
 ## 玩家圣水当前正在积累的那一滴的完成度（0.0 ~ 1.0）。
 ## BattleManager 每帧更新，CardBar._process() 读取用于平滑过渡动画。

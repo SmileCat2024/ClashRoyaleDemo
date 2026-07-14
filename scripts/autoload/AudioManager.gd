@@ -165,12 +165,18 @@ func _on_card_selected(_card_id: String, _hand_index: int) -> void:
 	play("card_select")
 
 
-func _on_card_played(card_id: String, _team: String, _pos: Vector2) -> void:
+func _on_card_played(card_id: String, _team: String, _pos: Vector2, is_awakened: bool = false) -> void:
 	var card := DataRegistry.get_card_data(card_id)
 	var card_type: String = card.get("card_type", "")
 	if card_type == "spell":
 		play("deploy_spell", _pos)
 		return
+	# 觉醒部署音效属于卡牌变体，不应覆盖普通版单位的部署音效。
+	if is_awakened:
+		var awakened_deploy_sfx: String = card.get("awakening_deploy_sfx", "")
+		if awakened_deploy_sfx != "":
+			play(awakened_deploy_sfx, _pos)
+			return
 	# troop / building：尝试单位专属部署音，未配置时回退到通用 deploy
 	var unit_id: String = card.get("unit_id", "")
 	if unit_id != "":
