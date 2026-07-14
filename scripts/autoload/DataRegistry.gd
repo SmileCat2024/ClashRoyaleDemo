@@ -932,6 +932,80 @@ var unit_data := {
 			"deploy": "deploy_building",
 		},
 	},
+	"princess": {
+		"id": "princess",
+		"display_name": "公主",
+		"max_hp": 261,  # 11级（用户要求：本次及以后新单位统一11级）
+		"shield": 0,
+		"move_speed": 1.0,  # 中速（Medium 60）
+		"movement_type": "ground",
+		"sight_range": 13.0,  # 视野须 ≥ reach(attack_range+self_cr+target_hurt)，否则塔在reach内但sight外会发呆不攻击。10.5+0.5+1.5(公主塔)=12.5，设13留余量
+		"movement_targeting": "any",
+		"collision_radius": 0.5,
+		"hurt_radius": 0.5,
+		"mass": 3,
+		"shadow_size": 0.5,
+		"deploy_time": 1.0,
+		"attacks": [{
+			"name": "arrow_shot",
+			"targeting": "any",
+			"attack_ground": true,
+			"attack_air": true,
+			"attack_range": 10.5,  # 超远射程（用户反馈近了3格，7.5→10.5；能跨河打公主塔）
+			"attack_interval": 3.0,  # 用户反馈过快，1.2→1.8→3.0
+			"first_attack_delay": 0.5,
+			"delivery": "projectile",
+			"trajectory": "linear",
+			"impact_type": "splash",  # AOE 溅射（箭矢落点范围伤害）
+			"impact_radius": 2.0,  # 用户反馈小了0.5格，1.5→2.0
+			"damage": 168,  # 11级
+			"projectile_speed": 15.0,
+		}],
+		# ---- 帧动画配置 ----
+		# 公主：地面远程弓箭手，中性单套贴图（1254×1254 正方形，linear 过滤）
+		# 仅 back 方向（player 推进方向）；front 方向素材缺失，暂用 back 占位（enemy 方视觉待补）
+		# projectile 单位，伤害由箭矢飞行结算，无需 damage_delay
+		"animation": {
+			"hide_placeholder": true,
+			"visual_offset_x": 0.0,
+			"visual_offset_y": -24.0,  # 初始估值，待校准
+			"visual_scale": 0.05,  # 初始估值（PNG 1254×1254），待校准
+			"health_bar_y": -60.0,  # 初始估值，待校准
+			"texture_filter": "linear",
+			"states": {
+				"walk_back": {
+					"frames": ["walk_back_01.png", "walk_back_02.png"],
+					"duration": [0.25, 0.25],
+					"mode": "loop",
+				},
+				"walk_front": {  # front 素材缺失，暂用 back 占位
+					"frames": ["walk_back_01.png", "walk_back_02.png"],
+					"duration": [0.25, 0.25],
+					"mode": "loop",
+				},
+				"idle_back": {
+					"frames": ["walk_back_01.png"],  # 暂用移动第 1 帧做待机
+					"duration": [0.3],
+					"mode": "loop",
+				},
+				"idle_front": {
+					"frames": ["walk_back_01.png"],
+					"duration": [0.3],
+					"mode": "loop",
+				},
+				"attack_back": {
+					"frames": ["attack_back_01.png", "attack_back_02.png", "attack_back_03.png"],
+					"duration": [0.1, 0.1, 0.15],  # 拉弓→释放→收势
+					"mode": "once",
+				},
+				"attack_front": {  # front 素材缺失，暂用 back 占位
+					"frames": ["attack_back_01.png", "attack_back_02.png", "attack_back_03.png"],
+					"duration": [0.1, 0.1, 0.15],
+					"mode": "once",
+				},
+			},
+		},
+	},
 }
 
 # ==============================================================================
@@ -1137,6 +1211,17 @@ var card_data := {
 		"spawn_spread": 0.0,
 		"icon": "res://assets/ui/cards/inferno_tower.png",
 		"description": "防御建筑，发射持续光束。锁定同一目标越久伤害越高，最高可秒杀肉盾。有寿命限制。",
+	},
+	"card_princess": {
+		"id": "card_princess",
+		"display_name": "公主",
+		"cost": 3,
+		"card_type": "troop",
+		"unit_id": "princess",
+		"spawn_count": 1,
+		"spawn_spread": 0.0,
+		# "icon": "res://assets/ui/cards/princess.png",  # 暂无卡面，待用户提供
+		"description": "超远程弓箭手，能从己方河岸狙击对方公主塔。箭矢带范围溅射，血量极低。",
 	},
 }
 
