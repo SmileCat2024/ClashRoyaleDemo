@@ -36,6 +36,27 @@ signal hand_updated(hand: Array, next_card: String)
 ## 选中状态变化。hand_index 为当前选中槽位（-1 = 未选中）。
 signal selection_changed(hand_index: int)
 
+## 觉醒进度变化（打出觉醒牌后发出，含初始广播）。
+## team: 阵营 | card_id: 卡牌 id | count: 累计普通版次数 | trigger_count: 阈值 | next_awakened: 下次是否觉醒
+signal awakening_progress_changed(team: String, card_id: String, count: int, trigger_count: int, next_awakened: bool)
+
+# ---- 精英技能 ----
+
+## 精英单位生成（带 elite_skill 的卡牌打出后发出）。SkillBar 据此创建技能按钮。
+signal elite_skill_added(unit: Node, skill_data: Dictionary)
+
+## 精英单位死亡/释放。SkillBar 据此移除技能按钮。
+signal elite_skill_removed(unit: Node)
+
+## UI 请求释放精英技能（玩家点击技能按钮发出）。BattleManager 据此处理能量检查和瞄准。
+signal elite_skill_requested(unit: Node, skill_data: Dictionary)
+
+## 精英技能已释放。效果执行后发出，可用于音效/视觉触发。
+signal elite_skill_cast(unit: Node, skill_data: Dictionary, target_pos: Vector2)
+
+## 精英技能冷却变化（每帧或释放时发出）。SkillBar 据此更新冷却进度条。
+signal elite_skill_cooldown_changed(unit: Node, remaining: float, total: float)
+
 # ---- 能量相关 ----
 
 ## 某一方能量发生变化

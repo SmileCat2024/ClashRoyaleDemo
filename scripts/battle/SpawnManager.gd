@@ -23,8 +23,9 @@ var _next_net_id: int = 1
 ## card_id: 卡牌 id（如 "card_knight"）
 ## team_name: "player" 或 "enemy"
 ## pos: 单位在世界中的生成位置
+## awakening_effects: 觉醒效果配置（来自 AwakeningTracker，空字典=普通版）
 ## 返回: 最后一个生成的单位节点，失败返回 null
-func spawn_unit(card_id: String, team_name: String, pos: Vector2) -> Node:
+func spawn_unit(card_id: String, team_name: String, pos: Vector2, awakening_effects: Dictionary = {}) -> Node:
 	# 1. 从 DataRegistry 获取卡牌数据
 	var card = DataRegistry.get_card_data(card_id)
 	if card.is_empty():
@@ -57,8 +58,8 @@ func spawn_unit(card_id: String, team_name: String, pos: Vector2) -> Node:
 		# 先 add_child（触发 _ready，@onready 解析）
 		units_root.add_child(unit)
 
-		# 再 setup（配置属性，创建 AttackComponent 等）
-		unit.setup(u_data, team_name)
+		# 再 setup（配置属性，创建 AttackComponent 等；elite_skill 从卡牌数据透传）
+		unit.setup(u_data, team_name, awakening_effects, card.get("elite_skill", {}))
 
 		# 注册到 EntityRegistry
 		EntityRegistry.register(unit)

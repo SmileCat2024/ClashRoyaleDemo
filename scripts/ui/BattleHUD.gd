@@ -36,6 +36,12 @@ func _ready() -> void:
 	_disable_mouse_filter_recursive($MultiplierIcon)
 	_disable_mouse_filter_recursive($BattleAnnouncement)
 	$CenterMessageLabel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# 创建精英技能栏（屏幕右侧，卡槽上方；动态创建/移除技能按钮）
+	# CanvasLayer offset=(40,0)，viewport 宽 440 → HUD x 必须 ≤ 400-按钮宽 才不被裁
+	var skill_bar := SkillBar.new()
+	skill_bar.position = Vector2(336, 478)
+	skill_bar.size = Vector2(56, 120)
+	add_child(skill_bar)
 	print("[BattleHUD] ready")
 
 

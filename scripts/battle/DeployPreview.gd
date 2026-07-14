@@ -39,6 +39,9 @@ var _attack_range: float = 0.0
 ## 建筑最小射程盲区（像素，>0 时射程圆中心掏空成环形，如迫击炮）
 var _min_attack_range: float = 0.0
 
+## 觉醒狙击弹扫描条带半宽（像素，>0 时绘制紫色扫描条，仅觉醒女枪用）
+var _sniper_scan_half_width: float = 0.0
+
 ## 预览方块半边长（匹配 UnitBase body size 16px → 半边 8）
 const PREVIEW_HALF := 8.0
 
@@ -65,6 +68,7 @@ func show_preview(card_data: Dictionary) -> void:
 		_offsets = SpawnManager.get_spawn_offsets(count, spread_px, offsets_data)
 		_load_unit_texture(card_data)
 		_load_building_range(card_data)
+		_load_sniper_strip(card_data)
 	_active = true
 	queue_redraw()
 
@@ -76,6 +80,7 @@ func hide_preview() -> void:
 	_frame_texture = null
 	_attack_range = 0.0
 	_min_attack_range = 0.0
+	_sniper_scan_half_width = 0.0
 	queue_redraw()
 
 
@@ -125,6 +130,22 @@ func _load_building_range(card_data: Dictionary) -> void:
 	_min_attack_range = BattleConstants.px(float(attacks[0].get("min_attack_range", 0.0)))
 
 
+## 检测永久觉醒卡牌（trigger_count=0）是否含狙击弹效果，设置扫描条带宽度。
+func _load_sniper_strip(card_data: Dictionary) -> void:
+	_sniper_scan_half_width = 0.0
+	var aw: Dictionary = card_data.get("awakening", {})
+	if aw.is_empty():
+		return
+	if int(aw.get("trigger_count", 1)) > 0:
+		return  # 非永久觉醒，不显示扫描条
+	var effects: Dictionary = aw.get("effects", {})
+	if not effects.has("sniper_shots"):
+		return
+	_sniper_scan_half_width = BattleConstants.px(
+		float(effects["sniper_shots"].get("scan_half_width", 1.0))
+	)
+
+
 func _process(_delta: float) -> void:
 	if not _active:
 		return
@@ -162,6 +183,9 @@ func _draw() -> void:
 		# 建筑单位：先画攻击范围圆（min_attack_range>0 时中心掏空成环形）
 		if _attack_range > 0.0:
 			_draw_range_circle(_snapped_pos, _attack_range, _min_attack_range)
+		# 觉醒狙击弹扫描条带（紫色光晕，从部署位延伸到对方底边）
+		if _sniper_scan_half_width > 0.0:
+			_draw_sniper_strip(_snapped_pos)
 		# 单位虚影：优先显示模型纹理（半透明），无纹理时退化为白色方块
 		for offset in _offsets:
 			var pos: Vector2 = _snapped_pos + offset
@@ -191,3 +215,29 @@ func _draw_range_circle(center: Vector2, outer_radius: float, inner_radius: floa
 	# 迫击炮盲区内圈边界标记
 	if inner_radius > 0.0:
 		draw_arc(center, inner_radius, 0, TAU, 64, RANGE_BORDER_COLOR, 1.5)
+
+
+## 绘制觉醒狙击弹扫描条带：浅紫色光晕，从部署位正前方延伸到对方底边。
+## 宽度 = scan_half_width × 2（左右各半宽）。不画精确边界，用渐变光晕表示扫描区。
+func _draw_sniper_strip(pos: Vector2) -> void:
+	var half_w := _sniper_scan_half_width
+	# 玩家始终在屏幕下方，扫描条向上（-Y）延伸到竞技场顶边 y=0
+	var end_y := 0.0
+	var strip_top := end_y
+	var strip_bottom := pos.y
+	var strip_h := strip_bottom - strip_top
+	var center_x := pos.x
+	# 三层渐变填充：外层最宽最淡 → 中层 → 内层最窄最亮，模拟光晕扩散
+	# 外光晕（1.8x 宽，极淡）
+	var outer_rect := Rect2(center_x - half_w * 1.8, strip_top, half_w * 3.6, strip_h)
+	draw_rect(outer_rect, Color(0.65, 0.35, 0.9, 0.06), true)
+	# 中层（1.3x 宽，稍浓）
+	var mid_rect := Rect2(center_x - half_w * 1.3, strip_top, half_w * 2.6, strip_h)
+	draw_rect(mid_rect, Color(0.7, 0.4, 0.95, 0.10), true)
+	# 核心带（原始宽度，最浓）
+	var core_rect := Rect2(center_x - half_w, strip_top, half_w * 2.0, strip_h)
+	draw_rect(core_rect, Color(0.75, 0.45, 1.0, 0.15), true)
+	# 左右边线（淡紫虚线感）
+	var line_color := Color(0.8, 0.5, 1.0, 0.35)
+	draw_line(Vector2(center_x - half_w, strip_top), Vector2(center_x - half_w, strip_bottom), line_color, 1.0)
+	draw_line(Vector2(center_x + half_w, strip_top), Vector2(center_x + half_w, strip_bottom), line_color, 1.0)

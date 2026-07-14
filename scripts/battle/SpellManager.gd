@@ -23,11 +23,20 @@ const POISON_FIELD_SCENE := preload("res://scenes/effects/PoisonField.tscn")
 ##   fireball → SpellProjectile（国王塔抛物线飞行 → 落地爆炸）
 ##   arrows   → ArrowsSpellController（多波箭雨）
 ##   poison   → 直接在目标位置创建 PoisonField（无弹道，即时部署）
-func cast_spell(card_id: String, team_name: String, target_pos: Vector2) -> void:
+func cast_spell(card_id: String, team_name: String, target_pos: Vector2, awakening_effects: Dictionary = {}) -> void:
 	var card := DataRegistry.get_card_data(card_id)
 	if card.is_empty():
 		push_error("[SpellManager] Unknown card id: " + card_id)
 		return
+
+	# 法术觉醒效果应用：通过 awakening_effects 覆盖 card 字段（数据驱动）。
+	# 例如觉醒火球可配 {"spell_damage": 1000, "spell_radius": 3.0} 提升伤害和范围。
+	# 深拷贝 card 避免修改 DataRegistry 原始数据。
+	if not awakening_effects.is_empty():
+		card = card.duplicate(true)
+		for key in awakening_effects:
+			card[key] = awakening_effects[key]
+		print("[SpellManager] 觉醒法术:", card_id, awakening_effects.keys())
 
 	var spell_type: String = card.get("spell_type", "")
 

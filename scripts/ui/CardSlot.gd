@@ -13,6 +13,7 @@ var hand_index: int = -1
 var _card_cost: int = 0
 var _selected: bool = false
 var _affordable: bool = true
+var _awakening_ready: bool = false  ## 觉醒就绪（下次打出为觉醒版）
 
 @onready var name_label: Label = $NameLabel
 @onready var cost_label: Label = $CostBadge/CostLabel
@@ -25,6 +26,8 @@ var _icon_cache: Dictionary = {}
 const SELECTED_TINT := Color(1.35, 1.15, 0.4)
 # 能量不足时的暗化
 const DIM_COLOR := Color(0.35, 0.35, 0.35)
+# 觉醒就绪时的金色高亮（下一次打出为觉醒版）
+const AWAKENING_TINT := Color(1.0, 0.85, 0.3)
 
 
 func _ready() -> void:
@@ -32,12 +35,15 @@ func _ready() -> void:
 	focus_mode = Control.FOCUS_NONE
 	_apply_theme()
 	pressed.connect(_on_pressed)
+	# 监听觉醒进度变化（start_battle 会延迟广播初始进度）
+	SignalBus.awakening_progress_changed.connect(_on_awakening_progress)
 
 
 ## 配置卡牌显示内容。由 CardBar 在 hand_updated 时调用。
 func setup(p_card_id: String, p_hand_index: int) -> void:
 	card_id = p_card_id
 	hand_index = p_hand_index
+	_awakening_ready = false  # 重置觉醒状态（卡牌轮转后由信号更新）
 	var card := DataRegistry.get_card_data(p_card_id)
 	_card_cost = int(card.get("cost", 0))
 	if name_label:
@@ -82,11 +88,21 @@ func _on_pressed() -> void:
 		SignalBus.card_selected.emit(card_id, hand_index)
 
 
-## 三态外观：不可负担（暗+禁用）> 选中（高亮）> 正常
+## 觉醒进度变化回调。只关心本地玩家方且卡牌 id 匹配时更新高亮。
+func _on_awakening_progress(team: String, p_card_id: String, _count: int, _trigger_count: int, next_awakened: bool) -> void:
+	if team != "player" or p_card_id != card_id:
+		return
+	_awakening_ready = next_awakened
+	_update_appearance()
+
+
+## 四态外观：不可负担（暗+禁用）> 觉醒就绪（金色）> 选中（暖色）> 正常
 func _update_appearance() -> void:
 	disabled = not _affordable
 	if not _affordable:
 		modulate = DIM_COLOR
+	elif _awakening_ready:
+		modulate = AWAKENING_TINT
 	elif _selected:
 		modulate = SELECTED_TINT
 	else:

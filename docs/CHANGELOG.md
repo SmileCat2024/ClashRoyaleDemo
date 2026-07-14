@@ -1,6 +1,44 @@
 # CHANGELOG
 
-## [版本待定·笑猫统筹A] - 2026-07-13 — 瓦基里武神新卡 + instant+splash 近战溅射机制 + splash ground/air 过滤修复（协作者 lpj-official 提交，版本号待笑猫定）
+## [0.22.0] - 2026-07-14 — 觉醒牌系统 + 精英牌系统底座
+
+### 新增
+- **觉醒牌系统**：卡牌打出指定次数（trigger_count）后，下一次打出为觉醒版（强化效果）。循环模式（皇室战争原版规则）——觉醒版打完后重新累计。数据驱动效果应用（shield/max_hp_bonus/death_damage），模型动作不变。
+  - `AwakeningTracker`（class_name）：按 team+card_id 独立计数的循环状态机。peek_next_effects（只读预览）+ record_play（提交计数）两步流程，避免出牌失败时错误计数。
+  - `UnitBase.apply_awakening(effects)`：数据驱动效果应用方法。当前支持 shield / max_hp_bonus / death_damage / death_radius / death_fuse_time，未识别 key 打印警告。
+  - `CardSlot` 觉醒就绪视觉标识：达到阈值后卡槽金色高亮（AWAKENING_TINT）。
+  - 出牌链路集成：try_play_card → peek_next_effects → spawn_unit/cast_spell（透传效果）→ record_play。
+  - 示例：card_knight 加 awakening 配置（trigger_count=2，+500 护盾 / +300 血量）；card_musketeer 使用 trigger_count=0 的每次觉醒配置，获得 3 发远程狙击弹。
+  - 觉醒狙击弹：向敌方半场扫描普攻范围外的兵种目标；锁定时显示紫色条带，子弹命中后结算伤害。
+- **精英牌系统**：改造已有牌增加主动技能。打出精英牌后单位存活期间屏幕右侧出现技能按钮，花圣水释放，单位死亡按钮消失。
+  - `EliteSkillManager`（class_name）：监听 unit_spawned/unit_died 自动注册/注销精英单位，发出 elite_skill_added/removed 信号驱动 UI。
+  - `SkillBar` + `SkillButton`（class_name）：动态创建/移除技能按钮，显示技能名/费用/冷却倒计时。位于卡槽上方右侧。
+  - `UnitBase` 精英技能字段 + trigger_skill / is_skill_ready / _process_skill_cooldown 方法。效果数据驱动（当前支持 self_rage 自身狂暴及 dash_to_weakest 锁定残血单位的冲刺范围伤害）。
+  - BattleManager 技能输入处理：instant 直接释放 / targeted 进入瞄准模式（点击战场释放）。能量检查复用 player_state。
+  - 示例：card_knight_elite 加 elite_skill 配置（集结号角，2 费 / instant / 8 秒冷却 / 自身狂暴 5 秒）；card_mega_minion_elite 加死亡俯冲（2 费 / 8 秒冷却 / 锁定最低血量非塔单位 / 30 格每秒冲刺 / 1.5 格范围伤害）。
+
+### 修改
+- `scripts/autoload/DataRegistry.gd`：card_knight、card_musketeer +awakening / +card_knight_elite、card_mega_minion_elite（含 elite_skill）/ 校验逻辑 +awakening +elite_skill 检查
+- `scripts/autoload/SignalBus.gd`：+awakening_progress_changed / +elite_skill_added/removed/requested/cast/cooldown_changed
+- `scripts/battle/BattleManager.gd`：+awakening_tracker / +elite_skill_manager 成员 / _ready 创建实例 / try_play_card 集成觉醒 / +_on_elite_skill_requested +_cast_elite_skill / _unhandled_input 技能瞄准 / _cancel_selection 清除瞄准 / start_battle reset
+- `scripts/battle/SpawnManager.gd`：spawn_unit +awakening_effects +elite_skill 透传
+- `scripts/battle/SpellManager.gd`：cast_spell +awakening_effects 参数（法术觉醒预留接口）
+- `scripts/entities/UnitBase.gd`：setup +awakening_effects +elite_skill_data 参数 / +apply_awakening / +is_awakened / +is_skill_ready / +trigger_skill / +_process_skill_cooldown / 狙击弹与死亡俯冲状态机
+- `scripts/ui/CardSlot.gd`：+AWAKENING_TINT / +_awakening_ready / +_on_awakening_progress / _update_appearance 四态
+- `scripts/ui/BattleHUD.gd`：_ready 动态创建 SkillBar
+- `scripts/battle/AwakeningTracker.gd`（新增）/ `scripts/battle/EliteSkillManager.gd`（新增）/ `scripts/ui/SkillBar.gd`（新增）/ `scripts/ui/SkillButton.gd`（新增）/ `scripts/effects/DeathMark.gd`（新增）/ `scripts/effects/SniperTracer.gd`（新增）
+- `scripts/tests/test_awakening_tracker.gd`、`scripts/tests/test_elite_skill_dash.gd`（新增）/ `scripts/tests/TestRunner.gd`：注册两个套件
+
+## [0.21.1] - 2026-07-13 — 修复联机 Client 选牌能量检查误用房主能量
+
+### 修复
+- **联机 Client 选牌能量检查误用房主能量**：Client 端点击手牌选中卡牌时，`_select_hand_card` 用 `local_team`（Client 端为 `"enemy"`，属 Host 逻辑空间 team）去索引能量状态，命中 `_enemy_state`——而 `_enemy_state.energy` 在 Client 端经 `_rpc_sync_state` 翻转后存的是**房主的能量**。表现为：加入房间的人能否选中/打出某张牌取决于房主的圣水池，而非自己的圣水。修复：能量检查改用显示空间的 `"player"`（本地玩家能量在 Host/Client/单机三种模式下始终存在 `_player_state`；Client 端 `_rpc_sync_state` 已将自身能量翻转写入 `_player_state`）。
+- **影响范围澄清**：实际出牌链路（Client → `_rpc_play_card` RPC → Host `try_play_card`）的能量检查本就正确（Host 用 `_enemy_state` 即 Client 能量），仅本地选牌拦截这一环节出错。部署位置检查（`find_nearest_valid_deploy` 传 `local_team="enemy"`）配合 mirror 后的逻辑空间坐标是正确的，未改动。
+
+### 修改
+- `scripts/battle/BattleManager.gd`：`_select_hand_card` 能量检查 `can_afford_card(local_team, …)` → `can_afford_card("player", …)`；print 的 `_get_state(local_team).energy` → `_player_state.energy`；补充注释说明两套 team 语义。
+
+## [0.21.0] - 2026-07-13 — 瓦基里武神新卡 + 重甲亡灵帧动画 + instant+splash 近战溅射机制（协作者 lpj-official）
 
 ### 新增
 - **瓦基里武神（valkyrie）新单位/卡牌**：4 费地面近战，以自身为中心的转斧范围伤害，清兵利器。HP 1500 / 中速 1.0 / 碰撞 0.5 / 质量 6 / 视野 5.0。攻击 `axe_spin`：射程 1.0 格 / 溅射半径 **2.0 格**（以自身为中心）/ 间隔 1.8 秒 / 起手 0.6 秒 / 伤害延迟 0.08 秒（对齐转斧命中第 2 帧）/ 仅地面 / 伤害 169。帧动画接入（11 帧 walk/attack × front/back，横向 2335×1856 中性贴图）+ 卡面 `valkyrie.png`。
@@ -20,7 +58,7 @@
 - `assets/sprites/valkyrie/`（新增 11 PNG）+ `assets/ui/cards/valkyrie.png`（卡面）
 - `docs/兵种数据.md`：+§3.13 瓦基里卡片 + 数据规模（12→13 单位/15→16 卡）/ 三个横向对比表 / 卡牌总表加行
 
-## [版本待定·笑猫统筹B] - 2026-07-13 — 重甲亡灵帧动画接入（首个飞行单位动画）（协作者 lpj-official 提交，版本号待笑猫定）
+_（0.21.0 第二部分：重甲亡灵帧动画接入 — 首个飞行单位动画）_
 
 ### 新增
 - **重甲亡灵（mega_minion）帧动画接入**：首个接入序列帧动画的飞行单位。中性单套贴图（10 张 PNG，2200×2240，linear 过滤）：walk front/back 各 1 帧 + attack front 3 帧 / back 2 帧 / side 3 帧。攻击三方向由 `UnitBase.get_attack_facing()` 按目标相对方向自动选择（水平偏移为主→side，正下→front，正上→back），侧面移动回退 front/back 行走帧（SpriteAnimator 降级链自动处理）。idle 复用 walk 首帧。
@@ -33,10 +71,6 @@
 - `scripts/autoload/DataRegistry.gd`：mega_minion +animation 配置（states: walk/idle/attack × front/back/side；visual_scale 0.0225 / visual_offset_y -25 / health_bar_y -50 / hide_placeholder true / texture_filter linear）
 - `assets/sprites/mega_minion/`（新增 10 PNG）：walk_front_01 / walk_back_01 / attack_front_01~03 / attack_back_01~02 / attack_side_01~03（源自美术素材「重甲幽灵」，规范命名后复制）
 - `docs/兵种数据.md`：§3.10 mega_minion 视觉小节由「ColorRect 兜底」更新为帧动画配置
-
----
-
-> ℹ️ 以下为笑猫先森已发布的版本（0.20.1 界面 / 0.20.2 爆炸视觉），与上方 lpj-official 的待定版本号存在撞号，合并时请统筹分配。
 
 ## [0.20.2] - 2026-07-13 — 范围伤害爆炸视觉统一 + 拖动预览渐变环
 

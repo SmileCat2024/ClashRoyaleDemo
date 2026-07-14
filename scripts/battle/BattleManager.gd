@@ -30,6 +30,13 @@ var energy_interval: float = CLASSIC_ENERGY_INTERVAL / 7.0
 var deck_manager: DeckManager = null
 var selected_hand_index: int = -1  ## 当前选中的手牌索引（-1 = 未选中）
 
+# ---- 觉醒追踪 ----
+var awakening_tracker: AwakeningTracker = null
+
+# ---- 精英技能 ----
+var elite_skill_manager: EliteSkillManager = null
+var selected_skill_unit: Node = null  ## targeted 技能瞄准中的单位（null=未瞄准）
+
 # ---- 联机状态 ----
 var is_network_mode: bool = false  ## 是否联机模式
 var is_host: bool = false          ## 是否是 host
@@ -72,6 +79,16 @@ func _ready() -> void:
 	deck_manager = DeckManager.new()
 	deck_manager.name = "DeckManager"
 	add_child(deck_manager)
+	# 创建 AwakeningTracker（追踪觉醒牌打出次数，循环觉醒机制）
+	awakening_tracker = AwakeningTracker.new()
+	awakening_tracker.name = "AwakeningTracker"
+	add_child(awakening_tracker)
+	# 创建 EliteSkillManager（精英单位注册/注销 + 技能释放协调）
+	elite_skill_manager = EliteSkillManager.new()
+	elite_skill_manager.name = "EliteSkillManager"
+	add_child(elite_skill_manager)
+	# 连接精英技能请求信号（SkillButton 点击 → 能量检查 → instant/targeted 分流）
+	SignalBus.elite_skill_requested.connect(_on_elite_skill_requested)
 	# 连接全局信号
 	SignalBus.tower_destroyed.connect(_on_tower_destroyed)
 	SignalBus.card_selected.connect(_on_card_selected)
@@ -121,6 +138,13 @@ func start_battle() -> void:
 	_enemy_state.reset()
 	energy_timer = 0.0
 	selected_hand_index = -1
+	# 重置觉醒追踪状态（重开战斗时清空计数）
+	if awakening_tracker:
+		awakening_tracker.reset()
+	# 清空精英单位注册（重开战斗时移除所有技能按钮）
+	if elite_skill_manager:
+		elite_skill_manager.clear()
+	selected_skill_unit = null
 
 	if is_network_mode and is_host:
 		# Host 联机：初始化自己 + 远程玩家的卡组
@@ -150,6 +174,9 @@ func start_battle() -> void:
 	# Client 联机：手牌由 host 通过 RPC 同步，此处不广播（避免闪烁空手牌）
 	if not (is_network_mode and not is_host):
 		call_deferred("_broadcast_hand_state")
+		# 广播觉醒牌初始进度（CardBar 已连接信号）
+		if awakening_tracker:
+			call_deferred("awakening_tracker.broadcast_initial_progress")
 	print("[BattleManager] battle started (network=%s host=%s mode=%s)" % [is_network_mode, is_host, match_mode])
 
 
@@ -264,9 +291,13 @@ func _select_hand_card(hand_index: int) -> void:
 	if hand_index >= hand.size():
 		return
 	var card_id = hand[hand_index]
-	# 能量不足时不允许选中（联机模式下用 local_team 判断）
-	if not can_afford_card(local_team, card_id):
-		print("[BattleManager] 能量不足:", card_id, "(需要", DataRegistry.get_card_data(card_id).get("cost", 0), "当前", _get_state(local_team).energy, ")")
+	# 能量不足时不允许选中。
+	# 本地玩家的能量始终存在 _player_state：Host/单机时它就是玩家自身；
+	# Client 端 _rpc_sync_state 已把自身能量翻转写入 _player_state。
+	# 故此处的 team 必须用显示空间的 "player"，而非逻辑空间的 local_team
+	# （local_team 在 Client 端为 "enemy"，会错误命中存着房主能量的 _enemy_state）。
+	if not can_afford_card("player", card_id):
+		print("[BattleManager] 能量不足:", card_id, "(需要", DataRegistry.get_card_data(card_id).get("cost", 0), "当前", _player_state.energy, ")")
 		return
 	# 再次点击同一张 = 取消
 	if selected_hand_index == hand_index:
@@ -326,8 +357,9 @@ func _cancel_selection() -> void:
 		selected_hand_index = -1
 		if deploy_preview:
 			deploy_preview.hide_preview()
-		SignalBus.selection_changed.emit(-1)
-		print("[BattleManager] 取消选中")
+	selected_skill_unit = null  # 清除精英技能瞄准
+	SignalBus.selection_changed.emit(-1)
+	print("[BattleManager] 取消选中")
 
 
 ## 通用出牌方法（玩家和敌方共用）。
@@ -349,15 +381,18 @@ func try_play_card(card_id: String, team_name: String, world_position: Vector2) 
 		print("[BattleManager] 无效部署位置:", world_position)
 		return false
 
+	# 预览觉醒效果（只读，不改变状态；非觉醒牌返回空字典）
+	var awakening_effects := awakening_tracker.peek_next_effects(team_name, card_id)
+
 	# 按卡牌类型分流
 	match card_type:
 		"troop":
-			var unit = spawn_manager.spawn_unit(card_id, team_name, world_position)
+			var unit = spawn_manager.spawn_unit(card_id, team_name, world_position, awakening_effects)
 			if unit == null:
 				return false
 		"spell":
 			if spell_manager:
-				spell_manager.cast_spell(card_id, team_name, world_position)
+				spell_manager.cast_spell(card_id, team_name, world_position, awakening_effects)
 			else:
 				push_error("[BattleManager] SpellManager not found")
 				return false
@@ -367,6 +402,8 @@ func try_play_card(card_id: String, team_name: String, world_position: Vector2) 
 
 	# 扣除能量
 	spend_energy(team_name, int(card.get("cost", 0)))
+	# 更新觉醒计数（出牌成功后提交状态变更，广播进度给 UI）
+	awakening_tracker.record_play(team_name, card_id)
 
 	SignalBus.card_played.emit(card_id, team_name, world_position)
 	print("[BattleManager] card played:", card_id, team_name, world_position)
@@ -403,6 +440,56 @@ func add_energy(team_name: String, amount: int) -> void:
 	state.energy = mini(max_energy, state.energy + amount)
 	SignalBus.energy_changed.emit(team_name, state.energy, max_energy)
 	print("[Cheat] %s energy +%d -> %d" % [team_name, amount, state.energy])
+
+
+# ==============================================================================
+# 精英技能
+# ==============================================================================
+
+## 接收 SkillButton 的精英技能释放请求（通过 SignalBus.elite_skill_requested）。
+## 检查冷却 + 能量 → instant 直接释放 / targeted 进入瞄准模式等待点击。
+func _on_elite_skill_requested(unit: Node, skill_data: Dictionary) -> void:
+	if not battle_running:
+		return
+	if not is_instance_valid(unit) or unit.is_dead:
+		return
+	# 检查技能冷却
+	if not unit.is_skill_ready():
+		print("[BattleManager] 精英技能冷却中:", skill_data.get("display_name", ""))
+		return
+	# 检查能量（精英技能能量独立于卡牌费用，用显示空间 player_state 检查）
+	var cost := int(skill_data.get("cost", 0))
+	if not _player_state.can_spend(cost):
+		print("[BattleManager] 精英技能能量不足:", skill_data.get("display_name", ""),
+			"需要", cost, "当前", _player_state.energy)
+		return
+	# 按 targeting 分流
+	var targeting: String = skill_data.get("targeting", "instant")
+	match targeting:
+		"instant":
+			# 瞬发：直接释放（target_pos 用单位自身位置，instant 技能忽略此参数）
+			_cast_elite_skill(unit, skill_data, unit.position)
+		"targeted":
+			# 指向型：进入瞄准模式，等待玩家点击战场选位置
+			selected_skill_unit = unit
+			# 取消卡牌选中（避免和部署流程冲突）
+			if selected_hand_index >= 0:
+				selected_hand_index = -1
+				if deploy_preview:
+					deploy_preview.hide_preview()
+				SignalBus.selection_changed.emit(-1)
+			print("[BattleManager] 精英技能瞄准中:", skill_data.get("display_name", ""))
+		_:
+			push_warning("[BattleManager] 未知技能 targeting:", targeting)
+
+
+## 实际释放精英技能：扣能量 + 调用单位 trigger_skill。由 instant 直接调用或 targeted 点击后调用。
+func _cast_elite_skill(unit: Node, skill_data: Dictionary, target_pos: Vector2) -> void:
+	var cost := int(skill_data.get("cost", 0))
+	spend_energy("player", cost)
+	unit.trigger_skill(target_pos)
+	selected_skill_unit = null
+	print("[BattleManager] 精英技能释放:", skill_data.get("display_name", ""))
 
 
 # ==============================================================================
@@ -534,6 +621,16 @@ func _unhandled_input(event: InputEvent) -> void:
 					add_energy("enemy", 1)
 	elif event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_LEFT:
+			# 精英技能瞄准中：点击战场释放 targeted 技能
+			if battle_running and selected_skill_unit != null:
+				var skill_pos: Vector2 = world.get_local_mouse_position()
+				if is_network_mode and not is_host:
+					skill_pos = BattleConstants.mirror(skill_pos)
+				if is_instance_valid(selected_skill_unit) and not selected_skill_unit.is_dead:
+					_cast_elite_skill(selected_skill_unit, selected_skill_unit.elite_skill_data, skill_pos)
+				else:
+					selected_skill_unit = null
+				return
 			if battle_running and selected_hand_index >= 0:
 				# 通过 World 节点的逆变换获取游戏空间坐标（自动处理 Y 压缩 + 偏移）
 				# 判断当前卡牌类型：法术全图含河道，单位限己方半场且避让建筑

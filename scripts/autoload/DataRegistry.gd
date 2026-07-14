@@ -953,6 +953,17 @@ var card_data := {
 		"spawn_spread": 0.0,
 		"icon": "res://assets/ui/cards/knight.png",
 		"description": "一个坚韧的近战战士。",
+		# ---- 觉醒配置（打出 2 次普通版后，下一次为觉醒版）----
+		# 觉醒效果在 UnitBase.apply_awakening() 中数据驱动应用，动作素材不变。
+		# effects 内的 key 对应已支持的觉醒效果类型，详见 UnitBase.apply_awakening。
+		"awakening": {
+			"trigger_count": 2,       # 打出 2 次后下一次觉醒
+			"name_suffix": "·觉醒",    # 觉醒版显示后缀
+			"effects": {
+				"shield": 500,           # 出生自带 500 护盾
+				"max_hp_bonus": 300,     # 最大血量 +300（current_hp 同步增加）
+			},
+		},
 	},
 	"card_hog_rider": {
 		"id": "card_hog_rider",
@@ -975,6 +986,20 @@ var card_data := {
 		"spawn_spread": 0.0,
 		"icon": "res://assets/ui/cards/musketeer.png",
 		"description": "远程射手，可对空对地。",
+		# ---- 觉醒配置（打出 1 次普通版后，下一次为觉醒版）----
+		# 觉醒效果在 UnitBase.apply_awakening() 中数据驱动应用，素材不变。
+		# effects 内的 key 对应已支持的觉醒效果类型，详见 UnitBase.apply_awakening。
+		"awakening": {
+			"trigger_count": 0,       # 0 = 每次打出都是觉醒版
+			"name_suffix": "·觉醒",    # 觉醒版显示后缀
+			"effects": {
+				"sniper_shots": {
+					"count": 3,             # 狙击弹数量
+					"damage_mult": 2.0,     # 伤害倍率（× 主攻击伤害 217 = 434）
+					"scan_half_width": 1.0, # 扫描宽度（格，左右各 1 格）
+				},
+			},
+		},
 	},
 	"card_mini_pekka": {
 		"id": "card_mini_pekka",
@@ -1137,6 +1162,64 @@ var card_data := {
 		"spawn_spread": 0.0,
 		"icon": "res://assets/ui/cards/inferno_tower.png",
 		"description": "防御建筑，发射持续光束。锁定同一目标越久伤害越高，最高可秒杀肉盾。有寿命限制。",
+	},
+	"card_knight_elite": {
+		"id": "card_knight_elite",
+		"display_name": "精英骑士",
+		"cost": 3,
+		"card_type": "troop",
+		"unit_id": "knight",   # 复用骑士单位数据（模型/动作不变，仅附加主动技能）
+		"spawn_count": 1,
+		"spawn_spread": 0.0,
+		"icon": "res://assets/ui/cards/knight.png",
+		"description": "骑士的精英变种，拥有主动技能「集结号角」。",
+		# ---- 精英技能配置 ----
+		# 打出后单位存活期间，屏幕右侧出现技能按钮。花圣水释放，单位死亡按钮消失。
+		# targeting: "instant"=瞬发（按下立即生效）| "targeted"=指向型（需点击战场选位置）
+		"elite_skill": {
+			"id": "knight_rally",
+			"display_name": "集结号角",
+			"cost": 2,                    # 圣水花费（独立于卡牌费用）
+			"targeting": "instant",
+			"cooldown": 8.0,               # 冷却时间（秒）
+			"icon": "",                    # 技能图标路径（空=用文字显示技能名）
+			"effect": {
+				"type": "self_rage",       # 效果类型 id（UnitBase.trigger_skill 按 type 分流）
+				"duration": 5.0,           # 狂暴持续时间（秒）
+				"move_mult": 1.35,         # 移速倍率
+				"attack_mult": 1.35,       # 攻速倍率
+			},
+		},
+	},
+	"card_mega_minion_elite": {
+		"id": "card_mega_minion_elite",
+		"display_name": "精英重甲亡灵",
+		"cost": 3,
+		"card_type": "troop",
+		"unit_id": "mega_minion",   # 复用重甲亡灵单位数据（模型/动作不变，仅附加主动技能）
+		"spawn_count": 1,
+		"spawn_spread": 0.0,
+		"icon": "res://assets/ui/cards/mega_minion.png",
+		"description": "重甲亡灵的精英变种，拥有主动技能「死亡俯冲」。锁定场上血量最低的敌方单位，在其脚下留下黑色标志后高速俯冲。",
+		# ---- 精英技能配置 ----
+		# 「死亡俯冲」：自动锁敌（instant），2 圣水释放。无需瞄准，按下即生效。
+		# 冲刺期间单位免疫普通 AI（不索敌/攻击/走 A*），直线飞向目标脚下，到达后造成范围伤害。
+		"elite_skill": {
+			"id": "mega_minion_death_dive",
+			"display_name": "死亡俯冲",
+			"cost": 2,
+			"targeting": "instant",        # 自动锁敌，瞬发型
+			"cooldown": 8.0,
+			"icon": "",
+			"effect": {
+				"type": "dash_to_weakest", # 锁定血量最低敌方单位 + 冲刺 + 范围伤害
+				"dash_speed_cells": 30.0,   # 冲刺固定速度（格/秒）
+				"impact_damage": 500,      # 到达后对单位的范围伤害
+				"impact_radius": 1.5,      # 冲击范围（格）
+				"tower_damage_ratio": 0.4, # 对塔伤害 = impact_damage × 此比例（200）
+				"mark_duration": 2.0,      # 目标脚下黑色标志显示时长（秒）
+			},
+		},
 	},
 }
 
@@ -1605,12 +1688,19 @@ func get_unit_sfx(unit_id: String) -> Dictionary:
 
 ## 返回玩家默认卡组（卡牌 id 列表）。开发阶段包含全部卡牌。
 func get_default_player_deck() -> Array:
-	return card_data.keys()
+	var deck := card_data.keys()
+	# 精英牌替代普通版，避免牌库中出现重复定位的卡牌
+	deck.erase("card_knight")
+	deck.erase("card_mega_minion")
+	return deck
 
 
 ## 返回敌方 AI 的默认卡组（卡牌 id 列表）。开发阶段包含全部卡牌。
 func get_default_enemy_deck() -> Array:
-	return card_data.keys()
+	var deck := card_data.keys()
+	deck.erase("card_knight")
+	deck.erase("card_mega_minion")
+	return deck
 
 
 # ==============================================================================
@@ -1663,6 +1753,33 @@ func _validate_all_data() -> void:
 				errors.append("卡牌 '%s' card_type 为空" % card_id)
 			_:
 				errors.append("卡牌 '%s' card_type 不合法: '%s'" % [card_id, c.get("card_type")])
+
+		# 觉醒字段校验（可选字段，存在时校验结构）
+		if c.has("awakening"):
+			var aw: Dictionary = c["awakening"]
+			if int(aw.get("trigger_count", 0)) < 0:
+				errors.append("卡牌 '%s' awakening.trigger_count < 0" % card_id)
+			if not aw.has("effects"):
+				errors.append("卡牌 '%s' awakening 缺少 effects" % card_id)
+			elif aw["effects"].is_empty():
+				errors.append("卡牌 '%s' awakening.effects 为空" % card_id)
+
+		# 精英技能字段校验（可选字段，存在时校验结构）
+		if c.has("elite_skill"):
+			var es: Dictionary = c["elite_skill"]
+			if not es.has("id"):
+				errors.append("卡牌 '%s' elite_skill 缺少 id" % card_id)
+			if not es.has("display_name"):
+				errors.append("卡牌 '%s' elite_skill 缺少 display_name" % card_id)
+			if int(es.get("cost", 0)) < 0:
+				errors.append("卡牌 '%s' elite_skill.cost < 0" % card_id)
+			var es_tgt: String = es.get("targeting", "")
+			if es_tgt != "instant" and es_tgt != "targeted":
+				errors.append("卡牌 '%s' elite_skill.targeting 不合法: '%s'" % [card_id, es_tgt])
+			if not es.has("effect"):
+				errors.append("卡牌 '%s' elite_skill 缺少 effect" % card_id)
+			if float(es.get("cooldown", 0)) < 0:
+				errors.append("卡牌 '%s' elite_skill.cooldown < 0" % card_id)
 
 	# ---- 校验单位 ----
 	for uid in unit_data:
