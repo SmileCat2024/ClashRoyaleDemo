@@ -1,5 +1,34 @@
 # CHANGELOG
 
+## [版本待定·笑猫统筹E] - 2026-07-14 — 飞行器+大皮卡美术接入 + 飞行单位投射物发射高度机制（协作者 lpj-official 提交，版本号待笑猫定）
+
+### 新增
+- **飞行器（flyer）美术接入**：飞行单位帧动画（2592×1650 横向中性单套贴图，linear）。walk front/back 各 1 帧单帧；attack front/back 各 2 帧过渡 [move→attack] duration [0.15,0.3]，side 单帧 duration 0.35；down=front/up=back，attack_side 默认朝左+flip_h。visual_scale 0.03 / offset_y -25 / health_bar_y -55。卡面 `flyer.png`。
+- **大皮卡（pekka）美术接入**：地面单位帧动画（2200×2200 正方形中性单套贴图，linear）。walk front/back 各 3 帧（duration 0.2 慢步态）；attack front/back/side 各 3 帧（duration 0.1，once）；damage_delay 0.05 对齐命中前段第 1 帧。visual_scale 0.034 / offset_y -28 / health_bar_y -85。卡面 `pekka.png`。
+
+### 修改
+- **飞行单位投射物发射高度（emit_offset_y 机制）**：飞行单位（flyer）投射物此前从地面逻辑位置发射，视觉上子弹从脚下射出与飞行单位脱节。新增 `emit_offset_y` 参数：AttackComponent `_fire_projectile` 按 `(altitude+0.5)×CELL_SIZE` 计算发射点上移量，经 `ProjectileManager.spawn_projectile` → 投射物创建时偏移视觉起点。联机安全：RPC 传地面 spawn_pos（不含 offset）+ emit_offset_y，client 端 `mirror(spawn_pos).y -= emit_offset_y`（mirror 翻转 y 但不改变"上=y减小"方向，两端一致）。地面单位 emit_offset_y=0 行为不变。涉及 AttackComponent（3 处）+ ProjectileManager（spawn_projectile + _rpc_spawn_projectile）。
+- `scripts/autoload/DataRegistry.gd`：flyer/pekka +animation 配置 + hide_placeholder=true；flyer/pekka card_data +icon
+- `docs/兵种数据.md`：§3.14/§3.15 视觉动画小节（ColorRect 兜底→帧动画）+ 卡面
+
+## [版本待定·笑猫统筹D] - 2026-07-13 — 大皮卡新卡（协作者 lpj-official 提交，版本号待笑猫定）
+
+### 新增
+- **大皮卡（pekka）新单位/卡牌**：7 费地面重型近战，极高血量高伤害，缓慢但致命。HP 3760 / 慢速 0.6 / 碰撞 1.0（比骑士大 0.5 格）/ 质量 8 / 视野 5.0。攻击 `heavy_slash`：射程 1.2 格 / 间隔 1.8 秒 / 起手 0.6 秒 / 伤害 816 / 即时单体仅地面。无新机制（instant single 现成），无美术（ColorRect 兜底）。
+
+### 修改
+- `scripts/autoload/DataRegistry.gd`：+unit_data.pekka / +card_data.card_pekka
+- `docs/兵种数据.md`：+§3.15 大皮卡卡片 + 数据规模（14→15 单位/17→18 卡）/ 四个横向对比表加行
+
+## [版本待定·笑猫统筹C] - 2026-07-13 — 飞行器新卡（协作者 lpj-official 提交，版本号待笑猫定）
+
+### 新增
+- **飞行器（flyer）新单位/卡牌**：4 费空中远程对单，对空对地，快移速高射程。HP 614 / 快速 1.5 / 飞行 / 碰撞 0.6 / 质量 3 / 视野 7.0。攻击 `cannon_shot`：射程 6.0 格 / 间隔 1.1 秒 / 起手 0.7 秒 / 伤害 171 / 投射物直线弹道 / 弹速 17.5。无新机制（air + projectile + single 均现成），无美术（ColorRect 兜底）。
+
+### 修改
+- `scripts/autoload/DataRegistry.gd`：+unit_data.flyer / +card_data.card_flyer
+- `docs/兵种数据.md`：+§3.14 飞行器卡片 + 数据规模（13→14 单位/16→17 卡）/ 四个横向对比表加行（含补登瓦基里 §2.4 DPS 行）
+
 ## [版本待定·笑猫统筹A] - 2026-07-13 — 瓦基里武神新卡 + instant+splash 近战溅射机制 + splash ground/air 过滤修复（协作者 lpj-official 提交，版本号待笑猫定）
 
 ### 新增
