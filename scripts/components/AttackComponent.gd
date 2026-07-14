@@ -292,6 +292,9 @@ func _execute_attack() -> void:
 ## trajectory=ballistic → 高抛溅射炮弹（迫击炮）；impact_type=splash → 非锁定范围溅射。
 func _fire_projectile() -> void:
 	var spawn_pos := BattlePathing.game_position_of(combatant)
+	# 飞行单位从视觉飞行高度发射投射物（对齐 altitude 离地偏移），地面单位为 0
+	# 额外上移 0.5 格让子弹从飞行器炮口射出而非身体中心
+	var emit_offset_y := (combatant.altitude + 0.5) * BattleConstants.CELL_SIZE if combatant.altitude > 0.0 else 0.0
 	var scene := get_tree().current_scene
 	var pm := scene.get_node_or_null("Managers/ProjectileManager")
 	# ballistic 轨迹 → 高抛溅射炮弹（迫击炮）
@@ -308,7 +311,7 @@ func _fire_projectile() -> void:
 	var is_homing := impact_type != "splash"
 	var splash_px := impact_radius if impact_type == "splash" else 0.0
 	if pm and pm.has_method("spawn_projectile"):
-		pm.spawn_projectile(spawn_pos, current_target, damage, projectile_speed, combatant.team, is_homing, splash_px, arc_height)
+		pm.spawn_projectile(spawn_pos, current_target, damage, projectile_speed, combatant.team, is_homing, splash_px, arc_height, emit_offset_y)
 		return
 	# 回退：DebugBattle 等场景无 ProjectileManager
 	var proj = preload("res://scenes/entities/Projectile.tscn").instantiate()
@@ -317,7 +320,9 @@ func _fire_projectile() -> void:
 		projectiles_root.add_child(proj)
 	else:
 		scene.add_child(proj)
-	proj.setup(spawn_pos, current_target, damage, projectile_speed, combatant.team, is_homing, splash_px)
+	var spawn_visual := spawn_pos
+	spawn_visual.y -= emit_offset_y
+	proj.setup(spawn_visual, current_target, damage, projectile_speed, combatant.team, is_homing, splash_px)
 	proj.arc_height = arc_height
 	SignalBus.projectile_spawned.emit(proj, combatant.team)
 

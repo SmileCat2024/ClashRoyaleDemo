@@ -28,10 +28,13 @@ var _next_net_id: int = 1
 ## splash: 溅射半径（可选，默认 0 = 单体伤害）
 ## arc_height_grids: 弹道弧高峰值（格，可选）。>0 时施加抛物线视觉偏移，不影响逻辑命中
 ## 返回: 生成的飞行物节点
-func spawn_projectile(spawn_pos: Vector2, target_node, damage: int, speed: float, team_name: String, is_homing: bool = true, splash: float = 0.0, arc_height_grids: float = 0.0) -> Node2D:
+func spawn_projectile(spawn_pos: Vector2, target_node, damage: int, speed: float, team_name: String, is_homing: bool = true, splash: float = 0.0, arc_height_grids: float = 0.0, emit_offset_y: float = 0.0) -> Node2D:
 	var projectile = PROJECTILE_SCENE.instantiate()
 	projectiles_root.add_child(projectile)
-	projectile.setup(spawn_pos, target_node, damage, speed, team_name, is_homing, splash)
+	# 飞行单位从视觉飞行高度发射（altitude 离地偏移），地面单位 emit_offset_y=0 不影响
+	var visual_spawn := spawn_pos
+	visual_spawn.y -= emit_offset_y
+	projectile.setup(visual_spawn, target_node, damage, speed, team_name, is_homing, splash)
 	if arc_height_grids > 0.0:
 		projectile.arc_height = arc_height_grids
 	SignalBus.projectile_spawned.emit(projectile, team_name)
@@ -41,7 +44,8 @@ func spawn_projectile(spawn_pos: Vector2, target_node, damage: int, speed: float
 		var net_name := "P%d" % _next_net_id
 		_next_net_id += 1
 		projectile.name = net_name
-		_rpc_spawn_projectile.rpc(net_name, spawn_pos, target_pos, damage, speed, team_name, is_homing, splash, arc_height_grids)
+		# RPC 传地面 spawn_pos（不含 emit_offset）+ emit_offset_y，client 端 mirror 后自行减去偏移
+		_rpc_spawn_projectile.rpc(net_name, spawn_pos, target_pos, damage, speed, team_name, is_homing, splash, arc_height_grids, emit_offset_y)
 	return projectile
 
 
@@ -71,11 +75,13 @@ func spawn_mortar_shell(spawn_pos: Vector2, target_node, damage: int, splash_px:
 
 ## Host → Client：通知 Client 创建投射物。两端独立运行确定性飞行，client 端 _on_hit 跳过伤害。
 @rpc("authority", "call_remote", "reliable")
-func _rpc_spawn_projectile(proj_name: String, spawn_pos: Vector2, target_pos: Vector2, dmg: int, spd: float, team_name: String, is_homing: bool, splash: float, arc_height_grids: float) -> void:
+func _rpc_spawn_projectile(proj_name: String, spawn_pos: Vector2, target_pos: Vector2, dmg: int, spd: float, team_name: String, is_homing: bool, splash: float, arc_height_grids: float, emit_offset_y: float = 0.0) -> void:
 	if NetworkManager.is_server():
 		return
-	# Client 端 180 度镜像：发射点和落点都镜像
+	# Client 端 180 度镜像：发射点和落点都镜像；发射点再上移 emit_offset_y 对齐飞行高度
+	# （mirror 翻转 y 但不改变"上=y减小"方向，所以两端都减 emit_offset_y）
 	var m_spawn := BattleConstants.mirror(spawn_pos)
+	m_spawn.y -= emit_offset_y
 	var m_target := BattleConstants.mirror(target_pos)
 	var projectile = PROJECTILE_SCENE.instantiate()
 	projectile.name = proj_name

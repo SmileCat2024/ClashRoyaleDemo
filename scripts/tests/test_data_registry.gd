@@ -156,10 +156,18 @@ func test_all_towers_have_zero_mass() -> void:
 #  默认卡组
 # ============================================================
 
-func test_player_deck_has_all_cards() -> void:
+func test_player_deck_has_all_available_cards() -> void:
 	var deck := DataRegistry.get_default_player_deck()
-	assert_eq(deck.size(), DataRegistry.card_data.size(),
-		"玩家默认卡组应包含全部卡牌")
+	var expected := DataRegistry.card_data.keys()
+	# 精英变种替代同定位的普通卡，避免默认开发卡组出现重复单位。
+	expected.erase("card_knight")
+	expected.erase("card_mega_minion")
+	assert_eq(deck.size(), expected.size(),
+		"玩家默认卡组应包含全部可用卡牌（普通版被精英版替代）")
+	assert_false(deck.has("card_knight"), "精英骑士应替代默认卡组中的普通骑士")
+	assert_false(deck.has("card_mega_minion"), "精英重甲亡灵应替代默认卡组中的普通重甲亡灵")
+	assert_true(deck.has("card_knight_elite"), "默认卡组应包含精英骑士")
+	assert_true(deck.has("card_mega_minion_elite"), "默认卡组应包含精英重甲亡灵")
 
 
 func test_deck_cards_all_exist() -> void:
