@@ -87,7 +87,7 @@ func test_pierce_no_duplicate_hit() -> void:
 func test_pierce_only_hits_current_arrow_body_not_full_history() -> void:
 	var p := _make_piercing(10.0, 40)
 	p._fly_dir = Vector2.RIGHT
-	# 箭头已飞到 x=200，极长实体箭身仅覆盖约 x=110~200；x=50 的敌人不应仍处于伤害带内。
+	# 箭头已飞到 x=200，超长实体箭身仅覆盖约 x=70~200；x=50 的敌人不应仍处于伤害带内。
 	var enemy := _make_enemy(Vector2(50, 0))
 	p.position = Vector2(200, 0)
 	p._check_pierce_hits()
