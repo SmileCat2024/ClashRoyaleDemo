@@ -195,21 +195,35 @@ func test_ignores_dead_enemies() -> void:
 
 
 # ============================================================
-#  find_best_target — 碰撞半径偏移
+#  find_best_target — 碰撞/受击半径偏移
 # ============================================================
 
-func test_collision_radius_extends_effective_sight() -> void:
-	# 两个敌人都在 125px（超出 sight_range=120），但碰撞半径不同
-	# 大半径(30px)有效距离 = 125-30 = 95 < 120 → 可发现
-	# 小半径(1px)有效距离 = 125-1 = 124 > 120 → 不可发现
+func test_target_hurt_radius_extends_effective_sight() -> void:
+	# 两个敌人都在 125px（超出 sight_range=120），但受击半径不同。
+	# 大受击半径(30px)有效距离 = 125-30 = 95 < 120 → 可发现；
+	# 小受击半径(1px)有效距离 = 125-1 = 124 > 120 → 不可发现。
 	var big := _make_enemy(Vector2(-125, 0))
-	big.collision_radius = 30.0
+	big.hurt_radius = 30.0
 	var small := _make_enemy(Vector2(125, 0))
-	small.collision_radius = 1.0
+	small.hurt_radius = 1.0
 	var target = TargetingSystem.find_best_target(
 		Vector2.ZERO, "player", 120.0, "any", true, false)
 	assert_not_null(target, "应找到大半径目标")
 	assert_eq(target, big, "大半径目标在有效视野内，小半径目标不在")
+
+
+func test_self_collision_radius_closes_attack_sight_dead_zone() -> void:
+	# 火枪手式场景：视野120px、自身半径10px，公主塔受击半径30px。
+	# 塔中心距160px时，攻击触及距离 = 120+10+30=160；索敌也必须成功，
+	# 否则 UnitBase 会在攻击距离停步，却没有攻击目标而永久发呆。
+	var tower := _make_enemy(Vector2(160, 0), "ground", true)
+	tower.collision_radius = 30.0
+	tower.hurt_radius = 30.0
+	var target = TargetingSystem.find_best_target(
+		Vector2.ZERO, "player", 120.0, "any", true, false,
+		"ground", false, 0.0, 10.0)
+	assert_eq(target, tower,
+		"攻击触及边界上的公主塔必须进入视野，不能形成停步死区")
 
 
 # ============================================================

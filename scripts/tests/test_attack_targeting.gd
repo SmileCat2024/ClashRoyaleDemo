@@ -202,3 +202,18 @@ func test_large_hurt_radius_extends_reach() -> void:
 	_comp._update_targeting()
 	assert_eq(_comp.current_target, enemy,
 		"大 hurt_radius 目标在扩展射程内(60px <= 70px)应保持锁定")
+
+
+func test_acquires_tower_at_fallback_stop_range() -> void:
+	# 回归火枪手对公主塔的停步死区：视野120px、自身半径10px、塔受击半径30px。
+	# 目标中心160px正是攻击触及距离，组件必须在此锁定目标。
+	_attacker.sight_range = 120.0
+	_attacker.collision_radius = 10.0
+	var tower := _make_enemy(Vector2(160, 0))
+	tower.tower_type = "guard"
+	tower.mass = 0
+	tower.collision_radius = 30.0
+	tower.hurt_radius = 30.0
+	_comp._update_targeting()
+	assert_eq(_comp.current_target, tower,
+		"到达对塔停步距离时必须已锁定，避免原地僵住")

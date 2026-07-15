@@ -66,6 +66,9 @@ static func find_nearest_enemy_target(from_position: Vector2, self_team: String,
 ## targeting_mode: "any" = 单位+塔都找 | "building_only" = 只找建筑（塔 + 建筑卡牌，如迫击炮）。
 ## attack_ground/attack_air: 能否攻击地面/空中目标。
 ## 塔没有 movement_type，默认视为 ground 目标。
+## p_self_collision_radius: 攻击者碰撞半径（像素）。视野按两个实体的边缘距离判定，
+## 必须与 AttackComponent.compute_reach() 使用同一套几何口径，避免单位在攻击触及范围内
+## 停步、却因尚未索敌而永久发呆。
 static func find_best_target(
 	from_position: Vector2,
 	self_team: String,
@@ -75,7 +78,8 @@ static func find_best_target(
 	p_attack_air: bool,
 	mover_movement_type: String = "ground",
 	mover_can_jump_river: bool = false,
-	p_min_range: float = 0.0
+	p_min_range: float = 0.0,
+	p_self_collision_radius: float = 0.0
 ) -> Node2D:
 	var enemies = EntityRegistry.get_enemies_of(self_team)
 	var nearest: Node2D = null
@@ -117,12 +121,16 @@ static func find_best_target(
 		# 盲区过滤（如迫击炮最小射程）：目标中心在盲区内直接跳过
 		if p_min_range > 0.0 and d < p_min_range:
 			continue
-		# 碰撞半径偏移：大目标的边缘比中心更早进入索敌范围
-		var cr = e.get("collision_radius")
-		if cr != null:
-			d -= float(cr)
-		if d < nearest_dist:
-			nearest_dist = d
+		# 视野按实体边缘的可触及距离判定，与攻击 reach 公式一致：
+		# sight_range + 自身 collision_radius + 目标 hurt_radius。
+		# 目标受击体积是攻击命中的几何边界，不能误用碰撞体积（两者允许独立配置）。
+		var target_hurt_radius := 0.0
+		var hr = e.get("hurt_radius")
+		if hr != null:
+			target_hurt_radius = float(hr)
+		var effective_distance := d - p_self_collision_radius - target_hurt_radius
+		if effective_distance <= nearest_dist:
+			nearest_dist = effective_distance
 			nearest = e
 
 	return nearest

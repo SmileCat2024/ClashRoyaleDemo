@@ -213,7 +213,8 @@ func _find_nearest_target() -> Node:
 		attack_air,
 		_get_movement_type(),
 		_get_can_jump_river(),
-		min_attack_range
+		min_attack_range,
+		combatant.collision_radius
 	)
 
 

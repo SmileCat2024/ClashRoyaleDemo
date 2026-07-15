@@ -1098,7 +1098,7 @@ var unit_data := {
 		"shield": 0,
 		"move_speed": 1.0,
 		"movement_type": "ground",
-		"sight_range": 13.0,
+		"sight_range": 10.5,
 		"movement_targeting": "any",
 		"collision_radius": 0.5,
 		"hurt_radius": 0.5,
