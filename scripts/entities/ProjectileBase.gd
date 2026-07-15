@@ -21,17 +21,23 @@ var speed: float = 200.0
 var splash_radius: float = 0.0  ## 溅射半径。>0 时命中后对范围内所有敌方造成伤害
 
 # ---- 穿透模式（神箭游侠）----
-var piercing: bool = false  ## 穿透：沿发射方向直线飞，命中路径上敌人但不消失，飞到 max_range 消失
+var piercing: bool = false  ## 穿透：实体长箭沿固定方向飞行，命中箭身触及的敌人但不消失
 var max_range: float = 0.0  ## 穿透最大飞行距离（像素）
 var pierce_radius: float = 0.0  ## 穿透命中判定半径（像素），敌人离飞行中心线 ≤ 此值则命中
 var _hit_targets: Array = []  ## 已命中目标集合（同一敌人只打一次）
 var _fly_dir: Vector2 = Vector2.ZERO  ## 穿透飞行方向（发射时固定，不追踪）
 # ---- 穿透箭视觉（神箭游侠）----
-const PIERCE_CORE_ALPHA := 0.80   ## 范围带中心（路径线侧）白色透明度
-const PIERCE_EDGE_ALPHA := 0.22   ## 范围带边缘泛蓝透明度
-const PIERCE_TRAIL_ALPHA := 0.90  ## 中心路径线白色透明度
-const ARROW_LEN := 8.0            ## 箭头长度（像素）
-const ARROW_HALF_W := 5.5         ## 箭头半宽（像素）
+# 穿透箭是实体长箭而非激光：拉弓时逐渐显形，完整露出后脱手飞行，抵达末端后箭尾没入终点。
+const PIERCE_ARROW_LENGTH := 90.0       ## 极长箭身（4.5 格），视觉上明显区别于普通投射物
+const PIERCE_ARROW_HALF_W := 5.0        ## 宽箭杆半宽（像素）
+const PIERCE_ARROW_HEAD_LENGTH := 14.0  ## 加长箭头长度（像素）
+const PIERCE_DRAW_DURATION := 0.32      ## 从弓上慢慢露出完整箭身的时间（秒）
+const PIERCE_EMBED_DURATION := 0.28     ## 箭头抵达终点后，箭尾完全没入的时间（秒）
+const PIERCE_ARROW_CORE := Color(0.70, 0.91, 1.0, 0.82) ## 半透明浅蓝箭杆内芯
+const PIERCE_ARROW_EDGE := Color(0.25, 0.66, 1.0, 0.28) ## 半透明浅蓝箭杆边缘
+var _piercing_phase: String = "drawing" ## "drawing" | "flying" | "embedding"
+var _piercing_phase_time: float = 0.0
+var _piercing_visible_length: float = 0.0
 
 # ---- 飞行模式 ----
 var homing: bool = true  ## true = 锁定型（追踪目标），false = 范围型（固定方向）
@@ -82,6 +88,9 @@ func setup(spawn_pos: Vector2, target_node, dmg: int, spd: float, team_name: Str
 	# 穿透模式：固定发射方向（不追踪），朝目标方向直线飞
 	if piercing:
 		_fly_dir = (_last_target_pos - spawn_pos).normalized() if _last_target_pos != spawn_pos else Vector2.RIGHT
+		_piercing_phase = "drawing"
+		_piercing_phase_time = 0.0
+		_piercing_visible_length = 0.0
 
 	# 弹道弧度初始化
 	_start_pos = spawn_pos
@@ -114,31 +123,53 @@ func _process(delta: float) -> void:
 		_on_hit()
 
 
-## 穿透模式飞行：沿发射方向直线飞，命中路径上敌人但不消失，飞到 max_range 消失
+## 穿透模式：先从弓上逐渐露出，再让实体长箭脱手飞行；箭头抵达终点后箭尾继续没入。
 func _process_piercing(delta: float) -> void:
-	position += _fly_dir * speed * delta
-	_apply_arc_offset()
-	queue_redraw()  # 重绘穿透箭视觉（position 变化已触发重绘，此处显式保证）
-	# 命中检测（host 端，client 端只飞视觉）
-	_check_pierce_hits()
-	# 超过最大飞行距离 → 消失
-	if _start_pos.distance_to(position) >= max_range:
-		SignalBus.projectile_hit.emit(position, team)
-		queue_free()
+	match _piercing_phase:
+		"drawing":
+			_piercing_phase_time += delta
+			var reveal := clampf(_piercing_phase_time / PIERCE_DRAW_DURATION, 0.0, 1.0)
+			_piercing_visible_length = PIERCE_ARROW_LENGTH * reveal
+			if reveal >= 1.0:
+				# 节点原点代表箭头；完整露出后让箭头从弓前端脱手，避免视觉跳回发射点。
+				position += _fly_dir * PIERCE_ARROW_LENGTH
+				_piercing_phase = "flying"
+				_piercing_phase_time = 0.0
+				_check_pierce_hits()
+		"flying":
+			var travelled := _start_pos.distance_to(position)
+			var remaining := maxf(max_range - travelled, 0.0)
+			var step := minf(speed * delta, remaining)
+			position += _fly_dir * step
+			_check_pierce_hits()
+			if remaining <= step:
+				# 箭头钻入最大射程终点，留下的箭身继续向前消失。
+				_piercing_phase = "embedding"
+				_piercing_phase_time = 0.0
+				_piercing_visible_length = PIERCE_ARROW_LENGTH
+				SignalBus.projectile_hit.emit(position, team)
+		"embedding":
+			_piercing_phase_time += delta
+			var embed := clampf(_piercing_phase_time / PIERCE_EMBED_DURATION, 0.0, 1.0)
+			_piercing_visible_length = PIERCE_ARROW_LENGTH * (1.0 - embed)
+			if embed >= 1.0:
+				queue_free()
+	queue_redraw()
 
 
-## 穿透命中检测：检测当前位置附近（pierce_radius 内）的未命中敌人，造成伤害并记录
+## 穿透命中检测：只检测正在飞行的实体箭身，而非发射点到箭头的整段路径。
 func _check_pierce_hits() -> void:
 	if NetworkManager.is_networked_client():
 		return
+	var dir := _fly_dir if _fly_dir != Vector2.ZERO else Vector2.RIGHT
+	var arrow_tail := position - dir * PIERCE_ARROW_LENGTH
 	for e in EntityRegistry.get_enemies_of(team):
 		if e in _hit_targets or not is_instance_valid(e):
 			continue
 		var e_pos := BattlePathing.game_position_of(e)
 		var hr := float(e.get("hurt_radius"))
-		# 敌人受击体与飞行范围带相交即命中：敌人中心到飞行线段（发射点→箭头）
-		# 的距离 ≤ 穿透半径 + 敌人受击半径，使范围带碰到敌人任何部分都扣血
-		if _dist_point_to_segment(e_pos, _start_pos, position) <= pierce_radius + hr:
+		# 敌人受击体与当前箭身相交即命中。箭经过后不再保留伤害带，避免成为激光。
+		if _dist_point_to_segment(e_pos, arrow_tail, position) <= pierce_radius + hr:
 			DamageSystem.resolve_impact(e, damage)
 			_hit_targets.append(e)
 
@@ -160,39 +191,36 @@ func _draw() -> void:
 	_draw_piercing_arrow()
 
 
-## 绘制穿透长箭（神箭游侠）：箭头 + 从发射点延伸的攻击范围长杆（宽度=2×pierce_radius）+ 中心路径线。
-## 全部基于两端均有的本地数据（position/_start_pos/_fly_dir/pierce_radius/team），对联机透明。
+## 绘制半透明浅蓝实体长箭。drawing 阶段从弓上露出，flying 阶段脱手，embedding 阶段从箭头方向没入终点。
 func _draw_piercing_arrow() -> void:
 	var dir := _fly_dir if _fly_dir != Vector2.ZERO else Vector2.RIGHT
-	var local_start := _start_pos - position  # 发射点局部坐标（节点无旋转，世界差=局部）
-	var perp := Vector2(-dir.y, dir.x)         # 飞行方向的垂直向量
-	var hw := pierce_radius                    # 范围带半宽（像素）= 穿透判定半径
-	# 颜色：中心路径线白色，向外渐变泛蓝
-	var white_core := Color(1.0, 1.0, 1.0, PIERCE_CORE_ALPHA)  # 中心（路径线侧）白色
-	var blue_edge := Color(0.30, 0.58, 1.0, PIERCE_EDGE_ALPHA) # 边缘泛蓝
-	var base_center := -dir * ARROW_LEN        # 箭头底部（长杆前端衔接处）
-	# 1. 攻击范围长杆：中心白→边缘蓝（沿宽度方向渐变），分左右两半各用顶点色绘制
-	var cols_edge := PackedColorArray([white_core, blue_edge, blue_edge, white_core])
-	var pts_l := PackedVector2Array([
-		base_center,              # 头部中心（白）
-		base_center - perp * hw,  # 头部左边缘（蓝）
-		local_start - perp * hw,  # 尾部左边缘（蓝）
-		local_start,              # 尾部中心（白）
-	])
-	draw_polygon(pts_l, cols_edge)
-	var pts_r := PackedVector2Array([
-		base_center,              # 头部中心（白）
-		base_center + perp * hw,  # 头部右边缘（蓝）
-		local_start + perp * hw,  # 尾部右边缘（蓝）
-		local_start,              # 尾部中心（白）
-	])
-	draw_polygon(pts_r, cols_edge)
-	# 2. 中心路径线：白色，贯穿发射点到箭头底部
-	draw_line(local_start, base_center, Color(1.0, 1.0, 1.0, PIERCE_TRAIL_ALPHA), 1.5)
-	# 3. 箭头本体：白色箭尖在当前位置（节点原点=判定中心），朝飞行方向
-	var b1 := base_center + perp * ARROW_HALF_W
-	var b2 := base_center - perp * ARROW_HALF_W
-	draw_colored_polygon(PackedVector2Array([Vector2.ZERO, b1, b2]), Color(1.0, 1.0, 1.0, 0.95))
+	var perp := Vector2(-dir.y, dir.x)
+	var head := Vector2.ZERO
+	var tail: Vector2
+	var show_arrowhead := true
+	if _piercing_phase == "drawing":
+		tail = Vector2.ZERO
+		head = dir * _piercing_visible_length
+	elif _piercing_phase == "embedding":
+		tail = -dir * _piercing_visible_length
+		show_arrowhead = false  # 箭头已钻入终点，仅剩箭身向前没入
+	else:
+		tail = -dir * PIERCE_ARROW_LENGTH
+	# 外缘和内芯均为浅蓝半透明，明确区分于激光路径。
+	draw_line(tail, head, PIERCE_ARROW_EDGE, PIERCE_ARROW_HALF_W * 2.0)
+	draw_line(tail, head, PIERCE_ARROW_CORE, 1.6)
+	# 羽尾：箭身已完整显形后始终保留，没入阶段随可见长度一起缩短。
+	if _piercing_visible_length > 4.0:
+		var feather_tip := tail - dir * minf(6.0, _piercing_visible_length * 0.3)
+		draw_line(tail, feather_tip + perp * 2.4, PIERCE_ARROW_EDGE, 1.2)
+		draw_line(tail, feather_tip - perp * 2.4, PIERCE_ARROW_EDGE, 1.2)
+	if show_arrowhead and _piercing_visible_length > 3.0:
+		var head_base := head - dir * minf(PIERCE_ARROW_HEAD_LENGTH, _piercing_visible_length * 0.6)
+		draw_colored_polygon(PackedVector2Array([
+			head,
+			head_base + perp * PIERCE_ARROW_HALF_W * 1.6,
+			head_base - perp * PIERCE_ARROW_HALF_W * 1.6,
+		]), PIERCE_ARROW_CORE)
 
 
 ## 通用定点飞行：沿直线向 dest 移动 speed（像素/秒），施加抛物线弧高视觉偏移。

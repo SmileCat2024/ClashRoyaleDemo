@@ -1167,6 +1167,7 @@ var unit_data := {
 			"attack_range": 9.5,
 			"attack_interval": 2.5,
 			"first_attack_delay": 0.5,
+			"damage_delay": 0.2,        # 背身/正面拉弓至第 3 帧后再放箭，确保攻击姿势完整呈现
 			"delivery": "projectile",
 			"trajectory": "ballistic",   # 高抛弹道（抄迫击炮：MortarShell 弧线飞行+落地爆炸范围圈）
 			"arc_height": 7.0,           # 弧高峰值（格），随距离自适应（近处低远处高）

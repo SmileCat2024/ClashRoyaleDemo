@@ -32,7 +32,7 @@ const PRESET_DECKS: Array[Dictionary] = [
 	{"name": "皇家冲锋", "cards": ["card_hog_rider", "card_musketeer", "card_knight_elite", "card_fireball", "card_archers", "card_goblins", "card_inferno_tower", "card_arrows"]},
 	{"name": "空中奇袭", "cards": ["card_balloon", "card_flyer", "card_mega_minion_elite", "card_musketeer", "card_fireball", "card_arrows", "card_goblins", "card_inferno_tower"]},
 	{"name": "重甲推进", "cards": ["card_giant", "card_pekka", "card_mini_pekka", "card_musketeer", "card_poison", "card_arrows", "card_goblins", "card_elixir_collector"]},
-	{"name": "迫击炮阵地", "cards": ["card_mortar", "card_princess", "card_knight_elite", "card_archers", "card_fireball", "card_poison", "card_goblins", "card_inferno_tower"]},
+	{"name": "迫击炮阵地", "cards": ["card_mortar", "card_princess", "card_knight_elite", "card_archers", "card_fireball", "card_poison", "card_ranger", "card_inferno_tower"]},
 	{"name": "王子突击", "cards": ["card_prince", "card_valkyrie", "card_hog_rider", "card_musketeer", "card_fireball", "card_arrows", "card_mega_minion_elite", "card_elixir_collector"]},
 ]
 

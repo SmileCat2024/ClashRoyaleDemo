@@ -96,6 +96,20 @@ func test_princess_high_arc_arrow_tuning() -> void:
 		"公主箭矢弹速应为 10 格/秒")
 	assert_eq(float(attack.get("arc_height", 0.0)), 7.0,
 		"公主箭矢弧高应为 7 格")
+	assert_eq(float(attack.get("damage_delay", 0.0)), 0.2,
+		"公主应在攻击姿势第 3 帧后放箭")
+	var states: Dictionary = DataRegistry.unit_data["princess"]["animation"].get("states", {})
+	var attack_back: Dictionary = states.get("attack_back", {})
+	var attack_back_frames: Array = attack_back.get("frames", [])
+	assert_eq(attack_back_frames.size(), 3,
+		"公主背身攻击应配置完整的 3 帧动画")
+
+
+func test_fourth_preset_uses_ranger_instead_of_goblins() -> void:
+	var fourth_deck: Dictionary = Game.PRESET_DECKS[3]
+	var cards: Array = fourth_deck.get("cards", [])
+	assert_true(cards.has("card_ranger"), "第 4 套预设应包含神箭游侠")
+	assert_false(cards.has("card_goblins"), "第 4 套预设应移除哥布林")
 
 
 func test_ranger_visual_uses_final_sprite_only() -> void:

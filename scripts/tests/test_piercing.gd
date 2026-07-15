@@ -84,6 +84,17 @@ func test_pierce_no_duplicate_hit() -> void:
 	p.free()
 
 
+func test_pierce_only_hits_current_arrow_body_not_full_history() -> void:
+	var p := _make_piercing(10.0, 40)
+	p._fly_dir = Vector2.RIGHT
+	# 箭头已飞到 x=200，极长实体箭身仅覆盖约 x=110~200；x=50 的敌人不应仍处于伤害带内。
+	var enemy := _make_enemy(Vector2(50, 0))
+	p.position = Vector2(200, 0)
+	p._check_pierce_hits()
+	assert_eq(enemy.damage_taken_total, 0, "穿透箭经过后不应保留激光式历史伤害带")
+	p.free()
+
+
 func test_pierce_multiple_enemies_along_path() -> void:
 	# 模拟穿透箭沿 x 轴飞行，依次经过 3 个敌人
 	var p := _make_piercing(10.0, 40)

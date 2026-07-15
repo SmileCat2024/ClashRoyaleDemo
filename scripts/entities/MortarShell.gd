@@ -25,14 +25,16 @@ const ARROW_LENGTH: float = 10.0       ## 箭杆长度（像素）
 const FLETCHING_LEN: float = 5.0       ## 羽尾长度（像素）
 const FLETCHING_SPREAD: float = 2.5    ## 羽尾展开宽度（像素）
 const FLETCHING_ALPHA: float = 0.4     ## 羽尾透明度
-const FLETCHING_COLOR := Color(0.95, 0.20, 0.18)  ## 羽尾颜色（皇室战争风红色）
+const FLETCHING_COLOR := Color(1.0, 0.62, 0.45)   ## 羽尾颜色（半透明浅红）
 const BURN_TRAIL_LENGTH: float = 18.0  ## 燃烧箭矢的持续火焰尾迹长度（像素）
 const BURN_FLICKER_SPEED: float = 14.0 ## 火焰摆动频率（弧度/秒）
 
 # ---- 箭矢扇形散布（appearance=arrow 时使用）----
 const ARROW_FAN_HALF: int = 2          ## 中心两侧各几根箭（2 = 共 5 根）
-const ARROW_FAN_SPREAD: float = 7.0    ## 相邻箭矢间距（像素，沿垂直飞行方向）
-const ARROW_FAN_ANGLE: float = 0.15    ## 外侧箭矢偏角（弧度，≈8.6°，形成扇形）
+const ARROW_FAN_START_SPREAD: float = 3.5 ## 发射时相邻箭矢间距（像素，保持收拢）
+const ARROW_FAN_MAX_SPREAD: float = 11.0  ## 落点前相邻箭矢间距上限（最外侧 ±22px，不越出 2 格 AOE）
+const ARROW_FAN_START_ANGLE: float = 0.06 ## 发射时外侧箭矢偏角（弧度）
+const ARROW_FAN_MAX_ANGLE: float = 0.20   ## 落点前外侧箭矢偏角（弧度）
 
 # ---- 炮弹贴图 ----
 # 美术提供的普通/觉醒迫击炮炮弹 PNG。按是否携带落点召唤效果选择贴图，找不到时退回圆形绘制。
@@ -188,11 +190,14 @@ func _draw_arrow_flying() -> void:
 	var perp := Vector2(-tangent.y, tangent.x)
 	# 地面影子
 	draw_rect(Rect2(-1.5, -1.0, 3.0, 2.0), Color(0, 0, 0, 0.12))
-	# 5 根箭矢扇形散布（中心 + 上下各 2 根）：head 沿垂直飞行方向偏移，切线略微旋转
+	# 5 根箭矢扇形散布：发射时收拢，飞行中逐步向落点展开，最外侧仍落在 2 格 AOE 内。
 	var base_head := Vector2(0.0, arc_y)
+	var fan_expand := ease(progress, 0.65)
+	var fan_spread := lerpf(ARROW_FAN_START_SPREAD, ARROW_FAN_MAX_SPREAD, fan_expand)
+	var fan_angle := lerpf(ARROW_FAN_START_ANGLE, ARROW_FAN_MAX_ANGLE, fan_expand)
 	for i in range(-ARROW_FAN_HALF, ARROW_FAN_HALF + 1):
-		var head := base_head + perp * (float(i) * ARROW_FAN_SPREAD)
-		var t_dir := tangent.rotated(float(i) * ARROW_FAN_ANGLE)
+		var head := base_head + perp * (float(i) * fan_spread)
+		var t_dir := tangent.rotated(float(i) * fan_angle)
 		var tail := head - t_dir * ARROW_LENGTH
 		var alpha: float = 1.0 - absf(float(i)) * 0.12  # 中心最亮，外侧略淡
 		_draw_burning_trail(tail, t_dir, alpha, float(i))
@@ -206,10 +211,10 @@ func _draw_burning_trail(tail: Vector2, tangent: Vector2, alpha: float, arrow_in
 	var phase := _flight_time * BURN_FLICKER_SPEED + arrow_index * 1.7
 	var flicker := 0.86 + sin(phase) * 0.14
 	var trail_end := tail - tangent * BURN_TRAIL_LENGTH * flicker
-	# 柔和的红橙外焰与金黄内焰，形成持续的燃烧流线。
-	draw_line(trail_end, tail, Color(1.0, 0.10, 0.01, 0.22 * alpha), 6.0)
-	draw_line(trail_end + tangent * 2.0, tail, Color(1.0, 0.34, 0.02, 0.64 * alpha), 3.5)
-	draw_line(trail_end + tangent * 4.0, tail, Color(1.0, 0.82, 0.18, 0.92 * alpha), 1.4)
+	# 轻盈的浅红外焰与浅黄内焰：保持“着火”辨识度，但不压过箭体和战场信息。
+	draw_line(trail_end, tail, Color(1.0, 0.42, 0.34, 0.13 * alpha), 5.0)
+	draw_line(trail_end + tangent * 2.0, tail, Color(1.0, 0.63, 0.36, 0.32 * alpha), 3.0)
+	draw_line(trail_end + tangent * 4.0, tail, Color(1.0, 0.94, 0.63, 0.54 * alpha), 1.2)
 	# 三段不规则火舌，让火焰在每一帧维持燃烧而不是静态色带。
 	for flame_index in range(3):
 		var distance := 3.0 + float(flame_index) * 4.8
@@ -217,7 +222,7 @@ func _draw_burning_trail(tail: Vector2, tangent: Vector2, alpha: float, arrow_in
 		var width := 2.6 - float(flame_index) * 0.45
 		var sway := sin(phase + float(flame_index) * 2.1) * (2.2 + float(flame_index))
 		var tip := anchor - tangent * (7.0 + float(flame_index) * 2.2) + perp * sway
-		var flame_color := Color(1.0, 0.20 + float(flame_index) * 0.12, 0.02, (0.50 - float(flame_index) * 0.10) * alpha)
+		var flame_color := Color(1.0, 0.56 + float(flame_index) * 0.10, 0.35, (0.30 - float(flame_index) * 0.06) * alpha)
 		draw_colored_polygon(PackedVector2Array([
 			anchor + perp * width,
 			tip,
@@ -229,16 +234,16 @@ func _draw_burning_trail(tail: Vector2, tangent: Vector2, alpha: float, arrow_in
 		var ember_pos := tail - tangent * (9.0 + float(ember_index) * 5.0) \
 			+ perp * sin(ember_phase) * 3.0
 		draw_circle(ember_pos, 1.2 - float(ember_index) * 0.25,
-			Color(1.0, 0.62, 0.08, (0.72 - float(ember_index) * 0.18) * alpha))
+			Color(1.0, 0.84, 0.46, (0.46 - float(ember_index) * 0.12) * alpha))
 
 
 ## 绘制单根燃烧箭矢（金色箭杆 + 红橙羽尾）。供 _draw_arrow_flying 扇形散布复用。
 func _draw_single_arrow(head: Vector2, tail: Vector2, tangent: Vector2, alpha: float) -> void:
-	draw_line(tail, head, Color(1.0, 0.26, 0.02, alpha), 2.8)
-	draw_line(tail, head, Color(1.0, 0.93, 0.46, alpha), 1.2)
-	draw_circle(head, 2.0, Color(1.0, 0.76, 0.20, 0.80 * alpha))
+	draw_line(tail, head, Color(1.0, 0.48, 0.38, 0.40 * alpha), 2.4)
+	draw_line(tail, head, Color(1.0, 0.94, 0.67, 0.75 * alpha), 1.1)
+	draw_circle(head, 1.8, Color(1.0, 0.82, 0.44, 0.55 * alpha))
 	var perp := Vector2(-tangent.y, tangent.x)
-	var fc := Color(FLETCHING_COLOR, 0.75 * alpha)
+	var fc := Color(FLETCHING_COLOR, 0.48 * alpha)
 	var fletch_back := tail - tangent * FLETCHING_LEN
 	draw_line(tail, fletch_back + perp * FLETCHING_SPREAD, fc, 1.5)
 	draw_line(tail, fletch_back - perp * FLETCHING_SPREAD, fc, 1.5)
