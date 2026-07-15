@@ -767,17 +767,17 @@ var unit_data := {
 				},
 				"attack_front": {
 					"frames": ["attack_front_01.png", "attack_front_02.png", "attack_front_03.png"],
-					"duration": [0.06, 0.10, 0.07],  # 校准：快起手→命中停顿→收势，缓解 3 帧低帧率卡顿
+					"duration": [0.08, 0.13, 0.09],  # 放慢约 30%，让出爪与收势更清晰
 					"mode": "once",
 				},
 				"attack_back": {
 					"frames": ["attack_back_01.png", "attack_back_02.png"],
-					"duration": [0.07, 0.11],  # 校准：2 帧动画，命中帧稍长表现力道
+					"duration": [0.09, 0.14],  # 放慢约 30%，保持与 front/side 相同节奏
 					"mode": "once",
 				},
 				"attack_side": {
 					"frames": ["attack_side_01.png", "attack_side_02.png", "attack_side_03.png"],
-					"duration": [0.06, 0.10, 0.07],  # 校准：快起手→命中停顿→收势
+					"duration": [0.08, 0.13, 0.09],  # 放慢约 30%，让出爪与收势更清晰
 					"mode": "once",
 				},
 			},
@@ -1169,12 +1169,12 @@ var unit_data := {
 			"first_attack_delay": 0.5,
 			"delivery": "projectile",
 			"trajectory": "ballistic",   # 高抛弹道（抄迫击炮：MortarShell 弧线飞行+落地爆炸范围圈）
-			"arc_height": 5.0,           # 弧高峰值（格），随距离自适应（近处低远处高）
+			"arc_height": 7.0,           # 弧高峰值（格），随距离自适应（近处低远处高）
 			"projectile_appearance": "arrow",  # 箭矢外观（抄箭雨白线+羽尾），落地爆炸圈
 			"impact_type": "splash",
 			"impact_radius": 2.0,
 			"damage": 168,
-			"projectile_speed": 15.0,
+			"projectile_speed": 10.0,
 		}],
 		"animation": {
 			"hide_placeholder": true,
@@ -1250,11 +1250,11 @@ var unit_data := {
 			"projectile_speed": 20.0,
 		}],
 		"animation": {
-			"hide_placeholder": false,  # 校准完成后改 true
+			"hide_placeholder": true,   # 使用正式帧动画，移除底部 ColorRect 调试占位
 			"visual_offset_x": 0.0,
 			"visual_offset_y": -29.0,
-			"visual_scale": 0.023,
-			"health_bar_y": -65.0,
+			"visual_scale": 0.025,      # 小幅放大约 9%
+			"health_bar_y": -70.0,      # 随模型放大上移，保持在头顶
 			"texture_filter": "linear",
 			"states": {
 				"walk_front": { "frames": ["walk_front_01.png", "walk_front_02.png"], "duration": [0.15, 0.15], "mode": "loop" },

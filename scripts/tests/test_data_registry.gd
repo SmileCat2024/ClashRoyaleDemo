@@ -90,6 +90,22 @@ func test_flyer_has_elevated_altitude() -> void:
 		"飞行器应高于默认空中单位的 2.5 格离地高度")
 
 
+func test_princess_high_arc_arrow_tuning() -> void:
+	var attack: Dictionary = DataRegistry.unit_data["princess"]["attacks"][0]
+	assert_eq(float(attack.get("projectile_speed", 0.0)), 10.0,
+		"公主箭矢弹速应为 10 格/秒")
+	assert_eq(float(attack.get("arc_height", 0.0)), 7.0,
+		"公主箭矢弧高应为 7 格")
+
+
+func test_ranger_visual_uses_final_sprite_only() -> void:
+	var animation: Dictionary = DataRegistry.unit_data["ranger"].get("animation", {})
+	assert_true(bool(animation.get("hide_placeholder", false)),
+		"神箭游侠应隐藏底部调试占位")
+	assert_eq(float(animation.get("visual_scale", 0.0)), 0.025,
+		"神箭游侠模型应使用校准后的缩放")
+
+
 func test_knockback_immunity_config() -> void:
 	var pekka: Dictionary = DataRegistry.unit_data["pekka"]
 	var valkyrie: Dictionary = DataRegistry.unit_data["valkyrie"]
