@@ -103,6 +103,8 @@ func _ready() -> void:
 	start_battle()
 	# Client 端：通知 host 已准备好
 	if is_network_mode and not is_host:
+		# 可靠 RPC 会先锁定卡组，再通知 Host 可以开始同步手牌。
+		_rpc_submit_deck.rpc_id(1, Game.get_selected_deck())
 		_rpc_client_ready.rpc_id(1)
 
 
@@ -149,15 +151,16 @@ func start_battle() -> void:
 
 	if is_network_mode and is_host:
 		# Host 联机：初始化自己 + 远程玩家的卡组
-		deck_manager.setup(DataRegistry.get_default_player_deck())
+		deck_manager.setup(Game.get_selected_deck())
 		_remote_deck = DeckManager.new()
 		_remote_deck.name = "RemoteDeck"
 		add_child(_remote_deck)
-		_remote_deck.setup(DataRegistry.get_default_enemy_deck())
+		var remote_cards := Game.get_remote_deck()
+		_remote_deck.setup(remote_cards if remote_cards.size() >= 5 else DataRegistry.get_default_enemy_deck())
 		# 不启动 AI（远程玩家是真人）
 	elif not is_network_mode:
 		# 单机模式：初始化玩家卡组 + AI
-		deck_manager.setup(DataRegistry.get_default_player_deck())
+		deck_manager.setup(Game.get_selected_deck())
 	else:
 		# Client：手牌由 host 通过 RPC 同步，此处不初始化
 		pass
@@ -686,6 +689,22 @@ func _unhandled_input(event: InputEvent) -> void:
 # ==============================================================================
 # 联机 RPC（@rpc 方法）
 # ==============================================================================
+
+## Client → Host：提交在大厅锁定的预设卡组。Host 统一维护远端手牌轮转。
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_submit_deck(cards: Array) -> void:
+	if not is_network_mode or not is_host or _remote_deck == null:
+		return
+	var validated: Array = []
+	for card_id in cards:
+		if card_id is String and not DataRegistry.get_card_data(card_id).is_empty():
+			validated.append(card_id)
+	if validated.size() < 5:
+		push_warning("[BattleManager] 忽略无效的远端预设卡组")
+		return
+	_remote_deck.setup(validated)
+	Game.set_remote_deck(validated)
+	print("[BattleManager] 已锁定远端预设卡组:", validated)
 
 ## Client → Host：通知已加载完战斗场景，准备好接收状态同步
 @rpc("any_peer", "call_remote", "reliable")
