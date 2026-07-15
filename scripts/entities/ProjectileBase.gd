@@ -30,11 +30,10 @@ var _fly_dir: Vector2 = Vector2.ZERO  ## 穿透飞行方向（发射时固定，
 # 穿透箭是实体长箭而非激光：拉弓时逐渐显形，完整露出后脱手飞行，抵达末端后箭尾没入终点。
 const PIERCE_ARROW_LENGTH := 130.0      ## 超长箭身（6.5 格），视觉上明显区别于普通投射物
 const PIERCE_ARROW_HALF_W := 7.0        ## 宽箭杆半宽（像素）
-const PIERCE_ARROW_HEAD_LENGTH := 18.0  ## 加长箭头长度（像素）
 const PIERCE_DRAW_DURATION := 0.32      ## 从弓上慢慢露出完整箭身的时间（秒）
 const PIERCE_EMBED_DURATION := 0.28     ## 箭头抵达终点后，箭尾完全没入的时间（秒）
-const PIERCE_ARROW_CORE := Color(0.32, 0.84, 1.0, 0.74) ## 高亮纯浅蓝箭杆内芯（不混白）
-const PIERCE_ARROW_EDGE := Color(0.12, 0.58, 0.96, 0.36) ## 稍深透明蓝边缘，勾勒箭体轮廓
+const PIERCE_ARROW_CORE := Color(0.32, 0.84, 1.0, 0.56) ## 柔和纯浅蓝箭杆内芯（不混白）
+const PIERCE_ARROW_EDGE := Color(0.12, 0.58, 0.96, 0.16) ## 柔和透明蓝边缘，不形成硬描边
 var _piercing_phase: String = "drawing" ## "drawing" | "flying" | "embedding"
 var _piercing_phase_time: float = 0.0
 var _piercing_visible_length: float = 0.0
@@ -197,30 +196,22 @@ func _draw_piercing_arrow() -> void:
 	var perp := Vector2(-dir.y, dir.x)
 	var head := Vector2.ZERO
 	var tail: Vector2
-	var show_arrowhead := true
 	if _piercing_phase == "drawing":
 		tail = Vector2.ZERO
 		head = dir * _piercing_visible_length
 	elif _piercing_phase == "embedding":
 		tail = -dir * _piercing_visible_length
-		show_arrowhead = false  # 箭头已钻入终点，仅剩箭身向前没入
 	else:
 		tail = -dir * PIERCE_ARROW_LENGTH
-	# 外缘和内芯均为浅蓝半透明，明确区分于激光路径。
+	# 以三层低透明度蓝色柔化边缘，不使用生硬高亮或激光感描边。
+	draw_line(tail, head, Color(0.08, 0.46, 0.90, 0.07), PIERCE_ARROW_HALF_W * 3.2)
 	draw_line(tail, head, PIERCE_ARROW_EDGE, PIERCE_ARROW_HALF_W * 2.0)
-	draw_line(tail, head, PIERCE_ARROW_CORE, 1.6)
+	draw_line(tail, head, PIERCE_ARROW_CORE, PIERCE_ARROW_HALF_W * 0.82)
 	# 羽尾：箭身已完整显形后始终保留，没入阶段随可见长度一起缩短。
 	if _piercing_visible_length > 4.0:
 		var feather_tip := tail - dir * minf(6.0, _piercing_visible_length * 0.3)
 		draw_line(tail, feather_tip + perp * 2.4, PIERCE_ARROW_EDGE, 1.2)
 		draw_line(tail, feather_tip - perp * 2.4, PIERCE_ARROW_EDGE, 1.2)
-	if show_arrowhead and _piercing_visible_length > 3.0:
-		var head_base := head - dir * minf(PIERCE_ARROW_HEAD_LENGTH, _piercing_visible_length * 0.6)
-		draw_colored_polygon(PackedVector2Array([
-			head,
-			head_base + perp * PIERCE_ARROW_HALF_W * 1.6,
-			head_base - perp * PIERCE_ARROW_HALF_W * 1.6,
-		]), PIERCE_ARROW_CORE)
 
 
 ## 通用定点飞行：沿直线向 dest 移动 speed（像素/秒），施加抛物线弧高视觉偏移。
