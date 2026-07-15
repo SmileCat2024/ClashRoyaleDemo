@@ -1258,8 +1258,8 @@ var unit_data := {
 			"health_bar_y": -70.0,      # 随模型放大上移，保持在头顶
 			"texture_filter": "linear",
 			"states": {
-				"walk_front": { "frames": ["walk_front_01.png", "walk_front_02.png"], "duration": [0.15, 0.15], "mode": "loop" },
-				"walk_back": { "frames": ["walk_back_01.png", "walk_back_02.png"], "duration": [0.15, 0.15], "mode": "loop" },
+				"walk_front": { "frames": ["walk_front_01.png", "walk_front_02.png"], "duration": [0.24, 0.24], "mode": "loop" },
+				"walk_back": { "frames": ["walk_back_01.png", "walk_back_02.png"], "duration": [0.24, 0.24], "mode": "loop" },
 				"idle_front": { "frames": ["walk_front_01.png"], "duration": [0.4], "mode": "loop" },
 				"idle_back": { "frames": ["walk_back_01.png"], "duration": [0.4], "mode": "loop" },
 				"attack_front": { "frames": ["attack_front_01.png", "attack_front_02.png", "attack_front_03.png", "attack_front_04.png"], "duration": [0.08, 0.08, 0.08, 0.55], "mode": "once" },
