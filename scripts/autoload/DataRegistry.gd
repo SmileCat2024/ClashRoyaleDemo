@@ -254,7 +254,7 @@ var unit_data := {
 		"collision_radius": 0.45,
 		"hurt_radius": 0.45,
 		"mass": 4,
-		"shadow_size": 0.45,
+		"shadow_size": 0.2,
 		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		"attacks": [{
 			"name": "blade_slash",
@@ -926,6 +926,7 @@ var unit_data := {
 		"hurt_radius": 0.5,
 		"mass": 3,
 		"shadow_size": 0.5,
+		"shadow_offset_y": 0.5,  # 影子下移0.5格（贴图脚部偏上，下移对齐视觉脚底）
 		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		"attacks": [{
 			"name": "stab",
@@ -1153,11 +1154,60 @@ var unit_data := {
 					"duration": [0.1, 0.1, 0.15],
 					"mode": "once",
 				},
-				"attack_front": {
-					"frames": ["attack_back_01.png", "attack_back_02.png", "attack_back_03.png"],
-					"duration": [0.1, 0.1, 0.15],
-					"mode": "once",
-				},
+			"attack_front": {
+				"frames": ["attack_back_01.png", "attack_back_02.png", "attack_back_03.png"],
+				"duration": [0.1, 0.1, 0.15],
+				"mode": "once",
+			},
+		},
+	},
+	},
+	"ranger": {
+		"id": "ranger",
+		"display_name": "神箭游侠",
+		"max_hp": 532,
+		"shield": 0,
+		"move_speed": 1.0,  # 中速
+		"movement_type": "ground",
+		"sight_range": 7.0,
+		"movement_targeting": "any",
+		"collision_radius": 1.0,
+		"hurt_radius": 1.0,
+		"mass": 5,
+		"shadow_size": 0.5,
+		"deploy_time": 1.0,
+		"attacks": [{
+			"name": "piercing_arrow",
+			"targeting": "any",
+			"attack_ground": true,
+			"attack_air": true,
+			"attack_range": 7.0,
+			"attack_interval": 1.1,
+			"first_attack_delay": 0.5,
+			"damage_delay": 0.2,
+			"delivery": "projectile",
+			"trajectory": "linear",
+			"impact_type": "piercing",
+			"impact_radius": 0.0,
+			"max_range": 11.0,  # 弹道最大射程（格），箭矢飞到此距离消失
+			"pierce_radius": 0.8,  # 穿透判定半径（格），敌人离飞行线 ≤ 此值则命中
+			"damage": 147,
+			"projectile_speed": 20.0,
+		}],
+		"animation": {
+			"hide_placeholder": false,  # 校准完成后改 true
+			"visual_offset_x": 0.0,
+			"visual_offset_y": -29.0,
+			"visual_scale": 0.023,
+			"health_bar_y": -65.0,
+			"texture_filter": "linear",
+			"states": {
+				"walk_front": { "frames": ["walk_front_01.png", "walk_front_02.png"], "duration": [0.15, 0.15], "mode": "loop" },
+				"walk_back": { "frames": ["walk_back_01.png", "walk_back_02.png"], "duration": [0.15, 0.15], "mode": "loop" },
+				"idle_front": { "frames": ["walk_front_01.png"], "duration": [0.4], "mode": "loop" },
+				"idle_back": { "frames": ["walk_back_01.png"], "duration": [0.4], "mode": "loop" },
+				"attack_front": { "frames": ["attack_front_01.png", "attack_front_02.png", "attack_front_03.png", "attack_front_04.png"], "duration": [0.08, 0.08, 0.08, 0.55], "mode": "once" },
+				"attack_back": { "frames": ["attack_back_01.png", "attack_back_02.png"], "duration": [0.1, 0.65], "mode": "once" },
 			},
 		},
 	},
@@ -1450,6 +1500,17 @@ var card_data := {
 		"spawn_count": 1,
 		"spawn_spread": 0.0,
 		"description": "超远程弓箭手，能从己方河岸狙击对方公主塔。箭矢带范围溅射，血量极低。",
+	},
+	"card_ranger": {
+		"id": "card_ranger",
+		"display_name": "神箭游侠",
+		"cost": 4,
+		"card_type": "troop",
+		"unit_id": "ranger",
+		"spawn_count": 1,
+		"spawn_spread": 0.0,
+		"icon": "res://assets/ui/cards/ranger.png",
+		"description": "远程穿透射手，箭矢沿直线飞行，穿透路径上所有敌人。",
 	},
 	"card_knight_elite": {
 		"id": "card_knight_elite",

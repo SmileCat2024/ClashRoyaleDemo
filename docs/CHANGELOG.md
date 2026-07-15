@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## [版本待定] - 2026-07-15 — 神箭游侠穿透箭攻击视觉重做
+
+### 改进
+- **神箭游侠穿透箭视觉重做**：穿透箭不再是移动的小色块，改用纯 `_draw` 绘制「穿透长箭」——箭头本体（小三角箭尖，朝飞行方向）+ 从发射点延伸到箭头的攻击范围长杆（宽度 = 2×pierce_radius，即真实穿透判定带，顶点色实现头亮尾淡渐变）+ 中心路径线，直观表现穿透攻击的路径与覆盖范围。改动集中在 `ProjectileBase._draw_piercing_arrow()`，仅 piercing 模式生效；穿透时隐藏默认 Body 色块，非穿透投射物子类（SpellProjectile / MortarShell / ArrowProjectile）各自重写 `_draw` 不受影响。全部基于两端已有的 position / _start_pos / _fly_dir / pierce_radius 数据，对联机透明，无需新增 RPC。
+
+## [版本待定·笑猫统筹G] - 2026-07-15 — 神箭游侠新卡 + piercing 穿透投射物机制（协作者 lpj-official 提交，版本号待笑猫定）
+
+### 新增
+- **神箭游侠（ranger）**：远程穿透射手，箭矢沿直线飞行穿透路径上所有敌人。HP532/伤害147/攻击射程7格/弹道射程11格/对空对地/费4/穿透判定0.8格
+- **piercing 穿透投射物机制（全新）**：ProjectileBase 新增第三种命中模式（前两种 homing 单体 / non-homing 溅射），沿发射方向直线飞，飞行中命中路径上敌人不消失继续穿透，飞到 max_range 消失，同一敌人只打一次。AttackComponent 新增 `impact_type=piercing` + `max_range`/`pierce_radius` 字段；ProjectileManager spawn_projectile + RPC 支持 piercing 参数
+- **神箭游侠美术接入**：11 帧 walk/attack × front/back + 卡面（2564×2445）
+- **测试**：test_piercing（7 断言：路径命中/路径外不命中/不重复命中/多敌人沿路径穿透），headless 922 passed（唯一失败为笑猫的 test_elite_skill_dash，与本次无关）
+
 ## [版本待定] - 2026-07-15 — 通用索敌触及距离修复
 
 ### 修复

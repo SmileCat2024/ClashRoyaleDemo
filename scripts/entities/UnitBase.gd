@@ -86,6 +86,8 @@ const SHADOW_SQUASH := 0.35
 
 ## 影子椭圆水平半径（px）。setup 时从 shadow_size（格）转换。0 = 不画影子。
 var _shadow_radius: float = 0.0
+## 影子垂直偏移（px）。正值=下移。贴图脚部偏上的单位（如哥布林）下移影子对齐视觉脚底。
+var _shadow_offset_y: float = 0.0
 
 # ---- 建筑机制（寿命 / 部署 / 自然掉血）----
 ## 部署时间（秒）。> 0 时建筑部署完成后才开始索敌/攻击/掉血/倒计时。普通单位 = 0。
@@ -237,6 +239,7 @@ func setup(unit_data: Dictionary, team_name: String, awakening_effects: Dictiona
 
 	# 影子大小（格 → 像素）。未配置时退化为 collision_radius。
 	_shadow_radius = BattleConstants.px(float(unit_data.get("shadow_size", unit_data.get("collision_radius", 0.5))))
+	_shadow_offset_y = BattleConstants.px(float(unit_data.get("shadow_offset_y", 0.0)))
 
 	# 视觉设置：统一方块大小，颜色按阵营区分
 	var size: int = 16
@@ -574,7 +577,7 @@ func _draw() -> void:
 		# 飞行单位影子更淡（离地越远越散）
 		var alpha := 0.18 if altitude > 0.0 else 0.28
 		# 用 Y 压缩把正圆变成扁平椭圆
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, SHADOW_SQUASH))
+		draw_set_transform(Vector2(0, _shadow_offset_y), 0.0, Vector2(1.0, SHADOW_SQUASH))
 		draw_circle(Vector2.ZERO, _shadow_radius, Color(0, 0, 0, alpha))
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	# 狙击锁定条（锁定新目标时显示一次，持续到 SNIPER_STRIP_DURATION 结束）

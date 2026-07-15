@@ -25,6 +25,8 @@ var trajectory: String = ""             ## "" | "linear" | "ballistic"（ballist
 var impact_type: String = "single"      ## "single" | "splash"（splash=命中后范围溅射）
 var impact_radius: float = 0.0          ## 溅射半径（像素）
 var arc_height: float = 0.0             ## 弹道弧高峰值（格），仅 trajectory=ballistic 时传给飞行物
+var max_range: float = 0.0              ## 穿透最大射程（像素），仅 impact_type=piercing 时用
+var pierce_radius: float = 0.0          ## 穿透判定半径（像素），仅 impact_type=piercing 时用
 
 # ---- 运行时状态 ----
 var current_target = null               ## 当前锁定的目标（CombatantBase 或 null）
@@ -75,6 +77,8 @@ func setup(attack_data: Dictionary) -> void:
 	impact_type = attack_data.get("impact_type", "single")
 	impact_radius = BattleConstants.px(float(attack_data.get("impact_radius", 0.0)))
 	arc_height = float(attack_data.get("arc_height", 0.0))
+	max_range = BattleConstants.px(float(attack_data.get("max_range", 0.0)))
+	pierce_radius = BattleConstants.px(float(attack_data.get("pierce_radius", 0.0)))
 	# 首次出手前摇：进入射程后等 first_attack_delay 秒才能第一次攻击
 	cooldown = first_attack_delay
 	# 递增伤害配置（地狱塔光束）。配置了 ramp_damage 即启用
@@ -309,11 +313,14 @@ func _fire_projectile() -> void:
 			dyn_arc = arc_height * ratio
 		pm.spawn_mortar_shell(spawn_pos, current_target, damage, impact_radius, projectile_speed, combatant.team, dyn_arc, attack_ground, attack_air, combatant.projectile_impact_summon_unit_id)
 		return
-	# 普通飞行物：splash 类型为非锁定范围溅射，否则锁定单体
-	var is_homing := impact_type != "splash"
+	# 普通飞行物：splash=非锁定范围溅射，piercing=穿透，否则锁定单体
+	var is_homing := impact_type != "splash" and impact_type != "piercing"
 	var splash_px := impact_radius if impact_type == "splash" else 0.0
+	var is_piercing := impact_type == "piercing"
+	var max_range_px := max_range if is_piercing else 0.0
+	var pierce_radius_px := pierce_radius if is_piercing else 0.0
 	if pm and pm.has_method("spawn_projectile"):
-		pm.spawn_projectile(spawn_pos, current_target, damage, projectile_speed, combatant.team, is_homing, splash_px, arc_height, emit_offset_y)
+		pm.spawn_projectile(spawn_pos, current_target, damage, projectile_speed, combatant.team, is_homing, splash_px, arc_height, emit_offset_y, is_piercing, max_range_px, pierce_radius_px)
 		return
 	# 回退：DebugBattle 等场景无 ProjectileManager
 	var proj = preload("res://scenes/entities/Projectile.tscn").instantiate()
@@ -324,7 +331,7 @@ func _fire_projectile() -> void:
 		scene.add_child(proj)
 	var spawn_visual := spawn_pos
 	spawn_visual.y -= emit_offset_y
-	proj.setup(spawn_visual, current_target, damage, projectile_speed, combatant.team, is_homing, splash_px)
+	proj.setup(spawn_visual, current_target, damage, projectile_speed, combatant.team, is_homing, splash_px, is_piercing, max_range_px, pierce_radius_px)
 	proj.arc_height = arc_height
 	SignalBus.projectile_spawned.emit(proj, combatant.team)
 
