@@ -32,8 +32,8 @@ const PIERCE_ARROW_LENGTH := 130.0      ## 超长箭身（6.5 格），视觉上
 const PIERCE_ARROW_HALF_W := 7.0        ## 宽箭杆半宽（像素）
 const PIERCE_DRAW_DURATION := 0.32      ## 从弓上慢慢露出完整箭身的时间（秒）
 const PIERCE_EMBED_DURATION := 0.28     ## 箭头抵达终点后，箭尾完全没入的时间（秒）
-const PIERCE_ARROW_CORE := Color(0.32, 0.84, 1.0, 0.56) ## 柔和纯浅蓝箭杆内芯（不混白）
-const PIERCE_ARROW_EDGE := Color(0.12, 0.58, 0.96, 0.16) ## 柔和透明蓝边缘，不形成硬描边
+const PIERCE_ARROW_CORE := Color(0.50, 0.91, 1.0, 0.60) ## 明亮天空蓝箭杆内芯（不混白）
+const PIERCE_ARROW_EDGE := Color(0.34, 0.78, 1.0, 0.20) ## 浅亮透明蓝边缘，不形成硬描边
 var _piercing_phase: String = "drawing" ## "drawing" | "flying" | "embedding"
 var _piercing_phase_time: float = 0.0
 var _piercing_visible_length: float = 0.0
@@ -204,7 +204,7 @@ func _draw_piercing_arrow() -> void:
 	else:
 		tail = -dir * PIERCE_ARROW_LENGTH
 	# 以三层低透明度蓝色柔化边缘，不使用生硬高亮或激光感描边。
-	draw_line(tail, head, Color(0.08, 0.46, 0.90, 0.07), PIERCE_ARROW_HALF_W * 3.2)
+	draw_line(tail, head, Color(0.28, 0.72, 1.0, 0.10), PIERCE_ARROW_HALF_W * 3.2)
 	draw_line(tail, head, PIERCE_ARROW_EDGE, PIERCE_ARROW_HALF_W * 2.0)
 	draw_line(tail, head, PIERCE_ARROW_CORE, PIERCE_ARROW_HALF_W * 0.82)
 	# 羽尾：箭身已完整显形后始终保留，没入阶段随可见长度一起缩短。
