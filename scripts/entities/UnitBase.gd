@@ -1201,6 +1201,10 @@ func get_visual_state() -> String:
 	if not is_deployed:
 		return "walk"
 	if _is_moving:
+		# 冲锋状态优先返回 charge（配 charge_朝向 动画播放冲刺美术）
+		# 注：Client 端 is_charging 未 RPC 同步，联机下 Client 冲锋仍显示 walk（仅动画差异，不影响功能）
+		if is_charging:
+			return "charge"
 		return "walk"
 	# Host 端顺便更新网络变量（供 Synchronizer 同步到 client）
 	var state := "idle"
