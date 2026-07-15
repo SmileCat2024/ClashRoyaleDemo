@@ -273,12 +273,12 @@ var unit_data := {
 		}],
 		# ---- 帧动画配置 ----
 		# 素材 2048×1920，原角色整体偏左，已统一右移 345px 校正居中（alpha 质心对齐）
-		# content 高约 940px，visual_scale 0.040 → 屏幕高约 48px；脚底对齐地面
+		# content 高约 940px，visual_scale 0.036 → 屏幕高约 43px；脚底对齐地面
 		"animation": {
 			"hide_placeholder": true,  # 已校准，隐藏 ColorRect 占位方块
 			"visual_offset_x": 0.0,
-			"visual_offset_y": -35.0,
-			"visual_scale": 0.040,
+			"visual_offset_y": -33.0,  # 缩小后同步下移，保持脚底对齐
+			"visual_scale": 0.036,  # 轻微缩小 10%
 			"health_bar_y": -60.0,
 			"texture_filter": "linear",
 			"states": {
@@ -421,7 +421,7 @@ var unit_data := {
 		"animation": {
 			"hide_placeholder": true,  # 已校准，隐藏 ColorRect 占位方块
 			"visual_offset_x": 0.0,
-			"visual_offset_y": -24.0,
+			"visual_offset_y": -20.0,  # 轻微下移 0.2 格（4px）
 			"visual_scale": 0.065,
 			"health_bar_y": -60.0,
 			"texture_filter": "linear",
