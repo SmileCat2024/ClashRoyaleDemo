@@ -69,6 +69,29 @@ func test_guard_tower_always_activated() -> void:
 	assert_true(comp.is_processing(), "公主塔攻击组件应始终启用")
 
 
+func test_guard_tower_princess_uses_team_idle_and_high_arrow_origin() -> void:
+	var player_tower := _make_guard_tower("player")
+	assert_not_null(player_tower._tower_princess, "我方公主塔应创建塔顶公主模型")
+	assert_eq(String(player_tower._tower_princess.animation), "idle_back", "我方塔顶公主待机应为背身")
+	assert_eq(player_tower._tower_princess.position.y, -28.0, "我方公主应落在我方塔身上半部的平台内")
+	assert_eq(player_tower.projectile_emit_offset_y, 18.0, "箭矢发射点应随塔顶公主高度抬升")
+	var tower_attack := player_tower.get_primary_attack()
+	assert_eq(tower_attack.attack_range, 150.0, "塔顶公主只能影响视觉，公主塔射程仍应为原来的7.5格")
+	assert_eq(tower_attack.attack_interval, 0.8, "塔顶公主只能影响视觉，公主塔攻速不应引用卡牌公主")
+	assert_eq(tower_attack.damage, 109, "塔顶公主只能影响视觉，公主塔伤害不应引用卡牌公主")
+	assert_eq(tower_attack.impact_type, "single", "公主塔仍为原有锁定单体箭矢，不应变为公主的范围攻击")
+	player_tower._on_attack_triggered()
+	assert_eq(String(player_tower._tower_princess.animation), "attack_back", "我方塔顶公主出手应播放公主攻击帧")
+
+	var enemy_tower := _make_guard_tower("enemy")
+	assert_not_null(enemy_tower._tower_princess, "敌方公主塔应创建塔顶公主模型")
+	assert_eq(enemy_tower._tower_princess.position.y, -42.0, "敌方公主应落在敌方塔身上半部的平台内")
+	assert_eq(enemy_tower.projectile_emit_offset_y, 32.0, "敌方箭矢发射点应随其塔顶站位抬升")
+	assert_eq(String(enemy_tower._tower_princess.animation), "idle_front", "敌方塔顶公主待机应面向下方")
+	enemy_tower._on_attack_triggered()
+	assert_eq(String(enemy_tower._tower_princess.animation), "attack_front", "敌方塔顶公主出手应播放对应攻击帧")
+
+
 # ============================================================
 #  受击激活
 # ============================================================

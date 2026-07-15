@@ -75,6 +75,10 @@ var knockback_immune: bool = false
 ## 仅影响视觉渲染（Body/HealthBar 向上偏移），不影响逻辑坐标和索敌。
 var altitude: float = 0.0
 
+## 投射物的额外视觉发射高度（像素，正数表示向屏幕上方偏移）。
+## 用于公主塔等“攻击者模型不在实体逻辑原点”的场景；不参与射程、索敌或命中计算。
+var projectile_emit_offset_y: float = 0.0
+
 # ---- 攻击组件实例列表（由 _init_combat_stats 动态创建）----
 var attack_components: Array = []
 

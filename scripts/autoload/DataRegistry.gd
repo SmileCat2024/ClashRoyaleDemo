@@ -1540,6 +1540,19 @@ var tower_data := {
 			"enemy_texture": "res://assets/sprites/towers/guard_tower_enemy.png",
 			"visual_scale": 0.06375,    # 统一缩放（基于原始大图，缩小25%）
 			"visual_offset_y": 25.0,    # 精细微调（正=下移，负=上移），底部对齐由代码自动计算
+			# 公主塔 UI：我方整体下移，敌方整体上移；血条数值会自动跟随。
+			"player_hud_offset_y": 10.0,
+			"enemy_hud_offset_y": -10.0,
+		},
+		# 仅复用 card_princess 的角色帧，固定站在塔顶中央；绝不读取其生命、射程、伤害或攻速。
+		# offset_y 为角色帧中心高度；代码会以此自动同步箭矢发射高度，避免仍从塔底飞出。
+		"tower_princess": {
+			"unit_id": "princess",
+			"offset_x": 0.0,
+			# 角色需要落在塔身上半部的中央平台内，而不是站到塔顶轮廓外。
+			"player_offset_y": -28.0,
+			"enemy_offset_y": -42.0,
+			"visual_scale": 0.05,
 		},
 		"attacks": [{
 			"name": "arrow_shot",

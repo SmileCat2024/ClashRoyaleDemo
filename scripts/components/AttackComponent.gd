@@ -294,9 +294,12 @@ func _execute_attack() -> void:
 ## trajectory=ballistic → 高抛溅射炮弹（迫击炮）；impact_type=splash → 非锁定范围溅射。
 func _fire_projectile() -> void:
 	var spawn_pos := BattlePathing.game_position_of(combatant)
-	# 飞行单位从视觉飞行高度发射投射物（对齐 altitude 离地偏移），地面单位为 0
-	# 额外上移 0.5 格让子弹从飞行器炮口射出而非身体中心
+	# 飞行单位从视觉飞行高度发射投射物（对齐 altitude 离地偏移），地面单位为 0。
+	# 塔顶角色等可额外提供 projectile_emit_offset_y，使箭矢从模型手部高度出手，
+	# 但仍以 combatant 的逻辑原点计算锁定、射程和命中。
+	# 飞行单位额外上移 0.5 格，让子弹从飞行器炮口射出而非身体中心。
 	var emit_offset_y := (combatant.altitude + 0.5) * BattleConstants.CELL_SIZE if combatant.altitude > 0.0 else 0.0
+	emit_offset_y += combatant.projectile_emit_offset_y
 	var scene := get_tree().current_scene
 	var pm := scene.get_node_or_null("Managers/ProjectileManager")
 	# ballistic 轨迹 → 高抛溅射炮弹（迫击炮）

@@ -21,6 +21,9 @@ var king_activated: bool = true:
 
 # ---- 精灵节点（有 sprite 配置时创建，替代 ColorRect 渲染）----
 var _tower_sprite: Sprite2D = null
+# ---- 公主塔顶角色（复用“公主”卡牌的帧素材）----
+var _tower_princess: AnimatedSprite2D = null
+var _tower_princess_idle_animation: String = ""
 # ---- 血条数值标签（精灵塔专用）----
 var _hp_label: Label = null
 
@@ -70,6 +73,9 @@ func setup(tower_data: Dictionary, team_name: String, tower_name: String) -> voi
 	var sprite_data = tower_data.get("sprite", {})
 	if not sprite_data.is_empty():
 		_create_tower_sprite(sprite_data)
+	# 仅公主塔创建塔顶公主。她是纯视觉表现，攻击参数仍完全沿用塔自身配置。
+	if tower_type == "guard":
+		_create_tower_princess(tower_data.get("tower_princess", {}))
 
 	initialized = true
 	print("[TowerBase] setup:", tower_id, team, tower_type, "hp:", max_hp)
@@ -119,7 +125,10 @@ func _create_tower_sprite(sprite_data: Dictionary) -> void:
 	health_bar.size = Vector2(bar_w, bar_h)
 	var sprite_render_h: float = tex_h * scale_y
 	var top_ratio: float = 0.63 if team == "player" else 0.38
-	health_bar.position = Vector2(-bar_w / 2.0, -sprite_render_h + sprite_render_h * top_ratio)
+	# 同一塔型的双方血条可按视角做独立微调；数值标签随后跟随血条定位。
+	var hud_offset_key := "player_hud_offset_y" if team == "player" else "enemy_hud_offset_y"
+	var hud_offset_y: float = float(sprite_data.get(hud_offset_key, 0.0))
+	health_bar.position = Vector2(-bar_w / 2.0, -sprite_render_h + sprite_render_h * top_ratio + hud_offset_y)
 
 	# 血条数值标签
 	_create_hp_label()
@@ -132,6 +141,81 @@ func _create_tower_sprite(sprite_data: Dictionary) -> void:
 		_tower_sprite.modulate = Color(0.55, 0.55, 0.55, 1.0)
 
 	print("[TowerBase] sprite loaded:", tex_path, "scale:", vs)
+
+
+## 创建站在公主塔顶端的公主视觉。
+## 我方固定使用背身待机，敌方固定使用面朝下待机；攻击时复用对应的公主攻击帧。
+## offset_y 与 projectile_emit_offset_y 由塔配置共同定义，保证模型升高时箭矢也从同一高度发射。
+func _create_tower_princess(princess_data: Dictionary) -> void:
+	if princess_data.is_empty():
+		return
+	var unit_id: String = princess_data.get("unit_id", "princess")
+	var frames := SpriteRegistry.get_sprite_frames(unit_id, team)
+	if frames == null:
+		push_warning("[TowerBase] 塔顶公主帧加载失败: " + unit_id)
+		return
+
+	_tower_princess = AnimatedSprite2D.new()
+	_tower_princess.name = "TowerPrincess"
+	_tower_princess.sprite_frames = frames
+	_tower_princess.centered = true
+	# 两套塔贴图的顶层平台高度不同，分别配置，保证双方都真正站在塔顶。
+	var offset_key := "player_offset_y" if team == "player" else "enemy_offset_y"
+	var offset_y: float = float(princess_data.get(offset_key, princess_data.get("offset_y", -75.0)))
+	_tower_princess.position = Vector2(
+		float(princess_data.get("offset_x", 0.0)),
+		offset_y
+	)
+	var visual_scale: float = float(princess_data.get("visual_scale", 0.05))
+	_tower_princess.scale = Vector2(visual_scale, visual_scale / BattleConstants.Y_COMPRESS)
+	_tower_princess.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	add_child(_tower_princess)
+
+	# 我方在地图下方，正常待机展示背身；敌方在地图上方，正常待机展示面向下。
+	_tower_princess_idle_animation = "idle_back" if team == "player" else "idle_front"
+	if not frames.has_animation(_tower_princess_idle_animation):
+		_tower_princess_idle_animation = "idle_back"
+	_tower_princess.animation_finished.connect(_on_tower_princess_animation_finished)
+	_set_tower_princess_idle()
+
+	# 发射点与塔顶公主的手部对齐。AttackComponent 只读取该视觉偏移，
+	# 不会影响塔原有的锁定目标、攻击范围、攻速或伤害。
+	# 未显式配置时，按模型中心位置自动推导，移动公主高度时箭矢高度也会同步变化。
+	projectile_emit_offset_y = float(princess_data.get("projectile_emit_offset_y", -offset_y - 10.0))
+
+
+func _set_tower_princess_idle() -> void:
+	if _tower_princess and not _tower_princess_idle_animation.is_empty():
+		_tower_princess.play(_tower_princess_idle_animation)
+
+
+## AttackComponent 在真正出手时调用。塔本体不移动，只让塔顶公主播放一次拉弓动作。
+func _on_attack_triggered() -> void:
+	if _tower_princess == null:
+		return
+	_play_tower_princess_attack()
+	# 塔的攻击逻辑仅在 host 端运行；把纯视觉动画同步到 client。
+	if NetworkManager.is_server():
+		_rpc_play_tower_princess_attack.rpc()
+
+
+func _play_tower_princess_attack() -> void:
+	if _tower_princess == null:
+		return
+	var attack_animation := "attack_back" if team == "player" else "attack_front"
+	if _tower_princess.sprite_frames.has_animation(attack_animation):
+		_tower_princess.play(attack_animation)
+
+
+func _on_tower_princess_animation_finished() -> void:
+	_set_tower_princess_idle()
+
+
+## 联机 client 使用本地镜像后的阵营来选择朝向，因此仍保持“自己背身、对方朝下”的视角规则。
+@rpc("authority", "call_remote", "reliable")
+func _rpc_play_tower_princess_attack() -> void:
+	if NetworkManager.is_networked_client():
+		_play_tower_princess_attack()
 
 
 ## 创建血条数值标签。我方在血条下方（重叠），敌方在血条上方（重叠）。
@@ -225,6 +309,8 @@ func die() -> void:
 		# Client 端：不注销、不发信号，只隐藏视觉（由 Synchronizer 同步 is_dead 触发）
 		if _tower_sprite:
 			_tower_sprite.visible = false
+		if _tower_princess:
+			_tower_princess.visible = false
 		if health_bar:
 			health_bar.visible = false
 		if _hp_label:
@@ -233,6 +319,8 @@ func die() -> void:
 	EntityRegistry.unregister(self)
 	if _tower_sprite:
 		_tower_sprite.visible = false
+	if _tower_princess:
+		_tower_princess.visible = false
 	if health_bar:
 		health_bar.visible = false
 	if _hp_label:
@@ -245,6 +333,8 @@ func die() -> void:
 func _on_remote_death() -> void:
 	if _tower_sprite:
 		_tower_sprite.visible = false
+	if _tower_princess:
+		_tower_princess.visible = false
 	if health_bar:
 		health_bar.visible = false
 	if _hp_label:
