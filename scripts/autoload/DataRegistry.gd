@@ -577,6 +577,59 @@ var unit_data := {
 			"deploy": "deploy_prince",
 			"charge": "prince_charge",
 		},
+		# 帧动画：walk/attack/charge × front(back)。1024×768 高清图。
+		# charge（冲刺）= 冲锋状态专属动画，get_visual_state 在 is_charging 时返回 "charge" 触发。
+		# walk_01 与 attack_01 公用同一张图（移动第1帧=攻击第1帧），同源拷贝。
+		"animation": {
+			"hide_placeholder": true,
+			"visual_offset_x": 0.0,
+			"visual_offset_y": -24.0,   # 待校准
+			"visual_scale": 0.12,       # 扩大一倍（用户反馈）
+			"health_bar_y": -60.0,      # 待校准
+			"texture_filter": "linear",
+			"states": {
+				"walk_back": {
+					"frames": ["walk_back_01.png", "walk_back_02.png"],
+					"duration": [0.25, 0.25],
+					"mode": "loop",
+				},
+				"walk_front": {
+					"frames": ["walk_front_01.png", "walk_front_02.png"],
+					"duration": [0.25, 0.25],
+					"mode": "loop",
+				},
+				"idle_back": {
+					"frames": ["walk_back_01.png"],
+					"duration": [0.3],
+					"mode": "loop",
+				},
+				"idle_front": {
+					"frames": ["walk_front_01.png"],
+					"duration": [0.3],
+					"mode": "loop",
+				},
+				"attack_back": {
+					"frames": ["attack_back_01.png", "attack_back_02.png"],
+					"duration": [0.12, 0.12],
+					"mode": "once",
+				},
+				"attack_front": {
+					"frames": ["attack_front_01.png", "attack_front_02.png"],
+					"duration": [0.12, 0.12],
+					"mode": "once",
+				},
+				"charge_back": {
+					"frames": ["charge_back_01.png", "charge_back_02.png"],
+					"duration": [0.1, 0.1],
+					"mode": "loop",
+				},
+				"charge_front": {
+					"frames": ["charge_front_01.png", "charge_front_02.png"],
+					"duration": [0.1, 0.1],
+					"mode": "loop",
+				},
+			},
+		},
 	},
 	"mortar": {
 		"id": "mortar",
@@ -1111,11 +1164,13 @@ var unit_data := {
 			"targeting": "any",
 			"attack_ground": true,
 			"attack_air": true,
-			"attack_range": 10.5,
-			"attack_interval": 3.0,
+			"attack_range": 9.5,
+			"attack_interval": 2.5,
 			"first_attack_delay": 0.5,
 			"delivery": "projectile",
-			"trajectory": "linear",
+			"trajectory": "ballistic",   # 高抛弹道（抄迫击炮：MortarShell 弧线飞行+落地爆炸范围圈）
+			"arc_height": 5.0,           # 弧高峰值（格），随距离自适应（近处低远处高）
+			"projectile_appearance": "arrow",  # 箭矢外观（抄箭雨白线+羽尾），落地爆炸圈
 			"impact_type": "splash",
 			"impact_radius": 2.0,
 			"damage": 168,
