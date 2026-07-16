@@ -858,12 +858,14 @@ func _sync_state_to_client() -> void:
 				var b_active: bool = attack.has_beam_target()
 				var b_target := Vector2.ZERO
 				var b_stage := 0
+				var b_altitude := 0.0
 				if b_active:
 					var bt = attack.get_beam_target()
 					if bt and is_instance_valid(bt):
 						b_target = BattlePathing.game_position_of(bt)
+						b_altitude = bt.altitude
 					b_stage = attack.get_ramp_stage_index()
-				beam_states.append([child.name, b_active, b_target.x, b_target.y, b_stage])
+				beam_states.append([child.name, b_active, b_target.x, b_target.y, b_stage, b_altitude])
 	_rpc_sync_units.rpc(unit_states)
 	if not beam_states.is_empty():
 		_rpc_sync_beams.rpc(beam_states)
@@ -881,9 +883,10 @@ func _rpc_sync_beams(states: Array) -> void:
 		# 光束目标位置镜像（与单位/塔位置镜像一致）
 		var target_pos := BattleConstants.mirror(Vector2(s[2], s[3]))
 		var stage: int = s[4]
+		var altitude: float = s[5]
 		var unit = units_root.get_node_or_null(unit_name)
 		if unit is UnitBase:
-			unit.update_beam_from_sync(active, target_pos, stage)
+			unit.update_beam_from_sync(active, target_pos, stage, altitude)
 
 
 ## Host → Client：定频同步所有单位/塔状态。替代 MultiplayerSynchronizer 的手动方案。

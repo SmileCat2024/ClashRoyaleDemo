@@ -46,6 +46,7 @@ var _builder_grid: Control
 var _builder_count: Label
 var _builder_confirm: Button
 var _builder_frames: Dictionary = {}  # card_id -> 选中金色边框 Panel
+var _builder_card_nodes: Dictionary = {}  # card_id -> {tex, btn} 冲突视觉更新用
 var _builder_selection: Array = []    # 已选 card_id 列表
 const BUILDER_COLS: int = 4
 const BUILDER_CARD_W: float = 92.0
@@ -791,6 +792,7 @@ func _refresh_builder_grid() -> void:
 	for child in _builder_grid.get_children():
 		child.queue_free()
 	_builder_frames.clear()
+	_builder_card_nodes.clear()
 	var pool := _builder_pool()
 	for i in range(pool.size()):
 		var card_id: String = pool[i]
@@ -821,7 +823,9 @@ func _refresh_builder_grid() -> void:
 		btn.add_theme_stylebox_override("pressed", StyleBoxEmpty.new())
 		btn.pressed.connect(_toggle_builder_card.bind(card_id))
 		slot.add_child(btn)
+		_builder_card_nodes[card_id] = {"tex": tex, "btn": btn}
 		_builder_grid.add_child(slot)
+	_apply_conflict_states()
 
 
 func _toggle_builder_card(card_id: String) -> void:
@@ -831,10 +835,42 @@ func _toggle_builder_card(card_id: String) -> void:
 	else:
 		if _builder_selection.size() >= 8:
 			return
+		if _would_conflict(card_id):
+			return  # 与已选卡 unit_id 冲突（精英 vs 普通同单位），禁止同选
 		_builder_selection.append(card_id)
 	if _builder_frames.has(card_id):
 		_builder_frames[card_id].visible = card_id in _builder_selection
+	_apply_conflict_states()
 	_update_builder_hud()
+
+
+## 互斥检查：选 card_id 是否会与已选卡 unit_id 冲突（精英 vs 普通同单位不能同选）
+func _would_conflict(card_id: String) -> bool:
+	var my_unit: String = DataRegistry.card_data[card_id].get("unit_id", "")
+	if my_unit == "":
+		return false
+	for sel_id in _builder_selection:
+		if sel_id == card_id:
+			continue
+		if DataRegistry.card_data[sel_id].get("unit_id", "") == my_unit:
+			return true
+	return false
+
+
+## 更新所有卡牌的冲突视觉：未选但会冲突的卡变灰禁用，其余正常
+func _apply_conflict_states() -> void:
+	for card_id in _builder_card_nodes:
+		var card: String = card_id
+		var node := _builder_card_nodes[card_id] as Dictionary
+		if node == null or node.is_empty():
+			continue
+		var conflict := _would_conflict(card) and not (card in _builder_selection)
+		var tex := node.get("tex", null) as TextureRect
+		var btn := node.get("btn", null) as Button
+		if tex:
+			tex.modulate = Color(0.35, 0.35, 0.35) if conflict else Color.WHITE
+		if btn:
+			btn.disabled = conflict
 
 
 func _update_builder_hud() -> void:
