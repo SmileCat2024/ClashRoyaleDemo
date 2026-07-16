@@ -31,11 +31,24 @@ const C_STREAK     := Color(1.0, 0.910, 0.373)        # rgba(255,232,95)
 
 const CORE_SEGMENTS := 36  # 核心束采样段数（原型150，降采样保性能）
 
+# 官方素材只有一段连续激光循环，而不是三段独立音效。
+# 因此设计意图是“锁定期间持续灼烧”；三阶段通过与伤害档位同步的音量/音调递进表达，
+# 不伪造未提供的升档音效。
+const LASER_LOOP_PATH := "res://assets/audio/sfx/official_inferno_laser_loop.ogg"
+const LASER_AUDIO_STAGES := [
+	{ "volume_db": -22.0, "pitch_scale": 0.88 }, # 0~2 秒：低能量预热（43 伤害）
+	{ "volume_db": -16.0, "pitch_scale": 1.00 }, # 2~4 秒：稳定升温（158 伤害）
+	{ "volume_db": -10.0, "pitch_scale": 1.12 }, # 4 秒后：满功率灼烧（847 伤害）
+]
+const LASER_VOLUME_RAMP_DB_PER_SEC := 28.0
+
 var _from: Vector2 = Vector2.ZERO
 var _to: Vector2 = Vector2.ZERO
 var _stage: int = 0
 var _time: float = 0.0
 var _pixel_scale: float = 1.0
+var _laser_player: AudioStreamPlayer = null
+var _laser_target_volume_db := -80.0
 
 
 func _ready() -> void:
@@ -44,10 +57,17 @@ func _ready() -> void:
 	mat.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
 	material = mat
 	z_index = 5  # 相对父单位略高，光束画在 sprite 上方
+	_setup_laser_audio()
 
 
 func _process(delta: float) -> void:
 	_time += delta
+	if _laser_player != null and _laser_player.playing:
+		_laser_player.volume_db = move_toward(
+			_laser_player.volume_db,
+			_laser_target_volume_db,
+			LASER_VOLUME_RAMP_DB_PER_SEC * delta
+		)
 
 
 ## 由 UnitBase 每帧调用，设置光束起止/阶段并触发重绘
@@ -56,7 +76,53 @@ func set_params(from_l: Vector2, to_l: Vector2, stage: int, pixel_scale: float) 
 	_to = to_l
 	_stage = clampi(stage, 0, 2)
 	_pixel_scale = pixel_scale
+	_activate_laser_audio()
+	_apply_laser_audio_stage()
 	queue_redraw()
+
+
+## 光束隐藏（目标丢失/死亡）时立即停止，避免在无目标状态残留持续声。
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_VISIBILITY_CHANGED and not is_visible_in_tree():
+		_stop_laser_audio()
+
+
+func _exit_tree() -> void:
+	_stop_laser_audio()
+
+
+func _setup_laser_audio() -> void:
+	var stream := load(LASER_LOOP_PATH)
+	if not (stream is AudioStream):
+		push_warning("[InfernoBeam] 缺少激光循环音: " + LASER_LOOP_PATH)
+		return
+	if stream is AudioStreamOggVorbis:
+		(stream as AudioStreamOggVorbis).loop = true
+	_laser_player = AudioStreamPlayer.new()
+	_laser_player.stream = stream
+	_laser_player.bus = "SFX"
+	_laser_player.volume_db = -80.0
+	add_child(_laser_player)
+
+
+func _activate_laser_audio() -> void:
+	if _laser_player != null and not _laser_player.playing:
+		_laser_player.volume_db = -80.0
+		_laser_player.play()
+
+
+func _apply_laser_audio_stage() -> void:
+	if _laser_player == null:
+		return
+	var audio: Dictionary = LASER_AUDIO_STAGES[_stage]
+	_laser_target_volume_db = float(audio["volume_db"])
+	_laser_player.pitch_scale = float(audio["pitch_scale"])
+
+
+func _stop_laser_audio() -> void:
+	if _laser_player != null and _laser_player.playing:
+		_laser_player.stop()
+	_laser_target_volume_db = -80.0
 
 
 # ---- 数学工具（复刻原型 noise / hash）----

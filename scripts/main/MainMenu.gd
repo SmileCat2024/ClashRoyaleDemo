@@ -57,6 +57,8 @@ const BUILDER_STEP_Y: float = 94.0
 
 
 func _ready() -> void:
+	# menu BGM 原配置为空；现在播放新增的官方大厅音乐。
+	AudioManager.play_bgm("menu")
 	_selected_preset = Game.selected_deck_index
 	_build_base()
 	_build_lobby_layer()

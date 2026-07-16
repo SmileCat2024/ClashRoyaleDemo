@@ -319,6 +319,9 @@ func apply_awakening(effects: Dictionary) -> void:
 		var bonus_shield := int(effects["shield"])
 		shield += bonus_shield
 		current_shield += bonus_shield
+		# 当前觉醒单位仅骑士；护盾生成时播放对应原版护盾展开音。
+		if unit_id == "knight":
+			AudioManager.play("evolved_knight_shield", BattlePathing.game_position_of(self))
 
 	# 血量提升（max_hp / current_hp 同步增加，觉醒版保持满血）
 	if effects.has("max_hp_bonus"):
@@ -418,6 +421,9 @@ func trigger_skill(target_pos: Vector2) -> void:
 	# 启动冷却
 	_skill_total_cooldown = float(elite_skill_data.get("cooldown", 0.0))
 	_skill_cooldown_timer = _skill_total_cooldown
+	var skill_sfx := str(elite_skill_data.get("sfx_cast", ""))
+	if skill_sfx != "":
+		AudioManager.play(skill_sfx, BattlePathing.game_position_of(self))
 	# 广播技能释放 + 冷却开始（SkillBar 启动倒计时动画）
 	SignalBus.elite_skill_cast.emit(self, elite_skill_data, target_pos)
 	SignalBus.elite_skill_cooldown_changed.emit(self, _skill_cooldown_timer, _skill_total_cooldown)
@@ -525,7 +531,6 @@ func _trigger_dash_to_weakest(effect: Dictionary) -> bool:
 	is_dashing = true
 	_is_moving = true
 	queue_redraw()
-	AudioManager.play_unit_sfx(unit_id, "deploy")  # 复用部署音效作为冲刺音效（临时）
 	return true
 
 
@@ -627,6 +632,9 @@ func _arrive_dash() -> void:
 	if _dash_damage > 0:
 		DamageSystem.deal_area_damage(_dash_target_pos, _dash_radius, _dash_damage, team, _dash_tower_damage)
 		BlastRingEffect.spawn(get_parent(), _dash_target_pos, _dash_radius)
+		var impact_sfx := str(elite_skill_data.get("sfx_impact", ""))
+		if impact_sfx != "":
+			AudioManager.play(impact_sfx, _dash_target_pos)
 	# 退出冲刺状态
 	is_dashing = false
 	_dash_target = null
@@ -1519,13 +1527,21 @@ func _fire_sniper(target) -> void:
 	_sniper_fire_lock = SNIPER_FIRE_LOCK
 	_on_attack_triggered()
 	queue_redraw()
-	# 狙击弹使用觉醒专属音效；普通普攻仍沿用火枪手常规攻击音。
-	AudioManager.play_unit_sfx(unit_id, "sniper_attack", BattlePathing.game_position_of(self))
+	# 狙击弹只在觉醒状态存在，使用原版觉醒火枪手专属射击音。
+	AudioManager.play("attack_evolved_musketeer_sniper", BattlePathing.game_position_of(self))
 	# 飞行子弹视觉 + 延迟伤害结算（子弹到达目标时才造成伤害）
 	var dmg := _sniper_damage
 	SniperTracer.spawn(get_parent(), position, target_pos, func():
 		DamageSystem.resolve_impact(target, dmg)
+		AudioManager.play("impact_evolved_musketeer_big", target_pos)
 	)
+	# 装填提示与射击动作保持同一位置，即使单位在回调前死亡也不读取失效节点。
+	var reload_pos := BattlePathing.game_position_of(self)
+	var tree := get_tree()
+	if tree != null:
+		tree.create_timer(SNIPER_FIRE_LOCK).timeout.connect(func():
+			AudioManager.play("reload_evolved_musketeer", reload_pos)
+		)
 	# 弹药消耗
 	_sniper_shots -= 1
 	_sniper_cooldown_timer = _sniper_cooldown
@@ -1566,6 +1582,7 @@ func _find_nearest_enemy_tower():
 func die() -> void:
 	if is_dead:
 		return
+	AudioManager.play_unit_sfx(unit_id, "death", BattlePathing.game_position_of(self))
 	_clear_passive_mark()
 	if not _is_remote() and _elixir_on_death > 0 and not _elixir_death_paid:
 		_elixir_death_paid = true
