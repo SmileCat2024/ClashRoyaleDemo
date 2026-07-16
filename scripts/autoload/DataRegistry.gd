@@ -1058,6 +1058,7 @@ var unit_data := {
 			"visual_offset_y": -15.0,
 			"visual_scale": 0.03,
 			"health_bar_y": -38.0,
+			"hide_placeholder": true,  # 已校准，隐藏 ColorRect 占位方块
 			"texture_filter": "linear",
 			"states": {
 				"walk_front": { "frames": ["walk_front_01.png"], "duration": [0.3], "mode": "loop" },
@@ -1522,6 +1523,7 @@ var unit_data := {
 			"visual_offset_y": 6.0,
 			"visual_scale": 0.03,
 			"health_bar_y": -15.0,
+			"hide_placeholder": true,  # 已校准，隐藏 ColorRect 占位方块
 			"texture_filter": "linear",
 			"states": {
 				"walk_front": { "frames": ["walk_front_01.png"], "duration": [0.3], "mode": "loop" },
@@ -1566,6 +1568,7 @@ var unit_data := {
 			"visual_offset_y": -7.0,
 			"visual_scale": 0.0375,
 			"health_bar_y": -6.0,
+			"hide_placeholder": true,  # 已校准，隐藏 ColorRect 占位方块
 			"texture_filter": "linear",
 			"states": {
 				"idle": { "frames": ["idle_01.png"], "duration": [0.3], "mode": "loop" },
