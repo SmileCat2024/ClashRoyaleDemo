@@ -41,6 +41,13 @@ var is_dead: bool = false:
 		if value and not was_dead and _is_remote():
 			_on_remote_death()
 
+# ---- 隐身状态（皇室幽灵）----
+## 当前是否隐身（不可被索敌锁定）。由子类 UnitBase 按数据驱动逻辑维护：
+## 移动/待机时为 true，攻击显形期间为 false。隐身不影响受伤（范围伤害/法术仍命中）。
+## 索敌系统（TargetingSystem.find_best_target）跳过 is_stealthed==true 的实体。
+## 联机下由 host 计算并定频同步（_rpc_sync_units），client 直接读取。
+var is_stealthed: bool = false
+
 
 # ---- 联机 ----
 var network_id: int = 0  ## 联机唯一标识（host 分配），用于 RPC 配对同名节点
@@ -52,6 +59,11 @@ var attacks_data: Array = []
 var death_damage: int = 0          ## 死亡时对周围敌方造成的伤害（0 = 无死亡伤害）
 var death_radius: float = 0.0      ## 死亡伤害范围（像素）
 var death_fuse_time: float = 0.0   ## 死亡炸弹引信时间（秒，0 = 无延迟效果）
+
+## 死亡时在死亡位置生成的单位 id（空 = 不生成）。如凤凰死亡后留下凤凰蛋。
+## 生成经 SpawnManager.spawn_unit_by_id，复用实体注册与联机生成同步。
+## 与 death_damage 可同时生效（凤凰：先爆炸伤害，再留蛋；爆炸只打敌方，不会误伤同方留下的蛋）。
+var death_spawn_unit_id: String = ""
 
 # ---- 投射物落点召唤（觉醒效果）----
 ## 非空时，弹道投射物落地并完成伤害结算后，在落点召唤该 unit_id 对应的一只单位。
@@ -191,6 +203,7 @@ func get_move_direction() -> Vector2:
 func _style_health_bar() -> void:
 	if health_bar == null:
 		return
+	health_bar.z_index = 1
 	var bg := StyleBoxFlat.new()
 	var fill := StyleBoxFlat.new()
 	# 圆角 + 描边统一参数

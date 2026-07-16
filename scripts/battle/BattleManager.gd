@@ -864,7 +864,7 @@ func _sync_state_to_client() -> void:
 		if not (child is CombatantBase) or not child.initialized:
 			continue
 		unit_states.append([child.name, child.position.x, child.position.y,
-			child.current_hp, child.current_shield, child.is_dead])
+			child.current_hp, child.current_shield, child.is_dead, child.is_stealthed])
 		# 地狱塔光束：beam_emit_offset_y != 0 的单位有光束能力
 		if child is UnitBase and child.beam_emit_offset_y != 0.0:
 			var attack = child.get_primary_attack()
@@ -904,7 +904,7 @@ func _rpc_sync_beams(states: Array) -> void:
 
 
 ## Host → Client：定频同步所有单位/塔状态。替代 MultiplayerSynchronizer 的手动方案。
-## 数据格式：Array of [name, x, y, hp, shield, is_dead]
+## 数据格式：Array of [name, x, y, hp, shield, is_dead, stealthed]
 @rpc("authority", "call_remote", "unreliable")
 func _rpc_sync_units(states: Array) -> void:
 	if is_host:
@@ -942,6 +942,9 @@ func _rpc_sync_units(states: Array) -> void:
 		# 死亡同步（触发 _on_remote_death 播放死亡视觉）
 		if s[5] and not unit.is_dead:
 			unit.is_dead = true
+		# 隐身同步（皇室幽灵；数组含第 7 元素时读取，向后兼容旧协议）
+		if s.size() > 6:
+			unit.is_stealthed = bool(s[6])
 		# 国王塔激活检测：hp 低于上限说明已受击
 		if unit is TowerBase and unit.tower_type == "king" and not unit.king_activated:
 			if unit.current_hp < unit.max_hp:

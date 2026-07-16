@@ -25,6 +25,9 @@ static func find_nearest_enemy_unit(from_position: Vector2, self_team: String, u
 			continue
 		if u_team == null or not is_enemy(self_team, u_team):
 			continue
+		# 隐身过滤：隐身单位（皇室幽灵移动中）不可被索敌锁定
+		if u.get("is_stealthed") == true:
+			continue
 		var d = from_position.distance_to(BattlePathing.game_position_of(u))
 		if d < nearest_dist:
 			nearest_dist = d
@@ -90,6 +93,9 @@ static func find_best_target(
 			continue
 		# 死亡过滤
 		if e.get("is_dead") == true:
+			continue
+		# 隐身过滤：隐身单位（皇室幽灵移动/待机中）不可被索敌锁定
+		if e.get("is_stealthed") == true:
 			continue
 
 		# targeting 规则过滤

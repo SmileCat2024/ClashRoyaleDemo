@@ -24,6 +24,8 @@ var min_attack_range: float = 0.0       ## 最小射程/盲区（像素）。>0 
 var trajectory: String = ""             ## "" | "linear" | "ballistic"（ballistic=高抛溅射，发射 MortarShell）
 var impact_type: String = "single"      ## "single" | "splash"（splash=命中后范围溅射）
 var impact_radius: float = 0.0          ## 溅射半径（像素）
+var impact_arc: float = 0.0             ## 扇形溅射角度（度，0/360=全圆）。>0 且 <360 时仅命中朝攻击方向±arc/2 的目标（通用机制，当前无单位使用）
+var impact_offset: float = 0.0           ## 溅射圆心偏移距离（像素）。>0 时溅射发生在攻击者朝目标方向此距离处，而非自身位置（皇室幽灵前方溅射）
 var arc_height: float = 0.0             ## 弹道弧高峰值（格），仅 trajectory=ballistic 时传给飞行物
 var max_range: float = 0.0              ## 穿透最大射程（像素），仅 impact_type=piercing 时用
 var pierce_radius: float = 0.0          ## 穿透判定半径（像素），仅 impact_type=piercing 时用
@@ -84,6 +86,8 @@ func setup(attack_data: Dictionary) -> void:
 	trajectory = attack_data.get("trajectory", "")
 	impact_type = attack_data.get("impact_type", "single")
 	impact_radius = BattleConstants.px(float(attack_data.get("impact_radius", 0.0)))
+	impact_arc = float(attack_data.get("impact_arc", 0.0))
+	impact_offset = BattleConstants.px(float(attack_data.get("impact_offset", 0.0)))
 	arc_height = float(attack_data.get("arc_height", 0.0))
 	max_range = BattleConstants.px(float(attack_data.get("max_range", 0.0)))
 	pierce_radius = BattleConstants.px(float(attack_data.get("pierce_radius", 0.0)))
@@ -343,9 +347,12 @@ func _can_attack_target(target: Node) -> bool:
 
 ## 通知宿主触发攻击视觉。联机 host 端由 UnitBase 发 RPC 同步给 client；
 ## 非联机 / 无动画单位由 UnitBase._on_attack_triggered 内部跳过。
+## 同时通知宿主"攻击已开始"（_on_attack_started），用于隐身单位（皇室幽灵）进入显形态。
 func _notify_attack_visual() -> void:
 	if combatant.has_method("_on_attack_triggered"):
 		combatant._on_attack_triggered()
+	if combatant.has_method("_on_attack_started"):
+		combatant._on_attack_started()
 
 
 ## 执行一次攻击，按 delivery 分支。
@@ -367,11 +374,21 @@ func _execute_attack() -> void:
 	match delivery:
 		"instant":
 			if impact_type == "splash" and impact_radius > 0.0:
-				# 近战范围溅射（瓦基里转斧）：以自身位置为中心，对范围内敌方造成伤害
-				# 传 attack_ground/attack_air 让 splash 遵守攻击范围（瓦基里仅地面，不误伤空中）
+				# 近战范围溅射：以自身位置为中心（瓦基里转斧），或在攻击距离处（皇室幽灵劈砍落点）
 				var center := BattlePathing.game_position_of(combatant)
+				# 溅射圆心偏移（皇室幽灵）：朝目标方向 impact_offset 处产生溅射，而非自身位置
+				if impact_offset > 0.0 and current_target != null and is_instance_valid(current_target):
+					var dir := BattlePathing.game_position_of(current_target) - center
+					if dir.length_squared() > 1.0:
+						center += dir.normalized() * impact_offset
 				_show_splash_impact_vfx(center)
-				DamageSystem.deal_area_damage(center, impact_radius, dmg, combatant.team, -1, attack_ground, attack_air)
+				# 传 attack_ground/attack_air 让 splash 遵守攻击范围（仅地面，不误伤空中）
+				# 扇形溅射（impact_arc 0/360=全圆）：仅命中朝锁定目标方向 ±arc/2 的目标
+				if impact_arc > 0.0 and impact_arc < 360.0 and current_target != null and is_instance_valid(current_target):
+					var facing := BattlePathing.game_position_of(current_target) - BattlePathing.game_position_of(combatant)
+					DamageSystem.deal_arc_damage(center, impact_radius, impact_arc, facing, dmg, combatant.team, -1, attack_ground, attack_air)
+				else:
+					DamageSystem.deal_area_damage(center, impact_radius, dmg, combatant.team, -1, attack_ground, attack_air)
 			else:
 				DamageSystem.resolve_impact(current_target, dmg)
 				_play_impact_sfx("charge_impact" if was_charging else "impact")
