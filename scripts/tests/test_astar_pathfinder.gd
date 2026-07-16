@@ -128,6 +128,27 @@ func test_bridge_x_direct_cross() -> void:
 	assert_eq(path[-1], Vector2(70, 200), "路径终点应等于目标")
 
 
+## 目标建筑紧贴河道、攻击者在另一侧时，接近格必须留在目标一侧。
+## 否则 A* 会把本侧河岸误当成建筑接近点，最后朝建筑中心直线走进非桥面河道并卡死。
+func test_cross_river_building_target_routes_through_bridge() -> void:
+	var building_pos := Vector2(180, 280)
+	_make_obstacle(building_pos, 12.0)
+	var from_pos := Vector2(180, 360)
+	var path := AStarPathfinder.find_path(from_pos, building_pos, 0.75)
+
+	assert_false(path.is_empty(), "隔河建筑目标应能生成路径")
+	assert_eq(path[-1], building_pos, "路径终点仍应保留精确建筑位置")
+	assert_false(_path_crosses_off_bridge_river(from_pos, path),
+		"隔河建筑目标的路径不得直穿非桥面河道")
+
+	var left_bridge := Rect2(45, 290, 50, 65)
+	var right_bridge := Rect2(265, 290, 50, 65)
+	assert_true(
+		_path_has_point_in_rect(path, left_bridge) or _path_has_point_in_rect(path, right_bridge),
+		"巨人追击隔河建筑时必须先经过桥面"
+	)
+
+
 # ============================================================
 #  桥入口卡兵回归（路径不得斜穿桥面外水域）
 # ============================================================

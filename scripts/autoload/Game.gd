@@ -24,12 +24,15 @@ var network_mode: bool = false
 enum MatchMode { FAST_7X, CLASSIC_1V1 }
 var match_mode: int = MatchMode.FAST_7X
 
-## 大厅中选择的预设卡组。卡组由设计方固定，不开放编辑。
+## 大厅中选择的预设卡组。
 var selected_deck_index: int = 0
 var remote_deck_cards: Array = []
-## 自由组卡：玩家在选卡界面自选的 8 张卡牌。use_custom_deck 为 true 时优先于预设卡组。
+## 自由组卡会直接更新当前选中的预设槽位。保留这两个字段以兼容旧调用方。
 var custom_deck: Array = []
 var use_custom_deck: bool = false
+## 运行时可编辑的预设卡组。常量 PRESET_DECKS 只作为每个槽位的初始配置，
+## 避免自由组卡误改共享默认数据，也确保切换预设后能保留各自的修改。
+var configured_preset_decks: Array = []
 ## 加载页提前洗好的本局牌序。BattleManager 复用它，保证预加载的初始手牌就是实际初始手牌。
 var prepared_player_deck_order: Array = []
 var prepared_enemy_deck_order: Array = []
@@ -59,17 +62,34 @@ func set_selected_deck(index: int) -> void:
 	print("[Game] selected deck =", selected_deck_index)
 
 
-## 设置自由组卡（由选卡界面调用，选满 8 张后确认）
-func set_custom_deck(cards: Array) -> void:
+## 确保每套预设都有独立的可编辑运行时副本。
+func _ensure_configured_preset_decks() -> void:
+	if configured_preset_decks.size() == PRESET_DECKS.size():
+		return
+	configured_preset_decks.clear()
+	for preset in PRESET_DECKS:
+		var cards: Array = preset.get("cards", [])
+		configured_preset_decks.append(cards.duplicate())
+
+
+## 更新当前选中预设的卡组。自由组卡确认后和开始游戏都会经由此处读取同一份数据。
+func set_selected_deck_cards(cards: Array) -> void:
+	_ensure_configured_preset_decks()
+	configured_preset_decks[selected_deck_index] = cards.duplicate()
+	# 旧字段作为当前槽位的镜像保留，不能再作为全局覆盖层影响其他预设。
 	custom_deck = cards.duplicate()
-	use_custom_deck = true
-	print("[Game] custom deck set:", custom_deck)
+	use_custom_deck = false
+	print("[Game] preset %d deck updated: %s" % [selected_deck_index, cards])
+
+
+## 兼容旧的自由组卡调用：现在它会更新当前预设，而不是创建脱离预设的全局覆盖层。
+func set_custom_deck(cards: Array) -> void:
+	set_selected_deck_cards(cards)
 
 
 func get_selected_deck() -> Array:
-	if use_custom_deck and custom_deck.size() >= 5:
-		return custom_deck.duplicate()
-	return PRESET_DECKS[selected_deck_index].get("cards", []).duplicate()
+	_ensure_configured_preset_decks()
+	return configured_preset_decks[selected_deck_index].duplicate()
 
 
 func set_remote_deck(cards: Array) -> void:
@@ -122,4 +142,8 @@ func return_to_menu() -> void:
 ## 重新开始战斗（重新加载战斗场景）
 func restart_battle() -> void:
 	current_state = GameState.BATTLE
+	# 重开会重新实例化 BattleScene；清空上一局的场景握手，避免旧的 ready 标记
+	# 让 Host 在 Client 新场景尚未创建时提前发送 BattleManager RPC。
+	if network_mode and NetworkManager.is_networked():
+		NetworkManager.reset_battle_scene_readiness()
 	SceneLoader.load_battle()

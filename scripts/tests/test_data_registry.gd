@@ -112,6 +112,35 @@ func test_fourth_preset_uses_ranger_instead_of_goblins() -> void:
 	assert_false(cards.has("card_goblins"), "第 4 套预设应移除哥布林")
 
 
+func test_custom_deck_updates_the_current_preset_slot() -> void:
+	var original_index := Game.selected_deck_index
+	Game.set_selected_deck(0)
+	var original_cards := Game.get_selected_deck()
+	var updated_cards := [
+		"card_mortar", "card_princess", "card_knight_elite", "card_archers",
+		"card_fireball", "card_poison", "card_ranger", "card_inferno_tower",
+	]
+	Game.set_selected_deck_cards(updated_cards)
+	assert_eq(Game.get_selected_deck(), updated_cards,
+		"自由组卡确认后应回写当前预设，开始游戏读取到相同卡组")
+	Game.prepare_battle_decks(Game.get_selected_deck(), [])
+	var prepared_cards := Game.get_prepared_player_deck()
+	assert_eq(prepared_cards.size(), updated_cards.size(),
+		"开始游戏锁定牌序时应使用自由组卡更新后的当前预设")
+	for card_id in updated_cards:
+		assert_true(prepared_cards.has(card_id),
+			"开始游戏锁定的牌序缺少自由组卡: " + card_id)
+	Game.clear_prepared_battle_decks()
+	Game.set_selected_deck(1)
+	assert_ne(Game.get_selected_deck(), updated_cards,
+		"修改当前预设不应覆盖其他预设槽位")
+	Game.set_selected_deck(0)
+	assert_eq(Game.get_selected_deck(), updated_cards,
+		"切换预设后，当前预设的自由组卡修改应保留")
+	Game.set_selected_deck_cards(original_cards)
+	Game.set_selected_deck(original_index)
+
+
 func test_ranger_visual_uses_final_sprite_only() -> void:
 	var animation: Dictionary = DataRegistry.unit_data["ranger"].get("animation", {})
 	assert_true(bool(animation.get("hide_placeholder", false)),

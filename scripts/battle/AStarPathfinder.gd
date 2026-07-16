@@ -59,11 +59,14 @@ static func find_path(from_pos: Vector2, to_pos: Vector2, mover_radius_cells: fl
 		if start_cell == Vector2i(-1, -1):
 			return [to_pos]
 
-	# 目标在障碍物内（如目标是塔）→ 沿接近方向退到边缘外
+	# 目标在障碍物内（如目标是塔）→ 沿接近方向退到边缘外。
+	# 目标位于河道一侧时，接近格必须也在该侧：否则建筑贴近河道时，
+	# 可能把河道另一侧的岸边误当作接近点，随后最后一段直线反复撞进河道。
 	if _is_blocked(goal_cell, grid):
-		goal_cell = _find_approach_cell(start_cell, goal_cell, grid)
+		var target_side := BattlePathing.river_side(to_pos)
+		goal_cell = _find_approach_cell(start_cell, goal_cell, grid, target_side)
 		if goal_cell == Vector2i(-1, -1):
-			goal_cell = _find_nearest_free_cell(_pos_to_cell(to_pos), grid)
+			goal_cell = _find_nearest_free_cell(_pos_to_cell(to_pos), grid, target_side)
 			if goal_cell == Vector2i(-1, -1):
 				return [to_pos]
 
@@ -429,8 +432,8 @@ static func _is_blocked(cell: Vector2i, grid: Dictionary) -> bool:
 
 
 ## BFS 找离 center 最近的非障碍格。完全被包围时返回 (-1, -1)。
-static func _find_nearest_free_cell(center: Vector2i, grid: Dictionary) -> Vector2i:
-	if not _is_blocked(center, grid) and _is_valid_cell(center):
+static func _find_nearest_free_cell(center: Vector2i, grid: Dictionary, required_river_side: int = 0) -> Vector2i:
+	if not _is_blocked(center, grid) and _is_valid_cell(center) and _is_on_required_river_side(center, required_river_side):
 		return center
 	# 螺旋向外搜索（BFS）
 	var queue: Array[Vector2i] = [center]
@@ -445,7 +448,7 @@ static func _find_nearest_free_cell(center: Vector2i, grid: Dictionary) -> Vecto
 			if not _is_valid_cell(n) or visited.has(n):
 				continue
 			visited[n] = true
-			if not _is_blocked(n, grid):
+			if not _is_blocked(n, grid) and _is_on_required_river_side(n, required_river_side):
 				return n
 			queue.append(n)
 	return Vector2i(-1, -1)
@@ -453,16 +456,22 @@ static func _find_nearest_free_cell(center: Vector2i, grid: Dictionary) -> Vecto
 
 ## 从 goal 沿 start→goal 反方向退，找到第一个非障碍格。
 ## 确保单位从正确方向接近目标（如塔），而不是绕到错误的一侧。
-static func _find_approach_cell(start: Vector2i, goal: Vector2i, grid: Dictionary) -> Vector2i:
+## required_river_side 非 0 时，避免把隔河的岸边误选为目标接近点。
+static func _find_approach_cell(start: Vector2i, goal: Vector2i, grid: Dictionary, required_river_side: int = 0) -> Vector2i:
 	var dir := Vector2(goal.x - start.x, goal.y - start.y)
 	if dir.length() < 0.01:
-		return _find_nearest_free_cell(goal, grid)
+		return _find_nearest_free_cell(goal, grid, required_river_side)
 	dir = dir.normalized()
 	var check_f := Vector2(goal)
 	for i in range(20):
 		check_f -= dir
 		var check_cell := Vector2i(int(round(check_f.x)), int(round(check_f.y)))
 		check_cell = _clamp_cell(check_cell)
-		if not _is_blocked(check_cell, grid):
+		if not _is_blocked(check_cell, grid) and _is_on_required_river_side(check_cell, required_river_side):
 			return check_cell
-	return _find_nearest_free_cell(goal, grid)
+	return _find_nearest_free_cell(goal, grid, required_river_side)
+
+
+## 检查候选格是否处于指定半场。required_river_side=0 表示不限制。
+static func _is_on_required_river_side(cell: Vector2i, required_river_side: int) -> bool:
+	return required_river_side == 0 or BattlePathing.river_side(_cell_to_pos(cell)) == required_river_side

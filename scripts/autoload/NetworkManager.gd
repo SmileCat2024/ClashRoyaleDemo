@@ -39,6 +39,11 @@ signal host_discovered(ip: String)
 ## LAN 发现：广播器状态变化
 signal discovery_started
 signal discovery_stopped
+## 远端已实例化战斗场景。该握手运行在常驻 Autoload 上，避免场景切换期间 RPC 找不到 BattleManager。
+signal remote_battle_scene_ready
+
+var _local_battle_scene_ready: bool = false
+var _remote_battle_scene_ready: bool = false
 
 # ---- LAN 发现内部对象 ----
 var _discovery: LanDiscovery = null
@@ -84,6 +89,7 @@ func leave() -> void:
 	_stop_discovery()
 	multiplayer.multiplayer_peer = OfflineMultiplayerPeer.new()
 	state = State.OFFLINE
+	reset_battle_scene_readiness()
 	print("[NetworkManager] 已断开")
 
 
@@ -115,6 +121,34 @@ func local_team() -> String:
 ## 远程玩家的阵营
 func remote_team() -> String:
 	return "enemy" if is_server() else "player"
+
+
+## 新的一局开始加载时清空场景握手状态。双方各自在进入加载页前调用。
+func reset_battle_scene_readiness() -> void:
+	_local_battle_scene_ready = false
+	_remote_battle_scene_ready = false
+
+
+## 当前端已实例化 BattleScene 后调用。RPC 挂在 Autoload，远端仍在菜单/加载页也能安全接收。
+func announce_battle_scene_ready() -> void:
+	if _local_battle_scene_ready:
+		return
+	_local_battle_scene_ready = true
+	if is_networked():
+		_rpc_battle_scene_ready.rpc()
+
+
+func is_remote_battle_scene_ready() -> bool:
+	return _remote_battle_scene_ready
+
+
+## 接收远端的战斗场景就绪通知。不能放在 BattleManager：其中一端加载较慢时该节点尚不存在。
+@rpc("any_peer", "call_remote", "reliable")
+func _rpc_battle_scene_ready() -> void:
+	if not is_networked() or _remote_battle_scene_ready:
+		return
+	_remote_battle_scene_ready = true
+	remote_battle_scene_ready.emit()
 
 ## 获取本机所有 IPv4 地址（用于显示给对方）
 func get_local_addresses() -> PackedStringArray:

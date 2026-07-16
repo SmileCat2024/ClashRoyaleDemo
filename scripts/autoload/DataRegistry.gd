@@ -501,6 +501,7 @@ var unit_data := {
 		"collision_radius": 0.75,  # 原版0.75
 		"hurt_radius": 0.75,
 		"mass": 10,
+		"knockback_immune": true,
 		"shadow_size": 0.8,
 		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		"attacks": [{
@@ -1053,11 +1054,12 @@ var unit_data := {
 		# walk/idle × front/back（显形·非透明）；walk_stealth × front/back（隐身·透明素材）
 		# attack × front/back 各 2 帧（起手→劈砍，mode=once）
 		# 隐身/显形由 SpriteAnimator 按 is_stealthed 切换 walk↔walk_stealth，不用 modulate.a
+		# 视觉校准：整体放大约 15%，模型上移 1 格，血条累计上移 2 格。
 		"animation": {
 			"visual_offset_x": 0.0,
-			"visual_offset_y": -15.0,
-			"visual_scale": 0.03,
-			"health_bar_y": -38.0,
+			"visual_offset_y": -35.0,
+			"visual_scale": 0.0345,
+			"health_bar_y": -78.0,
 			"hide_placeholder": true,  # 已校准，隐藏 ColorRect 占位方块
 			"texture_filter": "linear",
 			"states": {
@@ -1422,7 +1424,7 @@ var unit_data := {
 			"hide_placeholder": true,
 			"visual_offset_x": 0.0,
 			"visual_offset_y": -10.5,
-			"visual_scale": 0.015,
+			"visual_scale": 0.012,  # 视觉校准：缩小 20%
 			"health_bar_y": -70.0,
 			"texture_filter": "linear",
 			"states": {
@@ -1438,7 +1440,7 @@ var unit_data := {
 	},
 	"goblin_brawler": {
 		"id": "goblin_brawler",
-		"display_name": "哥布林斗士",
+		"display_name": "哥布林硬汉",
 		"max_hp": 1080,
 		"shield": 0,
 		"move_speed": 1.5,
@@ -1467,7 +1469,7 @@ var unit_data := {
 			"hide_placeholder": true,
 			"visual_offset_x": 0.0,
 			"visual_offset_y": -7.5,
-			"visual_scale": 0.015,
+			"visual_scale": 0.012,  # 视觉校准：缩小 20%
 			"health_bar_y": -60.0,
 			"texture_filter": "linear",
 			"states": {
@@ -1517,12 +1519,12 @@ var unit_data := {
 		# 凤凰：传奇飞行近战，中性单套贴图（1024×768 横向，linear 过滤）
 		# walk/idle × front/back（单帧移动）；attack × front/back 各 2 帧（起手→扑击）
 		# 飞行离地高度由 altitude 自动处理，此处仅精灵偏移
-		# 未校准：以下为初始估计值，保留 ColorRect 占位便于位置调试
+		# 视觉校准：在初始值基础上共放大约 50%，血条累计上移 2 格。
 		"animation": {
 			"visual_offset_x": 0.0,
 			"visual_offset_y": 6.0,
-			"visual_scale": 0.03,
-			"health_bar_y": -15.0,
+			"visual_scale": 0.04485,
+			"health_bar_y": -55.0,
 			"hide_placeholder": true,  # 已校准，隐藏 ColorRect 占位方块
 			"texture_filter": "linear",
 			"states": {
@@ -1561,13 +1563,13 @@ var unit_data := {
 		"hatch_time": 3.0,
 		"attacks": [],
 		# ---- 帧动画配置 ----
-		# 凤凰蛋：静态被动单位，单帧 idle（无方向无攻击）
-		# 未校准：以下为初始估计值
+		# 凤凰蛋：静态被动单位，单帧 idle（无方向无攻击）。
+		# 视觉校准：按原尺寸放大 1 倍（共为原来的 2 倍），血条轻微上移 0.3 格。
 		"animation": {
 			"visual_offset_x": -1.5,
 			"visual_offset_y": -7.0,
-			"visual_scale": 0.0375,
-			"health_bar_y": -6.0,
+			"visual_scale": 0.075,
+			"health_bar_y": -12.0,
 			"hide_placeholder": true,  # 已校准，隐藏 ColorRect 占位方块
 			"texture_filter": "linear",
 			"states": {
@@ -1981,7 +1983,7 @@ var card_data := {
 		"spawn_count": 1,
 		"spawn_spread": 0.0,
 		"icon": "res://assets/ui/cards/goblin_cage.png",
-		"description": "被摧毁或寿命结束时，放出一名快速近战的哥布林斗士。",
+		"description": "被摧毁或寿命结束时，放出一名快速近战的哥布林硬汉。",
 	},
 }
 

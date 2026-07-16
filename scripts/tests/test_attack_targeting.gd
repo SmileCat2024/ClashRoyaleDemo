@@ -126,6 +126,45 @@ func test_drops_locked_target_when_it_becomes_air() -> void:
 		"目标临时变为空中后，不能对空的攻击组件应取消锁定")
 
 
+func test_drops_locked_target_when_it_stealths() -> void:
+	# 锁定的目标进入隐身（皇室幽灵移动/待机）后应立即丢失锁定。
+	# 场上无其他敌人 → current_target 变 null，攻击者重新索敌无果。
+	var near := _make_enemy(Vector2(25, 0))
+	_comp.current_target = near
+
+	near.is_stealthed = true
+	_comp._update_targeting()
+
+	assert_null(_comp.current_target,
+		"锁定的目标进入隐身后应丢失锁定（不可穿透隐身继续追打）")
+
+
+func test_stealthed_target_switches_to_visible_enemy() -> void:
+	# 已锁定幽灵，幽灵隐身后视野内有其他显形敌人 → 应切换到显形敌人。
+	# 模拟火枪手锁定皇室幽灵、幽灵隐身、附近还有另一敌方单位的场景。
+	var ghost := _make_enemy(Vector2(25, 0))
+	var other := _make_enemy(Vector2(60, 0))
+	_comp.current_target = ghost
+
+	ghost.is_stealthed = true
+	_comp._update_targeting()
+
+	assert_eq(_comp.current_target, other,
+		"目标进入隐身后应切换到视野内最近的显形敌人")
+
+
+func test_keeps_locked_target_while_visible() -> void:
+	# 反向回归：目标显形期间（is_stealthed=false）不应被误判为无效。
+	var ghost := _make_enemy(Vector2(25, 0))
+	ghost.is_stealthed = false  # 显形（皇室幽灵攻击显形态）
+	_comp.current_target = ghost
+
+	_comp._update_targeting()
+
+	assert_eq(_comp.current_target, ghost,
+		"显形目标应保持锁定，不受隐身过滤影响")
+
+
 func test_re_evaluates_when_target_leaves_range() -> void:
 	# enemy_a 初始在攻击范围内(25px)
 	var enemy_a := _make_enemy(Vector2(25, 0))

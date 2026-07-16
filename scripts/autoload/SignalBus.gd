@@ -78,7 +78,7 @@ signal unit_spawned(unit: Node, team: String)
 ## 一个单位死亡
 signal unit_died(unit: Node, team: String)
 
-## 单位死亡时请求召唤后续单位（如哥布林牢笼放出哥布林斗士）。
+## 单位死亡时请求召唤后续单位（如哥布林牢笼放出哥布林硬汉）。
 ## position 使用 World 本地游戏坐标；仅 Host / 单机端发出，SpawnManager 是唯一实际创建实体的入口。
 signal unit_death_spawn_requested(position: Vector2, unit_id: String, team: String, count: int)
 

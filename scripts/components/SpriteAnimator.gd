@@ -113,10 +113,13 @@ func _attach_frames(frames: SpriteFrames) -> void:
 	else:
 		_sprite.modulate = Color(0.95, 1.0, 1.0)
 
-	# 有动画数据且单位标记 hide_placeholder 时，隐藏 ColorRect 占位方块
-	# （已校准好的单位开启，未校准的保留占位格用于位置调试）
-	if anim_data.get("hide_placeholder", false) and combatant.body_rect:
-		combatant.body_rect.visible = false
+	# 有动画数据且单位标记 hide_placeholder 时，隐藏 ColorRect 占位方块和调试名称。
+	# 帧资源可能异步到达；因此须在这里处理，不能只依赖 UnitBase 的首次布局。
+	if anim_data.get("hide_placeholder", false):
+		if combatant.body_rect:
+			combatant.body_rect.visible = false
+		if combatant.debug_label:
+			combatant.debug_label.visible = false
 
 	_has_animation = true
 

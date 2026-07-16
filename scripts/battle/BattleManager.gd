@@ -98,15 +98,17 @@ func _ready() -> void:
 	if is_network_mode:
 		NetworkManager.peer_disconnected.connect(_on_peer_disconnected)
 		NetworkManager.server_disconnected.connect(_on_server_disconnected)
+		NetworkManager.remote_battle_scene_ready.connect(_on_remote_battle_scene_ready)
 	# 初始化所有塔的属性
 	_setup_towers()
 	# 开始战斗
 	start_battle()
-	# Client 端：通知 host 已准备好
-	if is_network_mode and not is_host:
-		# 可靠 RPC 会先锁定卡组，再通知 Host 可以开始同步手牌。
-		_rpc_submit_deck.rpc_id(1, Game.get_selected_deck())
-		_rpc_client_ready.rpc_id(1)
+	# 战斗场景就绪握手必须走常驻 NetworkManager；不能直接向 BattleManager 发 RPC，
+	# 因为两端资源加载速度不同，接收端此时可能仍停留在 MainMenu。
+	NetworkManager.announce_battle_scene_ready()
+	# 若远端先完成加载，信号会早于本节点存在；读取缓存状态补上这次通知。
+	if is_network_mode and is_host and NetworkManager.is_remote_battle_scene_ready():
+		_on_remote_battle_scene_ready()
 
 
 ## 遍历 UnitsRoot 下的所有塔节点（TowerBase 实例），根据节点名称设置阵营和类型
@@ -198,7 +200,7 @@ func start_battle() -> void:
 		call_deferred("_broadcast_hand_state")
 		# 广播觉醒牌初始进度（CardBar 已连接信号）
 		if awakening_tracker:
-			call_deferred("awakening_tracker.broadcast_initial_progress")
+			awakening_tracker.call_deferred("broadcast_initial_progress")
 	print("[BattleManager] battle started (network=%s host=%s mode=%s)" % [is_network_mode, is_host, match_mode])
 
 
@@ -206,6 +208,13 @@ func start_battle() -> void:
 func _broadcast_hand_state() -> void:
 	SignalBus.hand_updated.emit(deck_manager.get_hand(), deck_manager.get_next())
 	SignalBus.selection_changed.emit(selected_hand_index)
+
+
+## 联机时只有双方都已进入 BattleScene 才允许出牌，避免把 Spawn/Play RPC 发给仍在加载页的远端。
+func _is_network_battle_ready() -> bool:
+	if not is_network_mode:
+		return true
+	return _client_ready if is_host else NetworkManager.is_remote_battle_scene_ready()
 
 
 func _queue_remaining_deck_art() -> void:
@@ -288,7 +297,7 @@ func end_battle(result: String) -> void:
 
 ## 重新开始战斗（重载场景）
 func restart_battle() -> void:
-	SceneLoader.reload_current_scene()
+	Game.restart_battle()
 
 
 func _process(delta: float) -> void:
@@ -296,6 +305,9 @@ func _process(delta: float) -> void:
 		return
 	# Client 端：不跑战斗逻辑（时间/能量/碰撞由 host 同步）
 	if is_network_mode and not is_host:
+		return
+	# Host 等待 Client 真正实例化 BattleScene 后才推进时间或允许产生场景级同步 RPC。
+	if is_network_mode and not _client_ready:
 		return
 	battle_time += delta
 	_update_match_timing()
@@ -334,6 +346,8 @@ func update_energy(delta: float) -> void:
 func _select_hand_card(hand_index: int) -> void:
 	if not battle_running:
 		return
+	if not _is_network_battle_ready():
+		return
 	var hand = deck_manager.get_hand()
 	if hand_index >= hand.size():
 		return
@@ -370,6 +384,8 @@ func _on_card_selected(_card_id: String, hand_index: int) -> void:
 
 ## 在指定位置部署当前选中的手牌
 func _try_deploy(world_position: Vector2) -> void:
+	if not _is_network_battle_ready():
+		return
 	if selected_hand_index < 0:
 		return
 	var hand = deck_manager.get_hand()
@@ -738,33 +754,16 @@ func _unhandled_input(event: InputEvent) -> void:
 # 联机 RPC（@rpc 方法）
 # ==============================================================================
 
-## Client → Host：提交在大厅锁定的预设卡组。Host 统一维护远端手牌轮转。
-@rpc("any_peer", "call_remote", "reliable")
-func _rpc_submit_deck(cards: Array) -> void:
-	if not is_network_mode or not is_host or _remote_deck == null:
+## NetworkManager 收到远端 BattleScene 就绪后触发。只有 Host 需要开启权威状态同步。
+func _on_remote_battle_scene_ready() -> void:
+	if not is_network_mode or not is_host or _client_ready:
 		return
-	var validated: Array = []
-	for card_id in cards:
-		if card_id is String and not DataRegistry.get_card_data(card_id).is_empty():
-			validated.append(card_id)
-	if validated.size() < 5:
-		push_warning("[BattleManager] 忽略无效的远端预设卡组")
-		return
-	_remote_deck.setup(validated)
-	Game.set_remote_deck(validated)
-	print("[BattleManager] 已锁定远端预设卡组:", validated)
-
-## Client → Host：通知已加载完战斗场景，准备好接收状态同步
-@rpc("any_peer", "call_remote", "reliable")
-func _rpc_client_ready() -> void:
 	_client_ready = true
-	print("[BattleManager] client 已就绪，开始同步状态")
-	# 立即同步一次完整状态
+	print("[BattleManager] client 战斗场景已就绪，开始同步状态")
+	# 立即同步一次完整状态和可靠手牌；此时 Client 的 BattleManager 已存在，RPC 不会丢包。
 	_sync_state_to_client()
 	if _remote_deck:
-		var remote_hand := _remote_deck.get_hand()
-		var remote_next := _remote_deck.get_next()
-		_rpc_sync_hand.rpc(remote_hand, remote_next)
+		_rpc_sync_hand.rpc(_remote_deck.get_hand(), _remote_deck.get_next())
 
 
 ## Client → Host：请求出牌。hand_index 为 client 手牌索引。

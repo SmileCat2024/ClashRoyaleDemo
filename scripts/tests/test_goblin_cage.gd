@@ -40,20 +40,20 @@ func test_goblin_cage_data_config() -> void:
 	assert_true(bool(cage.get("knockback_immune", false)), "静态牢笼应免疫击退")
 	assert_approx(float(cage.get("deploy_time", 0.0)), 1.0, 0.01, "牢笼部署时间应为 1 秒")
 	assert_approx(float(cage.get("lifespan", 0.0)), 20.0, 0.01, "牢笼寿命应为 20 秒")
-	assert_eq(cage.get("death_spawn_unit_id", ""), "goblin_brawler", "牢笼死亡应放出斗士")
-	assert_eq(int(cage.get("death_spawn_count", 0)), 1, "牢笼死亡应只放出 1 名斗士")
+	assert_eq(cage.get("death_spawn_unit_id", ""), "goblin_brawler", "牢笼死亡应放出硬汉")
+	assert_eq(int(cage.get("death_spawn_count", 0)), 1, "牢笼死亡应只放出 1 名硬汉")
 
 
 func test_goblin_brawler_data_config() -> void:
 	var brawler: Dictionary = DataRegistry.get_unit_data("goblin_brawler")
 	var attack: Dictionary = brawler.get("attacks", [])[0]
-	assert_eq(int(brawler.get("max_hp", 0)), 1080, "斗士应使用 11 级 1080 生命")
-	assert_approx(float(brawler.get("move_speed", 0.0)), 1.5, 0.01, "斗士应为快速移速")
-	assert_eq(int(attack.get("damage", 0)), 337, "斗士应使用 11 级 337 伤害")
-	assert_approx(float(attack.get("attack_range", 0.0)), 0.8, 0.01, "斗士应为 0.8 格短近战")
-	assert_approx(float(attack.get("attack_interval", 0.0)), 1.1, 0.01, "斗士攻击间隔应为 1.1 秒")
-	assert_approx(float(attack.get("first_attack_delay", 0.0)), 0.2, 0.01, "斗士首击延迟应为 0.2 秒")
-	assert_false(bool(attack.get("attack_air", true)), "斗士只能攻击地面")
+	assert_eq(int(brawler.get("max_hp", 0)), 1080, "硬汉应使用 11 级 1080 生命")
+	assert_approx(float(brawler.get("move_speed", 0.0)), 1.5, 0.01, "硬汉应为快速移速")
+	assert_eq(int(attack.get("damage", 0)), 337, "硬汉应使用 11 级 337 伤害")
+	assert_approx(float(attack.get("attack_range", 0.0)), 0.8, 0.01, "硬汉应为 0.8 格短近战")
+	assert_approx(float(attack.get("attack_interval", 0.0)), 1.1, 0.01, "硬汉攻击间隔应为 1.1 秒")
+	assert_approx(float(attack.get("first_attack_delay", 0.0)), 0.2, 0.01, "硬汉首击延迟应为 0.2 秒")
+	assert_false(bool(attack.get("attack_air", true)), "硬汉只能攻击地面")
 
 
 func test_goblin_cage_art_resources_exist() -> void:
@@ -79,10 +79,10 @@ func test_cage_death_requests_one_brawler() -> void:
 	_cage.die()
 	_cage.die()
 	assert_eq(_spawn_events.size(), 1, "重复死亡调用只能请求一次后续召唤")
-	assert_eq(_spawn_events[0]["unit_id"], "goblin_brawler", "死亡召唤应指定哥布林斗士")
-	assert_eq(_spawn_events[0]["team"], "player", "斗士应继承牢笼所属阵营")
+	assert_eq(_spawn_events[0]["unit_id"], "goblin_brawler", "死亡召唤应指定哥布林硬汉")
+	assert_eq(_spawn_events[0]["team"], "player", "硬汉应继承牢笼所属阵营")
 	assert_eq(_spawn_events[0]["count"], 1, "死亡召唤数量应为 1")
-	assert_eq(_spawn_events[0]["position"], Vector2(120.0, 360.0), "斗士应在牢笼死亡位置生成")
+	assert_eq(_spawn_events[0]["position"], Vector2(120.0, 360.0), "硬汉应在牢笼死亡位置生成")
 
 
 func test_goblin_cage_card_config() -> void:

@@ -183,11 +183,17 @@ func is_firing() -> bool:
 	return _is_firing
 
 
-## 当前目标是否有效（存在、未销毁、未死亡）
+## 当前目标是否有效（存在、未销毁、未死亡、未进入隐身）
+## 隐身检查与 TargetingSystem.find_best_target 的过滤口径保持一致：
+## 已锁定的目标进入隐身（如皇室幽灵移动/待机时）会立即失效，触发下一帧 _update_targeting 重新索敌，
+## 避免攻击者穿透隐身继续锁定它。
 func has_valid_target() -> bool:
 	if current_target == null or not is_instance_valid(current_target):
 		return false
 	if current_target.get("is_dead") == true:
+		return false
+	# 隐身过滤：目标进入隐身后丢失锁定，与索敌阶段的过滤口径一致
+	if current_target.get("is_stealthed") == true:
 		return false
 	if not _can_attack_target(current_target):
 		return false

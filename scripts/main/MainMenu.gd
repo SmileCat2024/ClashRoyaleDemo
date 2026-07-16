@@ -261,7 +261,6 @@ func _show_page(page: Page) -> void:
 
 func _select_preset(index: int) -> void:
 	_selected_preset = index
-	Game.use_custom_deck = false  # 选预设卡组时取消自定义卡组
 	Game.set_selected_deck(index)
 	_refresh_deck_cards()
 
@@ -429,6 +428,9 @@ func _on_server_disconnected() -> void:
 func _begin_loading() -> void:
 	if _loading:
 		return
+	# 后续 BattleScene 的就绪握手通过常驻 NetworkManager 完成；新局开始前必须清空上一局状态。
+	if NetworkManager.is_networked():
+		NetworkManager.reset_battle_scene_readiness()
 	_loading = true
 	_settings.visible = false
 	_room_overlay.visible = false
@@ -769,7 +771,8 @@ func _build_deck_builder() -> void:
 
 
 func _open_deck_builder() -> void:
-	_builder_selection = Game.custom_deck.duplicate() if Game.use_custom_deck else []
+	# 自由组卡编辑当前选中的预设槽位，重新打开时应显示该槽位现有配置。
+	_builder_selection = Game.get_selected_deck()
 	_builder_layer.visible = true
 	_refresh_builder_grid()
 	_update_builder_hud()
@@ -884,6 +887,6 @@ func _update_builder_hud() -> void:
 func _confirm_builder() -> void:
 	if _builder_selection.size() != 8:
 		return
-	Game.set_custom_deck(_builder_selection)
+	Game.set_selected_deck_cards(_builder_selection)
 	_refresh_deck_cards()  # 卡组页立即显示新选的 8 张
 	_close_deck_builder()
