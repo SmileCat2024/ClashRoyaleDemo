@@ -1250,10 +1250,11 @@ var unit_data := {
 					"duration": [0.1, 0.1, 0.15],
 					"mode": "once",
 				},
-			"attack_front": {
-				"frames": ["attack_back_01.png", "attack_back_02.png", "attack_back_03.png"],
-				"duration": [0.1, 0.1, 0.15],
-				"mode": "once",
+				"attack_front": {
+					"frames": ["attack_back_01.png", "attack_back_02.png", "attack_back_03.png"],
+					"duration": [0.1, 0.1, 0.15],
+					"mode": "once",
+				},
 			},
 		},
 		# 官方原版补充：此前公主没有专属部署/射击音效。

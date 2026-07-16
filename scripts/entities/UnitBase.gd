@@ -862,6 +862,11 @@ func _process(delta: float) -> void:
 	_update_passive_mark(delta)
 	# 地狱塔递增光束视觉更新（InfernoBeam 子节点）
 	_update_beam_visual()
+	# 击退动画推进：被击退期间单位受眩晕控制（is_stunned），跳过索敌/移动/跳河等自主行动。
+	# 注意：必须在 _process_status_effects 之后调用，确保眩晕状态能正常随时间过期。
+	if _process_knockback(delta):
+		_is_moving = false
+		return
 	_is_moving = false
 	if is_jumping_river:
 		_is_moving = true
@@ -913,7 +918,11 @@ func _process(delta: float) -> void:
 ## 按单位能力移动：跳河单位在跳河更短时起跳；其余地面单位沿 A* 路径绕过塔/建筑。
 ## 空中单位直线飞向目标（不需要寻路）。
 func _move_towards_position(target_pos: Vector2, delta: float) -> void:
+	var pos_before := position
 	if _try_move_for_river_jump(target_pos, delta):
+		# 跳河路线含"走向起跳点"的长距离移动阶段（可跨越半个己方半场），
+		# 必须按实际位移累计冲锋距离，否则可跳河单位在走跳河路线期间冲锋进度永远不增长。
+		_accumulate_charge(position.distance_to(pos_before))
 		return
 
 	var step := _get_effective_move_speed() * delta
@@ -933,7 +942,8 @@ func _move_towards_position(target_pos: Vector2, delta: float) -> void:
 
 	position += move_dir * step
 	_last_move_dir = move_dir
-	_accumulate_charge(step)
+	# 按实际位移累计（碰撞/分离偏转后真正走了多远），与跳河路线分支统一口径
+	_accumulate_charge(position.distance_to(pos_before))
 	# 移动音效：间歇播放（仅配了 sfx.move 的单位，如野猪骑士蹄声）
 	_move_sfx_timer -= delta
 	if _move_sfx_timer <= 0.0:
@@ -1319,6 +1329,11 @@ func get_visual_state() -> String:
 ## 覆写朝向：移动时按 A* 路径/分离修正后的实际方向判定；静止时按目标方向判定。
 ## 这样单位为绕开障碍物短暂后退时，walk 动画会跟随路径，而攻击/待机仍朝向目标。
 func get_facing() -> String:
+	# 静态建筑（不可移动，如圣水收集器/迫击炮/地狱塔）：朝向固定，不随目标/部署位置变化
+	if move_speed <= 0.0:
+		var f := "back" if team == "player" else "front"
+		_net_facing = f
+		return f
 	# 部署期间无目标，按阵营强制朝向（player 向上走=back，enemy 向下走=front）
 	if not is_deployed:
 		var f := "back" if team == "player" else "front"
@@ -1346,6 +1361,12 @@ func get_facing() -> String:
 
 ## 覆写水平翻转：移动时按实际移动方向；静止/攻击时按目标方向（素材默认面朝左）。
 func get_flip_h() -> bool:
+	# 静态建筑（不可移动）：贴图朝向固定，不随目标/部署位置翻转
+	# 修复：圣水收集器部署后 _move_target 指向敌方塔，原逻辑按 _get_target_x()>position.x
+	# 决定镜像，导致在左/右不同位置部署时贴图莫名左右翻转
+	if move_speed <= 0.0:
+		_net_flip_h = false
+		return false
 	if _is_remote():
 		# 攻击期间单位静止（位置不变，移动方向推断失效），用 host 同步的翻转值
 		if _net_is_firing:

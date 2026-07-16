@@ -11,7 +11,7 @@ extends Node
 ## 战斗开始时发出
 signal battle_started
 
-## 战斗结束时发出，result 为 "victory" / "defeat" / "draw"
+## 战斗结束时发出，result 为本地玩家视角的 "victory" / "defeat" / "draw"。
 signal battle_ended(result: String)
 
 ## 战斗阶段变化（"regular" → "overtime"），time_remaining 为当前阶段剩余秒

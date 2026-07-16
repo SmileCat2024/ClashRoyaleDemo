@@ -88,6 +88,14 @@ var sprite_animator: SpriteAnimator = null
 # ---- 状态效果（由 apply_status_effect 管理，_process_status_effects 每帧更新）----
 var _status_effects: Array = []
 
+# ---- 击退动画（由 knockback() 启动，_process_knockback() 每帧推进）----
+## 击退动画总时长（秒）。期间单位被施加眩晕，无法自主移动/攻击。
+const KNOCKBACK_DURATION: float = 0.5
+var _knockback_active: bool = false
+var _knockback_start: Vector2 = Vector2.ZERO
+var _knockback_target: Vector2 = Vector2.ZERO
+var _knockback_elapsed: float = 0.0
+
 # ---- 子节点引用 ----
 # UnitBase.tscn 有 Body 子节点；TowerBase.tscn 无（塔用 sprite 贴图，不再有占位方块）。
 @onready var body_rect: ColorRect = get_node_or_null("Body")
@@ -363,17 +371,46 @@ func die() -> void:
 		)
 
 
-## 击退：沿 direction 方向瞬移 distance 像素。是否生效只由 knockback_immune 决定。
-## 位置钳制到竞技场范围内，CollisionSystem 下一帧处理重叠/河道回弹。
+## 击退：沿 direction 方向在 KNOCKBACK_DURATION 秒内做 ease-out 动画移动 distance 像素。
+## 动画期间施加眩晕（apply_stun），单位无法自主移动/攻击。
+## 是否生效只由 knockback_immune 决定。位置钳制到竞技场范围内。
 func knockback(direction: Vector2, distance: float) -> void:
 	if is_dead or knockback_immune or distance <= 0.0:
 		return
-	position += direction.normalized() * distance
+	if _is_remote():
+		return  # Client 端位置由 RPC 同步，不本地驱动击退
+	var dir := direction.normalized()
+	if dir.length_squared() < 0.0001:
+		return
+	var target := position + dir * distance
 	# 钳制到竞技场边界（World 本地游戏空间）
-	position.x = clampf(position.x, BattleConstants.CELL_SIZE * 0.5,
+	target.x = clampf(target.x, BattleConstants.CELL_SIZE * 0.5,
 		BattleConstants.ARENA_WIDTH - BattleConstants.CELL_SIZE * 0.5)
-	position.y = clampf(position.y, BattleConstants.CELL_SIZE * 0.5,
+	target.y = clampf(target.y, BattleConstants.CELL_SIZE * 0.5,
 		BattleConstants.ARENA_HEIGHT - BattleConstants.CELL_SIZE * 0.5)
+	# 启动/覆盖击退动画（从当前位置起步）
+	_knockback_active = true
+	_knockback_start = position
+	_knockback_target = target
+	_knockback_elapsed = 0.0
+	# 动画期间施加眩晕控制效果（多次击退按 merge 规则取最长剩余时间）
+	apply_stun(KNOCKBACK_DURATION)
+
+
+## 推进击退动画。由子类 _process 每帧调用。返回 true 表示击退仍在进行（子类应跳过自主行动逻辑）。
+func _process_knockback(delta: float) -> bool:
+	if not _knockback_active:
+		return false
+	_knockback_elapsed += delta
+	if _knockback_elapsed >= KNOCKBACK_DURATION:
+		position = _knockback_target
+		_knockback_active = false
+	else:
+		# ease-out quad：起步快、收尾慢，符合"被冲击推开"的视觉感
+		var t := _knockback_elapsed / KNOCKBACK_DURATION
+		var eased := 1.0 - (1.0 - t) * (1.0 - t)
+		position = _knockback_start.lerp(_knockback_target, eased)
+	return true
 
 
 # =============================================================================
