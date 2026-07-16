@@ -9,6 +9,10 @@ extends Node
 # 按 team 分组的实体列表
 var _entities_by_team: Dictionary = {}
 
+# 静态障碍物（塔/建筑）增减版本。地面单位只在此版本变化时重算路线，
+# 避免同一组建筑间每隔一小段时间反复换一条等价路径。
+var _static_obstacle_revision: int = 0
+
 
 ## 注册一个实体到注册表
 func register(entity: Node) -> void:
@@ -17,13 +21,18 @@ func register(entity: Node) -> void:
 		_entities_by_team[t] = []
 	if not _entities_by_team[t].has(entity):
 		_entities_by_team[t].append(entity)
+		if _is_static_obstacle(entity):
+			_static_obstacle_revision += 1
 
 
 ## 从注册表移除一个实体
 func unregister(entity: Node) -> void:
 	var t: String = entity.team
 	if _entities_by_team.has(t):
-		_entities_by_team[t].erase(entity)
+		if _entities_by_team[t].has(entity):
+			if _is_static_obstacle(entity):
+				_static_obstacle_revision += 1
+			_entities_by_team[t].erase(entity)
 
 
 ## 获取指定 team 的所有活跃敌方实体（已过滤死亡和无效引用）
@@ -69,6 +78,11 @@ func get_static_obstacles() -> Array:
 	return obstacles
 
 
+## 当前静态障碍物布局版本。仅塔/建筑增减时变化，供路径缓存判定是否失效。
+func get_static_obstacle_revision() -> int:
+	return _static_obstacle_revision
+
+
 ## 获取所有活跃战斗实体（含友军和塔），供碰撞分离系统使用。
 func get_all_combatants() -> Array:
 	var all: Array = []
@@ -82,6 +96,12 @@ func get_all_combatants() -> Array:
 ## 清空注册表（场景切换时调用）
 func clear() -> void:
 	_entities_by_team.clear()
+	_static_obstacle_revision += 1
+
+
+func _is_static_obstacle(entity: Node) -> bool:
+	var m = entity.get("mass")
+	return m != null and int(m) <= 0
 
 
 ## 打印所有实体状态（调试用，绑 F8）

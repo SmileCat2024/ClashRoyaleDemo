@@ -39,6 +39,13 @@ const DIRS_DIAG := [Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-
 ## 返回路径点数组（像素坐标），不含起点，含终点。
 ## 无需绕行时返回 [to_pos]；完全无路径时也返回 [to_pos]（兜底直线走）。
 static func find_path(from_pos: Vector2, to_pos: Vector2, mover_radius_cells: float) -> Array:
+	# 先用连续圆形几何检查直线路径。主 A* 采用 1 格网格，两个建筑之间
+	# 的有效窄缝可能没有任何格中心，若直接进入网格会被错误地判成完全封死。
+	# 这条快速路径沿用相同的碰撞半径和安全余量，仅绕过“格中心量化”的误判；
+	# 涉及河道的路线仍由下方 A* 处理，确保不会斜穿桥面外水域。
+	if _has_clear_direct_path(from_pos, to_pos, mover_radius_cells):
+		return [to_pos]
+
 	var grid := _build_blocked_grid(mover_radius_cells)
 
 	var start_cell := _pos_to_cell(from_pos)
@@ -84,6 +91,42 @@ static func find_path(from_pos: Vector2, to_pos: Vector2, mover_radius_cells: fl
 			smoothed.append(to_pos)
 
 	return smoothed
+
+
+## 连续几何版直线路径检查。
+## 与网格构建使用同一套「建筑半径 + 单位半径 + SAFETY_MARGIN」规则，
+## 但不要求可通行区域内恰好存在一个 20px 的格中心。
+## 终点落在静态建筑内时，将该建筑视为当前接近目标；单位会在攻击距离停下，
+## 不会真的穿过它。其余建筑仍必须保持安全距离。
+static func _has_clear_direct_path(from_pos: Vector2, to_pos: Vector2, mover_radius_cells: float) -> bool:
+	if _segment_crosses_off_bridge_river(from_pos, to_pos):
+		return false
+
+	var mover_radius_px := BattleConstants.px(mover_radius_cells + SAFETY_MARGIN)
+	for obs in EntityRegistry.get_static_obstacles():
+		if not is_instance_valid(obs):
+			continue
+		var obs_pos := BattlePathing.game_position_of(obs)
+		var obs_r_raw = obs.get("collision_radius")
+		var obs_radius_px: float = float(obs_r_raw) if obs_r_raw != null else BattleConstants.px(0.5)
+		var clearance_radius := obs_radius_px + mover_radius_px
+
+		# 目标是建筑中心（塔或建筑卡）时，允许直线接近该目标本身。
+		if to_pos.distance_to(obs_pos) <= clearance_radius:
+			continue
+		if _point_to_segment_distance(obs_pos, from_pos, to_pos) <= clearance_radius:
+			return false
+	return true
+
+
+## 返回点到有限线段的最短距离（像素）。
+static func _point_to_segment_distance(point: Vector2, seg_start: Vector2, seg_end: Vector2) -> float:
+	var segment := seg_end - seg_start
+	var len_sq := segment.length_squared()
+	if len_sq < 0.001:
+		return point.distance_to(seg_start)
+	var t := clampf((point - seg_start).dot(segment) / len_sq, 0.0, 1.0)
+	return point.distance_to(seg_start + segment * t)
 
 
 # ============================================================

@@ -85,6 +85,24 @@ func test_path_detours_around_obstacle() -> void:
 		"路径中间点应远离障碍物中心")
 
 
+## 只有塔/建筑的增减才应使路径缓存失效；普通单位注册不应触发整场单位重新选路。
+func test_static_obstacle_revision_changes_only_for_buildings() -> void:
+	var base_revision := EntityRegistry.get_static_obstacle_revision()
+	var troop: CombatantBase = MockScript.new()
+	troop.team = "player"
+	troop.mass = 5
+	EntityRegistry.register(troop)
+	assert_eq(EntityRegistry.get_static_obstacle_revision(), base_revision,
+		"普通单位注册不应改变静态障碍布局版本")
+	_make_obstacle(Vector2(130, 420), 12.0)
+	assert_eq(EntityRegistry.get_static_obstacle_revision(), base_revision + 1,
+		"建筑注册应使路径缓存失效")
+	EntityRegistry.unregister(troop)
+	assert_eq(EntityRegistry.get_static_obstacle_revision(), base_revision + 1,
+		"普通单位注销不应改变静态障碍布局版本")
+	troop.free()
+
+
 # ============================================================
 #  河道与桥
 # ============================================================
@@ -240,8 +258,30 @@ func test_start_inside_obstacle_corrected() -> void:
 
 
 # ============================================================
-#  塔间窄通道（公主塔-国王塔场景）
+#  静态障碍物间窄通道
 # ============================================================
+
+## 两座 0.6 格建筑相隔 3 格时，0.5 格单位在连续几何中有安全通道：
+## 建筑中心距 60px，寻路膨胀半径为 12 + 10 + 5 = 27px，
+## 中线仍有 6px 宽。旧的 20px 网格没有落在这 6px 内的格中心，
+## 会错误绕远；现在应保留直线路径。
+func test_small_buildings_keep_geometrically_clear_narrow_passage() -> void:
+	_make_obstacle(Vector2(150, 480), 12.0)
+	_make_obstacle(Vector2(210, 480), 12.0)
+	var from := Vector2(180, 560)
+	var to := Vector2(180, 400)
+	var path := AStarPathfinder.find_path(from, to, 0.5)
+	assert_eq(path.size(), 1, "真实可通行的建筑窄缝不应因网格量化而绕远")
+	assert_eq(path[0], to, "窄缝直行路径应保持精确目标点")
+
+
+## 大体积单位的安全半径会让同一条缝真实封闭，不能套用窄缝直通优化。
+func test_large_unit_still_detours_when_narrow_passage_is_physically_blocked() -> void:
+	_make_obstacle(Vector2(150, 480), 12.0)
+	_make_obstacle(Vector2(210, 480), 12.0)
+	var path := AStarPathfinder.find_path(Vector2(180, 560), Vector2(180, 400), 0.8)
+	assert_true(path.size() > 1, "大体积单位无法安全穿过的窄缝仍应走 A* 绕行")
+
 
 func test_narrow_passage_between_towers() -> void:
 	# 模拟玩家左公主塔和国王塔

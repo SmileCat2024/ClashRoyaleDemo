@@ -42,7 +42,7 @@ var _last_move_dir: Vector2 = Vector2.ZERO  ## 上一帧实际移动方向（供
 # ---- A* 路径缓存 ----
 var _path: Array = []                      ## 当前缓存的 A* 路径点（像素坐标，不含起点）
 var _path_target: Vector2 = Vector2.ZERO   ## 当前路径的目标位置（检测目标变化时重算）
-var _path_repath_timer: float = 0.0        ## 路径重算倒计时（秒）
+var _path_obstacle_revision: int = -1      ## 生成当前路径时的静态障碍布局版本
 var is_jumping_river: bool = false
 # ---- 冲锋（王子专属，数据驱动；无 charge 配置时 _charge_enabled=false）----
 var is_charging: bool = false           ## 是否处于冲锋状态（AttackComponent 命中时读取此标记 + charge_damage）
@@ -65,7 +65,6 @@ const RIVER_JUMP_BANK_OFFSET := 1.0
 const SEPARATION_RADIUS_CELLS := 0.5   ## 单位间分离探测余量（格），碰撞半径之外额外保持的距离
 
 # ---- A* 寻路（路径缓存 + 重算）----
-const PATH_REPATH_INTERVAL := 0.4     ## 路径重算间隔（秒）
 const PATH_WAYPOINT_REACHED := 12.0   ## 到达路径点的判定距离（像素，约 0.6 格）
 
 # ---- 部署下落动画（前 DEPLOY_ANIM_DURATION 秒的视觉表现）----
@@ -824,7 +823,7 @@ func _move_towards_position(target_pos: Vector2, delta: float) -> void:
 
 	var step := _get_effective_move_speed() * delta
 	# A* 寻路：获取下一个路径点（已处理桥路由和障碍物绕行）
-	var next_pos := _get_move_waypoint(target_pos, delta)
+	var next_pos := _get_move_waypoint(target_pos)
 
 	var move_vec := next_pos - position
 	if move_vec.length() < 0.01:
@@ -847,17 +846,18 @@ func _move_towards_position(target_pos: Vector2, delta: float) -> void:
 		_move_sfx_timer = MOVE_SFX_INTERVAL
 
 
-## 获取当前移动的下一个路径点。地面单位使用 A* 寻路绕过静态障碍物（塔/建筑/河道），
-## 路径定期重算以适应障碍物变化（如新部署的建筑）。空中单位直线飞。
-func _get_move_waypoint(target_pos: Vector2, delta: float) -> Vector2:
+## 获取当前移动的下一个路径点。地面单位使用 A* 寻路绕过静态障碍物（塔/建筑/河道）。
+## 已选路线会持续执行；只有目标明显移动、建筑布局变化或路径走完时才重算，避免左右横跳。
+func _get_move_waypoint(target_pos: Vector2) -> Vector2:
 	# 空中单位不需要寻路，直线飞向目标
 	if movement_type == "air":
 		return target_pos
 
-	_path_repath_timer -= delta
-	# 目标变化超过 1 格 → 立即重算；或定时重算
+	# 目标变化超过 1 格、塔/建筑增减，或当前路径耗尽 → 重算。
+	# 不再按固定时间间隔重算：相邻格的等价路径会因此反复切换，造成前进后退的视觉抖动。
 	var target_moved := target_pos.distance_to(_path_target) > BattleConstants.CELL_SIZE
-	if _path.is_empty() or target_moved or _path_repath_timer <= 0.0:
+	var obstacle_changed := _path_obstacle_revision != EntityRegistry.get_static_obstacle_revision()
+	if _path.is_empty() or target_moved or obstacle_changed:
 		_recompute_path(target_pos)
 
 	# 沿路径前进：跳过已到达的路径点
@@ -878,7 +878,7 @@ func _recompute_path(target_pos: Vector2) -> void:
 		position, target_pos, collision_radius / BattleConstants.CELL_SIZE
 	)
 	_path_target = target_pos
-	_path_repath_timer = PATH_REPATH_INTERVAL
+	_path_obstacle_revision = EntityRegistry.get_static_obstacle_revision()
 
 
 ## 计算与附近同层单位的分离转向向量。
