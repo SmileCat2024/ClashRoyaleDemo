@@ -135,6 +135,11 @@ func _show_countdown(second: int) -> void:
 	$BattleAnnouncement/TitleLabel.text = str(second)
 	$BattleAnnouncement/SubtitleLabel.visible = false
 	$BattleAnnouncement.visible = true
+	# 倒计时音效：首次进入 10 秒阶段时播放完整 countdown_10s。
+	# 音频约 12 秒（10 声滴答 + 头尾留白），与屏幕上 10-1 数字自然同步。
+	# overtime 末尾会因 _last_countdown_second 在 time_left>12 时被重置而再次触发。
+	if second == 10:
+		AudioManager.play("countdown_10s")
 
 
 ## 能量变化时更新显示
