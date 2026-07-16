@@ -19,6 +19,20 @@ const UNIT_SCENE := preload("res://scenes/entities/units/UnitBase.tscn")
 var _next_net_id: int = 1
 
 
+func _ready() -> void:
+	if not SignalBus.unit_death_spawn_requested.is_connected(_on_unit_death_spawn_requested):
+		SignalBus.unit_death_spawn_requested.connect(_on_unit_death_spawn_requested)
+
+
+## 处理单位死亡后的数据驱动召唤。实体本身只发请求，仍由 SpawnManager 统一创建。
+## 联机 Client 不运行死亡逻辑，因此不会发出该信号；此处额外保护，避免未来调用方误触发重复生成。
+func _on_unit_death_spawn_requested(pos: Vector2, unit_id: String, team_name: String, count: int) -> void:
+	if NetworkManager.is_networked() and not NetworkManager.is_server():
+		return
+	for _i in range(maxi(count, 0)):
+		spawn_unit_by_id(unit_id, team_name, pos)
+
+
 ## 根据卡牌 id 生成单位到指定位置。
 ## card_id: 卡牌 id（如 "card_knight"）
 ## team_name: "player" 或 "enemy"
