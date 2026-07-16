@@ -46,16 +46,20 @@ func setup(unit: Node, skill_data: Dictionary) -> void:
 	_skill_data = skill_data
 	_is_ready = true
 	_cooldown_remaining = 0.0
+	# 精英单位技能按钮首次出现即提示可用。
+	AudioManager.play("elite_skill_ready")
 
 
 ## 点击按钮 → 请求释放技能（BattleManager 做能量检查和瞄准处理）
 func _on_pressed() -> void:
 	if _unit and is_instance_valid(_unit) and not _unit.is_dead:
+		AudioManager.play("elite_skill_press")
 		SignalBus.elite_skill_requested.emit(_unit, _skill_data)
 
 
 ## 更新冷却显示。由 SkillBar 转发 elite_skill_cooldown_changed 信号调用。
 func update_cooldown(remaining: float, total: float) -> void:
+	var was_ready := _is_ready
 	_cooldown_total = total
 	_cooldown_remaining = remaining
 	if remaining > 0:
@@ -64,6 +68,8 @@ func update_cooldown(remaining: float, total: float) -> void:
 	else:
 		disabled = false
 		_is_ready = true
+		if not was_ready:
+			AudioManager.play("elite_skill_ready")
 	queue_redraw()
 
 

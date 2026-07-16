@@ -108,6 +108,8 @@ func _spawn_wave(wave_idx: int) -> void:
 func _deal_wave_damage() -> void:
 	# 爆炸范围视觉（两端都显示，在 is_client 检查之前）
 	BlastRingEffect.spawn(_arrows_root, _target, _radius)
+	# 三波箭雨各自落地时播放官方箭矢命中，客户端也保持相同听觉节奏。
+	AudioManager.play("arrows_impact", _target)
 	# 联机 client 端：不造成伤害（由 host 计算），仅保留箭矢飞行视觉
 	if NetworkManager.is_networked_client():
 		return

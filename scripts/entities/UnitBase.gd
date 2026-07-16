@@ -142,12 +142,17 @@ var _elixir_generation_amount: int = 0
 var _elixir_generation_timer: float = 0.0
 var _elixir_on_death: int = 0
 var _elixir_death_paid: bool = false
+## 死亡后召唤（哥布林牢笼等）。实际创建统一交给 SpawnManager。
+var _death_spawn_unit_id: String = ""
+var _death_spawn_count: int = 0
+var _death_spawned: bool = false
 ## 光束发射点 Y 偏移（像素，负=上移）。仅地狱塔配置，其他单位 = 0（无光束）。
 var beam_emit_offset_y: float = 0.0
 var _beam: InfernoBeam = null
 ## Client 端光束同步状态（host 通过 RPC 同步，client 端 _update_beam_visual 读取替代 AttackComponent）
 var _sync_beam_active: bool = false
 var _sync_beam_target: Vector2 = Vector2.ZERO
+var _sync_beam_altitude: float = 0.0
 var _sync_beam_stage: int = 0
 
 # ---- 精英技能：冲刺（死亡俯冲等 dash 类技能的运行时状态机）----
@@ -250,6 +255,8 @@ func setup(unit_data: Dictionary, team_name: String, awakening_effects: Dictiona
 
 	# 建筑机制配置（寿命/部署/自然掉血，仅建筑单位使用）
 	deploy_time = float(unit_data.get("deploy_time", 0.0))
+	# 部署下落高度（格）：默认 3.5 格；凤凰蛋等特殊单位可配置为从指定高度下落
+	_deploy_drop_cells = float(unit_data.get("deploy_drop_cells", DEPLOY_DROP_CELLS_DEFAULT))
 	if deploy_time > 0.0:
 		is_deployed = false
 		_deploy_timer = deploy_time
@@ -275,6 +282,9 @@ func setup(unit_data: Dictionary, team_name: String, awakening_effects: Dictiona
 	_elixir_generation_timer = _elixir_generation_interval
 	_elixir_on_death = int(unit_data.get("elixir_on_death", 0))
 	_elixir_death_paid = false
+	_death_spawn_unit_id = str(unit_data.get("death_spawn_unit_id", ""))
+	_death_spawn_count = maxi(int(unit_data.get("death_spawn_count", 0)), 0)
+	_death_spawned = false
 	# 光束发射点偏移（仅地狱塔等递增光束单位配置）
 	beam_emit_offset_y = float(unit_data.get("beam_emit_offset_y", 0.0))
 
@@ -322,6 +332,8 @@ func setup(unit_data: Dictionary, team_name: String, awakening_effects: Dictiona
 		hb_y = float(anim_cfg.get("health_bar_y", hb_y))
 	health_bar.size = Vector2(hb_w, hb_h)
 	health_bar.position = Vector2(-hb_w / 2.0, hb_y)
+	# 帧动画精灵在运行时动态追加到实体末尾；血条显式置顶，避免被大尺寸透明贴图的有效像素覆盖。
+	health_bar.z_index = 10
 
 	# 调试标签（有动画模型的单位隐藏）
 	debug_label.text = display_name
@@ -373,6 +385,9 @@ func apply_awakening(effects: Dictionary) -> void:
 		var bonus_shield := int(effects["shield"])
 		shield += bonus_shield
 		current_shield += bonus_shield
+		# 当前觉醒单位仅骑士；护盾生成时播放对应原版护盾展开音。
+		if unit_id == "knight":
+			AudioManager.play("evolved_knight_shield", BattlePathing.game_position_of(self))
 
 	# 血量提升（max_hp / current_hp 同步增加，觉醒版保持满血）
 	if effects.has("max_hp_bonus"):
@@ -472,6 +487,9 @@ func trigger_skill(target_pos: Vector2) -> void:
 	# 启动冷却
 	_skill_total_cooldown = float(elite_skill_data.get("cooldown", 0.0))
 	_skill_cooldown_timer = _skill_total_cooldown
+	var skill_sfx := str(elite_skill_data.get("sfx_cast", ""))
+	if skill_sfx != "":
+		AudioManager.play(skill_sfx, BattlePathing.game_position_of(self))
 	# 广播技能释放 + 冷却开始（SkillBar 启动倒计时动画）
 	SignalBus.elite_skill_cast.emit(self, elite_skill_data, target_pos)
 	SignalBus.elite_skill_cooldown_changed.emit(self, _skill_cooldown_timer, _skill_total_cooldown)
@@ -579,7 +597,6 @@ func _trigger_dash_to_weakest(effect: Dictionary) -> bool:
 	is_dashing = true
 	_is_moving = true
 	queue_redraw()
-	AudioManager.play_unit_sfx(unit_id, "deploy")  # 复用部署音效作为冲刺音效（临时）
 	return true
 
 
@@ -684,6 +701,9 @@ func _arrive_dash() -> void:
 	if _dash_damage > 0:
 		DamageSystem.deal_area_damage(_dash_target_pos, _dash_radius, _dash_damage, team, _dash_tower_damage)
 		BlastRingEffect.spawn(get_parent(), _dash_target_pos, _dash_radius)
+		var impact_sfx := str(elite_skill_data.get("sfx_impact", ""))
+		if impact_sfx != "":
+			AudioManager.play(impact_sfx, _dash_target_pos)
 	# 退出冲刺状态
 	is_dashing = false
 	_dash_target = null
@@ -786,7 +806,7 @@ func _update_beam_visual() -> void:
 			_beam = InfernoBeam.new()
 			add_child(_beam)
 		var from_pos_c := Vector2(0.0, beam_emit_offset_y)
-		var to_pos_c := _sync_beam_target - position + Vector2(0.0, -10.0)
+		var to_pos_c := _sync_beam_target - position + Vector2(0.0, -10.0 - _sync_beam_altitude * BattleConstants.CELL_SIZE)
 		_beam.set_params(from_pos_c, to_pos_c, _sync_beam_stage, 1.0)
 		_beam.visible = true
 		return
@@ -806,18 +826,19 @@ func _update_beam_visual() -> void:
 	if _beam == null or not is_instance_valid(_beam):
 		_beam = InfernoBeam.new()
 		add_child(_beam)
-	# 起点：塔顶喷口（本地坐标）；终点：目标逻辑位置（转父节点本地坐标 + 身体偏移）
+	# 起点：塔顶喷口（本地坐标）；终点：目标逻辑位置（转父节点本地坐标 + 身体偏移 + 空中离地偏移）
 	var from_pos := Vector2(0.0, beam_emit_offset_y)
-	var to_pos := BattlePathing.game_position_of(target) - position + Vector2(0.0, -10.0)
+	var to_pos := BattlePathing.game_position_of(target) - position + Vector2(0.0, -10.0 - target.altitude * BattleConstants.CELL_SIZE)
 	_beam.set_params(from_pos, to_pos, attack.get_ramp_stage_index(), 1.0)
 	_beam.visible = true
 
 
 ## Client 端：接收 host 同步的光束状态（由 BattleManager._rpc_sync_beams 调用）。
 ## target_pos 已由 BattleManager 做过镜像。
-func update_beam_from_sync(active: bool, target_pos: Vector2, stage: int) -> void:
+func update_beam_from_sync(active: bool, target_pos: Vector2, stage: int, altitude: float = 0.0) -> void:
 	_sync_beam_active = active
 	_sync_beam_target = target_pos
+	_sync_beam_altitude = altitude
 	_sync_beam_stage = stage
 
 
@@ -860,27 +881,11 @@ func _process_hatching(delta: float) -> void:
 			var reborn := spawn_manager.spawn_unit_by_id(hatch_unit_id, team, position) as UnitBase
 			if reborn != null:
 				# 重生凤凰不再留蛋：凤凰只能复活一次
-				reborn.death_spawn_unit_id = ""
+				reborn._death_spawn_unit_id = ""  # 重生凤凰不留蛋
+				reborn._death_spawned = true    # 防止 _request_death_spawn 误触发
 	# 蛋碎播完后销毁蛋
 	if _hatch_timer <= 0.0:
 		die()
-
-
-## 死亡生成单位（如凤凰死亡留下凤凰蛋）。在死亡位置生成 death_spawn_unit_id 指定的单位。
-## 经 SpawnManager.spawn_unit_by_id 创建，Host→Client 联机生成自动同步。
-func _spawn_death_unit_if_any() -> void:
-	if death_spawn_unit_id.is_empty():
-		return
-	var spawn_manager := _get_spawn_manager()
-	if spawn_manager:
-		var egg: Node = spawn_manager.spawn_unit_by_id(death_spawn_unit_id, team, position)
-		# 蛋从凤凰模型位置（altitude 高度）开始下落到地面
-		if egg is UnitBase and altitude > 0.0:
-			egg._deploy_drop_cells = altitude
-			egg._deploy_drop_dy = -BattleConstants.px(altitude)
-			egg._refresh_visual_offsets()
-	else:
-		push_error("[UnitBase] Missing SpawnManager for death spawn: " + unit_id)
 
 
 ## 推进被动圣水生产。满圣水时 BattleManager 不会增加能量，因此本次产出直接舍弃。
@@ -1010,6 +1015,11 @@ func _process(delta: float) -> void:
 	_update_passive_mark(delta)
 	# 地狱塔递增光束视觉更新（InfernoBeam 子节点）
 	_update_beam_visual()
+	# 击退动画推进：被击退期间单位受眩晕控制（is_stunned），跳过索敌/移动/跳河等自主行动。
+	# 注意：必须在 _process_status_effects 之后调用，确保眩晕状态能正常随时间过期。
+	if _process_knockback(delta):
+		_is_moving = false
+		return
 	_is_moving = false
 	if is_jumping_river:
 		_is_moving = true
@@ -1061,7 +1071,11 @@ func _process(delta: float) -> void:
 ## 按单位能力移动：跳河单位在跳河更短时起跳；其余地面单位沿 A* 路径绕过塔/建筑。
 ## 空中单位直线飞向目标（不需要寻路）。
 func _move_towards_position(target_pos: Vector2, delta: float) -> void:
+	var pos_before := position
 	if _try_move_for_river_jump(target_pos, delta):
+		# 跳河路线含"走向起跳点"的长距离移动阶段（可跨越半个己方半场），
+		# 必须按实际位移累计冲锋距离，否则可跳河单位在走跳河路线期间冲锋进度永远不增长。
+		_accumulate_charge(position.distance_to(pos_before))
 		return
 
 	var step := _get_effective_move_speed() * delta
@@ -1081,7 +1095,8 @@ func _move_towards_position(target_pos: Vector2, delta: float) -> void:
 
 	position += move_dir * step
 	_last_move_dir = move_dir
-	_accumulate_charge(step)
+	# 按实际位移累计（碰撞/分离偏转后真正走了多远），与跳河路线分支统一口径
+	_accumulate_charge(position.distance_to(pos_before))
 	# 移动音效：间歇播放（仅配了 sfx.move 的单位，如野猪骑士蹄声）
 	_move_sfx_timer -= delta
 	if _move_sfx_timer <= 0.0:
@@ -1484,6 +1499,11 @@ func get_visual_state() -> String:
 ## 覆写朝向：移动时按 A* 路径/分离修正后的实际方向判定；静止时按目标方向判定。
 ## 这样单位为绕开障碍物短暂后退时，walk 动画会跟随路径，而攻击/待机仍朝向目标。
 func get_facing() -> String:
+	# 静态建筑（不可移动，如圣水收集器/迫击炮/地狱塔）：朝向固定，不随目标/部署位置变化
+	if move_speed <= 0.0:
+		var f := "back" if team == "player" else "front"
+		_net_facing = f
+		return f
 	# 部署期间无目标，按阵营强制朝向（player 向上走=back，enemy 向下走=front）
 	if not is_deployed:
 		var f := "back" if team == "player" else "front"
@@ -1511,6 +1531,12 @@ func get_facing() -> String:
 
 ## 覆写水平翻转：移动时按实际移动方向；静止/攻击时按目标方向（素材默认面朝左）。
 func get_flip_h() -> bool:
+	# 静态建筑（不可移动）：贴图朝向固定，不随目标/部署位置翻转
+	# 修复：圣水收集器部署后 _move_target 指向敌方塔，原逻辑按 _get_target_x()>position.x
+	# 决定镜像，导致在左/右不同位置部署时贴图莫名左右翻转
+	if move_speed <= 0.0:
+		_net_flip_h = false
+		return false
 	if _is_remote():
 		# 攻击期间单位静止（位置不变，移动方向推断失效），用 host 同步的翻转值
 		if _net_is_firing:
@@ -1692,13 +1718,21 @@ func _fire_sniper(target) -> void:
 	_sniper_fire_lock = SNIPER_FIRE_LOCK
 	_on_attack_triggered()
 	queue_redraw()
-	# 狙击弹使用觉醒专属音效；普通普攻仍沿用火枪手常规攻击音。
-	AudioManager.play_unit_sfx(unit_id, "sniper_attack", BattlePathing.game_position_of(self))
+	# 狙击弹只在觉醒状态存在，使用原版觉醒火枪手专属射击音。
+	AudioManager.play("attack_evolved_musketeer_sniper", BattlePathing.game_position_of(self))
 	# 飞行子弹视觉 + 延迟伤害结算（子弹到达目标时才造成伤害）
 	var dmg := _sniper_damage
 	SniperTracer.spawn(get_parent(), position, target_pos, func():
 		DamageSystem.resolve_impact(target, dmg)
+		AudioManager.play("impact_evolved_musketeer_big", target_pos)
 	)
+	# 装填提示与射击动作保持同一位置，即使单位在回调前死亡也不读取失效节点。
+	var reload_pos := BattlePathing.game_position_of(self)
+	var tree := get_tree()
+	if tree != null:
+		tree.create_timer(SNIPER_FIRE_LOCK).timeout.connect(func():
+			AudioManager.play("reload_evolved_musketeer", reload_pos)
+		)
 	# 弹药消耗
 	_sniper_shots -= 1
 	_sniper_cooldown_timer = _sniper_cooldown
@@ -1739,6 +1773,7 @@ func _find_nearest_enemy_tower():
 func die() -> void:
 	if is_dead:
 		return
+	AudioManager.play_unit_sfx(unit_id, "death", BattlePathing.game_position_of(self))
 	_clear_passive_mark()
 	if not _is_remote() and _elixir_on_death > 0 and not _elixir_death_paid:
 		_elixir_death_paid = true
@@ -1747,11 +1782,19 @@ func die() -> void:
 	if _is_remote():
 		# Client 端：不注销（未注册）、不触发死亡逻辑链，只播放视觉
 		return
-	_spawn_death_unit_if_any()  # 死亡生成单位（如凤凰死亡留下蛋），client 端已在上方 return 跳过
+	_request_death_spawn()
 	EntityRegistry.unregister(self)
 	SignalBus.unit_died.emit(self, team)
 	print("[UnitBase] unit died:", unit_id)
 	queue_free()
+
+
+## 发起死亡召唤请求。生命周期自然结束同样调用 die()，因此会共用这条链路。
+func _request_death_spawn() -> void:
+	if _death_spawned or _death_spawn_unit_id.is_empty() or _death_spawn_count <= 0:
+		return
+	_death_spawned = true
+	SignalBus.unit_death_spawn_requested.emit(BattlePathing.game_position_of(self), _death_spawn_unit_id, team, _death_spawn_count)
 
 
 ## 联机 client 端：检测到 host 同步的 is_dead=true 后，延迟销毁（留 0.3 秒让死亡视觉播放）

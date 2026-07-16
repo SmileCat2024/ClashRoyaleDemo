@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://bwfsbnn3f6vy1"
+path="res://.godot/imported/laser_loop_02.wav-e440a4e7ba7baa3e0bd46b2d208984be.sample"
+
+[deps]
+
+source_file="res://assets/audio/official_catalog/Inferno Tower/laser_loop_02.wav"
+dest_files=["res://.godot/imported/laser_loop_02.wav-e440a4e7ba7baa3e0bd46b2d208984be.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

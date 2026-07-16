@@ -144,6 +144,7 @@ func _connect_signals() -> void:
 	SignalBus.tower_destroyed.connect(_on_tower_destroyed)
 	SignalBus.projectile_spawned.connect(_on_projectile_spawned)
 	SignalBus.projectile_hit.connect(_on_projectile_hit)
+	SignalBus.elixir_generated.connect(_on_elixir_generated)
 	SignalBus.card_selected.connect(_on_card_selected)
 
 
@@ -183,8 +184,38 @@ func _on_card_played(card_id: String, _team: String, _pos: Vector2, is_awakened:
 		var sfx_map := DataRegistry.get_unit_sfx(unit_id)
 		if sfx_map.has("deploy"):
 			play(sfx_map["deploy"], _pos)
+			_schedule_unit_deploy_end(unit_id, _pos)
+			# 角色语音与部署 Foley 分层播放；未配置时不产生额外声音。
+			if sfx_map.has("deploy_voice"):
+				play_unit_sfx(unit_id, "deploy_voice", _pos)
 			return
 	play("deploy", _pos)
+
+
+## 部署结束音紧随其对应起手 Foley 的实际时长播放。
+## 不写死秒数，因此替换部署资源后仍能保持自然衔接；未配置 deploy_end 时静默跳过。
+func _schedule_unit_deploy_end(unit_id: String, world_pos: Vector2) -> void:
+	var sfx_map := DataRegistry.get_unit_sfx(unit_id)
+	var end_value = sfx_map.get("deploy_end", "")
+	var start_value = sfx_map.get("deploy", "")
+	if end_value == "" or not (start_value is String):
+		return
+	var start_cfg := DataRegistry.get_sound_data(start_value)
+	var start_path: String = start_cfg.get("stream", "")
+	if start_path == "":
+		return
+	var stream := _load_stream(start_path)
+	if stream == null:
+		return
+	var delay := stream.get_length()
+	if delay <= 0.0:
+		return
+	var tree := get_tree()
+	if tree == null:
+		return
+	tree.create_timer(delay).timeout.connect(func():
+		play_unit_sfx(unit_id, "deploy_end", world_pos)
+	)
 
 
 func _on_tower_destroyed(_tower_id: String, _team: String, tower_type: String) -> void:
@@ -202,6 +233,11 @@ func _on_projectile_hit(_pos: Vector2, _team: String) -> void:
 	play("projectile_hit")
 
 
+## 圣水收集器每次产出（含死亡返还）播放其专属收集反馈。
+func _on_elixir_generated(pos: Vector2, _team: String, _amount: int, _is_death: bool) -> void:
+	play_unit_sfx("elixir_collector", "collect", pos)
+
+
 # ==============================================================================
 # SFX 播放 API
 # ==============================================================================
@@ -216,6 +252,9 @@ func play(event_id: String, world_pos: Vector2 = Vector2.ZERO, opts: Dictionary 
 	var cfg := DataRegistry.get_sound_data(event_id)
 	if cfg.is_empty():
 		return  # 未知事件 id，静默跳过（可能是资源尚未配置）
+	# 可选概率门控：角色语音等装饰性音效可避免每次动作都重复播放。
+	if randf() > float(cfg.get("chance", 1.0)):
+		return
 	var stream_path: String = cfg.get("stream", "")
 	if stream_path == "":
 		return  # 资源未上线，静默跳过
@@ -227,9 +266,14 @@ func play(event_id: String, world_pos: Vector2 = Vector2.ZERO, opts: Dictionary 
 	var active: int = int(_active_counts.get(event_id, 0))
 	if active >= max_poly:
 		return
-	# 获取播放器（round-robin，可能打断旧播放）
-	var player := _next_sfx_player()
+	# 优先级（数字越大越优先）。池子满时低优先级新音效不会抢占正在播放的高优先级音效。
+	var priority: int = int(cfg.get("priority", 5))
+	# 获取播放器（优先空闲，否则按 priority 抢占；找不到可用则丢弃此次播放）
+	var player := _next_sfx_player(priority)
+	if player == null:
+		return
 	player.set_meta("sfx_event_id", event_id)
+	player.set_meta("sfx_priority", priority)
 	# 配置
 	player.stream = stream
 	player.volume_db = float(cfg.get("volume_db", 0.0)) + float(opts.get("volume_db", 0.0))
@@ -255,7 +299,15 @@ func play_unit_sfx(unit_id: String, sfx_key: String, world_pos: Vector2 = Vector
 	var sfx_map := DataRegistry.get_unit_sfx(unit_id)
 	if sfx_map.is_empty():
 		return
-	var event_id: String = sfx_map.get(sfx_key, "")
+	var event_value = sfx_map.get(sfx_key, "")
+	var event_id := ""
+	# 同一动作可配置多个等价 Foley 变体，随机选择一个而不是叠加播放。
+	if event_value is Array:
+		if event_value.is_empty():
+			return
+		event_id = str(event_value.pick_random())
+	else:
+		event_id = str(event_value)
 	if event_id == "":
 		return
 	play(event_id, world_pos)
@@ -281,15 +333,32 @@ func _decrement_count(player: AudioStreamPlayer) -> void:
 	player.remove_meta("sfx_event_id")
 
 
-## 轮转获取下一个 SFX 播放器。如果当前播放器正在播放，会被打断（保证池可用）。
+## 获取下一个 SFX 播放器（兑现 priority 字段的抢占规则）。
+## 1) 优先复用空闲播放器；
+## 2) 全部忙碌时，按 round-robin 抢占当前播放音效 priority 不高于新音效的播放器；
+## 3) 找不到可抢占目标返回 null（调用方丢弃此次播放）。
+## 这样高优先级长音效（如倒计时 priority=8）不会被激战时的低优先级短音效截断。
 ## stop() 不触发 finished 信号，所以手动调用 _decrement_count 维持计数准确。
-func _next_sfx_player() -> AudioStreamPlayer:
-	var player := _sfx_pool[_sfx_pool_index]
-	_sfx_pool_index = (_sfx_pool_index + 1) % _sfx_pool.size()
-	if player.playing:
-		player.stop()
-		_decrement_count(player)
-	return player
+func _next_sfx_player(new_priority: int) -> AudioStreamPlayer:
+	# 1) 优先找空闲播放器（从 round-robin 起点扫描，保持池内热度均衡）
+	for i in range(_sfx_pool.size()):
+		var idx := (_sfx_pool_index + i) % _sfx_pool.size()
+		var p_idle := _sfx_pool[idx]
+		if not p_idle.playing:
+			_sfx_pool_index = (idx + 1) % _sfx_pool.size()
+			return p_idle
+	# 2) 全部忙碌：找一个当前 priority 不高于新音效的可抢占目标
+	for i in range(_sfx_pool.size()):
+		var idx := (_sfx_pool_index + i) % _sfx_pool.size()
+		var p_busy := _sfx_pool[idx]
+		var cur_priority := int(p_busy.get_meta("sfx_priority", 1))
+		if cur_priority <= new_priority:
+			_sfx_pool_index = (idx + 1) % _sfx_pool.size()
+			p_busy.stop()
+			_decrement_count(p_busy)
+			return p_busy
+	# 3) 所有播放器都在播更高优先级音效：丢弃新音效
+	return null
 
 
 # ==============================================================================

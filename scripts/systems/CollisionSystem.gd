@@ -46,6 +46,13 @@ static func _resolve_pair(a: Node2D, b: Node2D) -> void:
 	if _is_deploying_non_building(a) or _is_deploying_non_building(b):
 		return
 
+	# 冲刺（死亡俯冲等 dash 技能）中的单位对碰撞完全免疫：
+	# 既不被任何单位阻挡/推回，也不推开路过的单位。高速俯冲应直线穿透战场。
+	# 否则冲刺单位（多为 air 层）冲向同层目标时，半径和（24px）大于到达阈值（6px），
+	# 被碰撞分离反复推开永远到不了；且会撞散路过的同层单位。
+	if _is_dashing(a) or _is_dashing(b):
+		return
+
 	var diff := b.position - a.position
 	var dist := diff.length()
 
@@ -163,6 +170,11 @@ static func _get_layer(entity: Node2D) -> String:
 ## is_deployed=false 且 mass>0 → 部署虚影中，跳过碰撞推挤（允许叠加部署）。
 static func _is_deploying_non_building(entity: Node2D) -> bool:
 	return entity.get("is_deployed") == false and _get_mass(entity) > 0
+
+
+## 是否正处于冲刺（dash 技能）状态。冲刺单位对碰撞完全免疫。
+static func _is_dashing(entity: Node2D) -> bool:
+	return entity.get("is_dashing") == true
 
 
 static func _get_collision_radius(entity: Node2D) -> float:

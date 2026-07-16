@@ -11,7 +11,7 @@ extends Node
 ## 战斗开始时发出
 signal battle_started
 
-## 战斗结束时发出，result 为 "victory" / "defeat" / "draw"
+## 战斗结束时发出，result 为本地玩家视角的 "victory" / "defeat" / "draw"。
 signal battle_ended(result: String)
 
 ## 战斗阶段变化（"regular" → "overtime"），time_remaining 为当前阶段剩余秒
@@ -77,6 +77,10 @@ signal unit_spawned(unit: Node, team: String)
 
 ## 一个单位死亡
 signal unit_died(unit: Node, team: String)
+
+## 单位死亡时请求召唤后续单位（如哥布林牢笼放出哥布林斗士）。
+## position 使用 World 本地游戏坐标；仅 Host / 单机端发出，SpawnManager 是唯一实际创建实体的入口。
+signal unit_death_spawn_requested(position: Vector2, unit_id: String, team: String, count: int)
 
 ## 一座塔被摧毁
 signal tower_destroyed(tower_id: String, team: String, tower_type: String)

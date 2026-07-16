@@ -145,13 +145,30 @@ func test_area_damage_unit_and_tower_mixed() -> void:
 
 # ============================================================
 #  击退（CombatantBase.knockback）
+#  击退为 0.5 秒 ease-out 动画 + 期间眩晕控制效果。
+#  测试通过手动推进 _process_knockback + _process_status_effects 模拟动画。
 # ============================================================
+
+## 模拟击退动画推进：分步驱动位置 lerp 与状态效果过期。
+func _advance_knockback(unit: CombatantBase, total_time: float, step: float = 0.016) -> void:
+	var elapsed := 0.0
+	while elapsed < total_time:
+		var dt := minf(step, total_time - elapsed)
+		unit._process_status_effects(dt)
+		unit._process_knockback(dt)
+		elapsed += dt
+
 
 func test_knockback_moves_unit() -> void:
 	var unit := _make_target(100)
 	unit.position = Vector2(100, 100)
 	unit.knockback(Vector2(1, 0), 20.0)
-	assert_eq(unit.position, Vector2(120, 100), "单位应沿X正方向移动20px")
+	# 启动瞬间：位置未变（动画未推进），但已施加眩晕控制
+	assert_eq(unit.position, Vector2(100, 100), "击退启动后位置不应立即变化")
+	assert_true(unit.is_stunned(), "击退期间单位应被施加眩晕控制")
+	_advance_knockback(unit, CombatantBase.KNOCKBACK_DURATION)
+	assert_eq(unit.position, Vector2(120, 100), "动画结束单位应沿X正方向移动20px")
+	assert_false(unit.is_stunned(), "击退结束后眩晕应解除")
 
 
 func test_knockback_diagonal() -> void:
@@ -160,8 +177,19 @@ func test_knockback_diagonal() -> void:
 	# 45度方向，距离 20px
 	var dir := Vector2(1, 1).normalized()
 	unit.knockback(dir, 20.0)
+	_advance_knockback(unit, CombatantBase.KNOCKBACK_DURATION)
 	assert_approx(unit.position.x, 100 + dir.x * 20.0, 0.1, "X方向偏移正确")
 	assert_approx(unit.position.y, 100 + dir.y * 20.0, 0.1, "Y方向偏移正确")
+
+
+func test_knockback_partial_progress() -> void:
+	# 半程断言：动画未结束时位置应在起点与终点之间，眩晕仍生效
+	var unit := _make_target(100)
+	unit.position = Vector2(100, 100)
+	unit.knockback(Vector2(1, 0), 20.0)
+	_advance_knockback(unit, CombatantBase.KNOCKBACK_DURATION * 0.5)
+	assert_true(unit.position.x > 100.0 and unit.position.x < 120.0, "半程位置应在起点与终点之间")
+	assert_true(unit.is_stunned(), "动画未结束时眩晕应持续")
 
 
 func test_knockback_tower_immune() -> void:
@@ -169,6 +197,9 @@ func test_knockback_tower_immune() -> void:
 	tower.position = Vector2(100, 100)
 	tower.knockback(Vector2(1, 0), 20.0)
 	assert_eq(tower.position, Vector2(100, 100), "塔应免疫击退")
+	assert_false(tower.is_stunned(), "免疫击退的单位不应被施加眩晕")
+	_advance_knockback(tower, CombatantBase.KNOCKBACK_DURATION)
+	assert_eq(tower.position, Vector2(100, 100), "推进时间后塔仍不应移动")
 
 
 func test_knockback_immunity_is_independent_of_mass() -> void:
@@ -176,6 +207,7 @@ func test_knockback_immunity_is_independent_of_mass() -> void:
 	heavy_unit.mass = 18
 	heavy_unit.position = Vector2(100, 100)
 	heavy_unit.knockback(Vector2(1, 0), 20.0)
+	_advance_knockback(heavy_unit, CombatantBase.KNOCKBACK_DURATION)
 	assert_eq(heavy_unit.position, Vector2(120, 100), "高质量但未免疫的单位仍应被击退")
 
 	var immune_unit := _make_target(100)
@@ -183,6 +215,7 @@ func test_knockback_immunity_is_independent_of_mass() -> void:
 	immune_unit.knockback_immune = true
 	immune_unit.position = Vector2(100, 100)
 	immune_unit.knockback(Vector2(1, 0), 20.0)
+	_advance_knockback(immune_unit, CombatantBase.KNOCKBACK_DURATION)
 	assert_eq(immune_unit.position, Vector2(100, 100), "具有击退免疫的单位不应被击退")
 
 
@@ -192,6 +225,7 @@ func test_knockback_dead_immune() -> void:
 	unit.position = Vector2(100, 100)
 	unit.knockback(Vector2(1, 0), 20.0)
 	assert_eq(unit.position, Vector2(100, 100), "死亡单位应免疫击退")
+	assert_false(unit.is_stunned(), "死亡单位不应被施加眩晕")
 
 
 func test_knockback_clamped_to_arena() -> void:
@@ -199,6 +233,7 @@ func test_knockback_clamped_to_arena() -> void:
 	# 放在右边缘附近
 	unit.position = Vector2(BattleConstants.ARENA_WIDTH - 5, 100)
 	unit.knockback(Vector2(1, 0), 20.0)
+	_advance_knockback(unit, CombatantBase.KNOCKBACK_DURATION)
 	# 应被钳制到 ARENA_WIDTH - 0.5*CELL_SIZE
 	var max_x := BattleConstants.ARENA_WIDTH - BattleConstants.CELL_SIZE * 0.5
 	assert_eq(unit.position.x, max_x, "击退应被钳制到竞技场边界")
@@ -209,6 +244,24 @@ func test_knockback_zero_distance_noop() -> void:
 	unit.position = Vector2(100, 100)
 	unit.knockback(Vector2(1, 0), 0.0)
 	assert_eq(unit.position, Vector2(100, 100), "零距离击退不应移动")
+	assert_false(unit.is_stunned(), "零距离击退不应施加眩晕")
+
+
+func test_knockback_retrigger_extends_stun() -> void:
+	# 击退进行中再次被击退：旧动画从当前位置重启，眩晕按 merge 取最长剩余
+	var unit := _make_target(100)
+	unit.position = Vector2(100, 100)
+	unit.knockback(Vector2(1, 0), 20.0)
+	_advance_knockback(unit, 0.2)  # 推进 0.2 秒，已移动一段距离
+	var pos_mid := unit.position
+	assert_true(pos_mid.x > 100.0, "首次击退应已推进")
+	# 从当前位置再次击退 20px
+	unit.knockback(Vector2(1, 0), 20.0)
+	assert_eq(unit.position, pos_mid, "二次击退应从当前位置起步")
+	assert_true(unit.is_stunned(), "二次击退后仍应处于眩晕")
+	_advance_knockback(unit, CombatantBase.KNOCKBACK_DURATION)
+	assert_approx(unit.position.x, pos_mid.x + 20.0, 0.1, "二次击退应在当前位置基础上再推进20px")
+
 
 
 # ============================================================

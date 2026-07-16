@@ -89,6 +89,14 @@ var unit_data := {
 				},
 			},
 		},
+		# 官方原版补充：此前骑士没有专属音效，不替换任何已有文件或事件。
+		"sfx": {
+			"deploy": "deploy_knight",
+			"attack": ["attack_knight_01", "attack_knight_02", "attack_knight_03", "attack_knight_04", "attack_knight_05"],
+			"move": ["move_knight_01", "move_knight_02", "move_knight_03", "move_knight_04"],
+			"impact": "hit_knight",
+			"death": "death_knight",
+		},
 	},
 	"hog_rider": {
 		"id": "hog_rider",
@@ -161,7 +169,11 @@ var unit_data := {
 		},
 		"sfx": {
 			"deploy": "deploy_hog_rider",
-			"move": "hog_rider_move",
+			"deploy_end": "deploy_end_hog_rider",
+			"attack": ["attack_hog_rider_01", "attack_hog_rider_03"],
+			"move": "move_hog_rider",
+			"impact": "impact_hog_rider",
+			"death": "death_hog_rider",
 		},
 	},
 	"musketeer": {
@@ -239,7 +251,9 @@ var unit_data := {
 		"sfx": {
 			"deploy": "deploy_musketeer",
 			"attack": "attack_musketeer",
-			"sniper_attack": "attack_awakened_musketeer",
+			"sniper_attack": "attack_musketeer",
+			"move": ["move_musketeer_01", "move_musketeer_02", "move_musketeer_03", "move_musketeer_04"],
+			"hit": "hit_musketeer",
 		},
 	},
 	"mini_pekka": {
@@ -325,7 +339,11 @@ var unit_data := {
 		},
 		"sfx": {
 			"deploy": "deploy_mini_pekka",
+			"deploy_end": "deploy_end_mini_pekka",
 			"attack": "attack_mini_pekka",
+			"move": "move_mini_pekka",
+			"impact": "impact_mini_pekka",
+			"death": "death_mini_pekka",
 		},
 	},
 	"balloon": {
@@ -384,6 +402,9 @@ var unit_data := {
 		},
 		"sfx": {
 			"deploy": "deploy_balloon",
+			"attack": "attack_balloon",
+			"move": "balloon_fly_loop",
+			"impact": "impact_balloon",
 		},
 	},
 	"archers": {
@@ -462,6 +483,10 @@ var unit_data := {
 		},
 		"sfx": {
 			"deploy": "deploy_archers",
+			"attack": "attack_archers",
+			"move": "move_archers",
+			"hit": "hit_archers",
+			"death": "death_archers",
 		},
 	},
 	"giant": {
@@ -532,7 +557,11 @@ var unit_data := {
 			},
 		},
 		"sfx": {
-			"attack": "attack_giant",
+			"deploy": "deploy_giant",
+			"attack": ["attack_giant_01", "attack_giant_02", "attack_giant_03"],
+			"move": "move_giant",
+			"impact": "impact_giant",
+			"death": "death_giant",
 		},
 	},
 	"prince": {
@@ -575,7 +604,11 @@ var unit_data := {
 		}],
 		"sfx": {
 			"deploy": "deploy_prince",
+			"attack": ["attack_prince_02", "attack_prince_04", "attack_prince_09", "attack_prince_10"],
+			"move": ["move_prince_01", "move_prince_02"],
+			"impact": "impact_prince",
 			"charge": "prince_charge",
+			"charge_impact": "prince_charge_impact",
 		},
 		# 帧动画：walk/attack/charge × front(back)。1024×768 高清图。
 		# charge（冲刺）= 冲锋状态专属动画，get_visual_state 在 is_charging 时返回 "charge" 触发。
@@ -665,7 +698,9 @@ var unit_data := {
 			"arc_height": 7.0,           # 最大射程处弧高（格），近处按距离比例自动降低
 		}],
 		"sfx": {
-			"deploy": "deploy_building",
+			"deploy": "deploy_mortar",
+			"impact": "mortar_impact",
+			"death": "death_mortar",
 		},
 		# 迫击炮建筑贴图（314×464）。首次使用团队色双套贴图：
 		# player 用蓝方贴图，enemy 用红方贴图（联机下 team flip 后两端各看己方蓝/敌方红）。
@@ -784,6 +819,9 @@ var unit_data := {
 		},
 		"sfx": {
 			"deploy": "deploy_mega_minion",
+			"attack": "attack_mega_minion",
+			"move": "mega_minion_wing",
+			"death": "death_mega_minion",
 		},
 	},
 	"flyer": {
@@ -885,7 +923,11 @@ var unit_data := {
 		},
 		"sfx": {
 			"deploy": "deploy_pekka",
+			"deploy_end": "deploy_end_pekka",
 			"attack": "attack_pekka",
+			"move": "move_pekka",
+			"impact": "impact_pekka",
+			"death": "death_pekka",
 		},
 	},
 	"valkyrie": {
@@ -963,7 +1005,11 @@ var unit_data := {
 		},
 		"sfx": {
 			"deploy": "deploy_valkyrie",
-			"attack": "attack_valkyrie",
+			"deploy_end": "deploy_end_valkyrie",
+			"attack": ["attack_valkyrie_04", "attack_valkyrie_05", "attack_valkyrie_06", "attack_valkyrie_07", "attack_valkyrie_08", "attack_valkyrie_09", "attack_valkyrie_10"],
+			"move": "move_valkyrie",
+			"impact": "impact_valkyrie",
+			"death": "death_valkyrie",
 		},
 	},
 	"royal_ghost": {
@@ -1099,6 +1145,10 @@ var unit_data := {
 		},
 		"sfx": {
 			"deploy": "deploy_goblins",
+			"attack": ["attack_goblins_01", "attack_goblins_02", "attack_goblins_03"],
+			"move": ["move_goblins_01", "move_goblins_02", "move_goblins_03", "move_goblins_04", "move_goblins_05"],
+			"impact": ["impact_goblins_01", "impact_goblins_02", "impact_goblins_03", "impact_goblins_04"],
+			"death": "death_goblins",
 		},
 	},
 	"inferno_tower": {
@@ -1156,7 +1206,7 @@ var unit_data := {
 			},
 		},
 		"sfx": {
-			"deploy": "deploy_building",
+			"deploy": "deploy_inferno_tower",
 		},
 	},
 	"elixir_collector": {
@@ -1202,7 +1252,9 @@ var unit_data := {
 			},
 		},
 		"sfx": {
-			"deploy": "deploy_building",
+			"deploy": "deploy_elixir_collector",
+			"collect": "elixir_collector_collect",
+			"death": "death_elixir_collector",
 		},
 	},
 	"princess": {
@@ -1238,20 +1290,21 @@ var unit_data := {
 			"projectile_speed": 10.0,
 		}],
 		"animation": {
-			"hide_placeholder": true,
-			"visual_offset_x": 0.0,
-			"visual_offset_y": -14.0,
-			"visual_scale": 0.05,
-			"health_bar_y": -60.0,
-			"texture_filter": "linear",
-			"states": {
+		"hide_placeholder": true,
+		"visual_offset_x": 0.0,
+		"visual_offset_y": -14.0,
+		"visual_scale": 0.05,
+		"front_scale_mult": 1.3,
+		"health_bar_y": -60.0,
+		"texture_filter": "linear",
+		"states": {
 				"walk_back": {
 					"frames": ["walk_back_01.png", "walk_back_02.png"],
 					"duration": [0.25, 0.25],
 					"mode": "loop",
 				},
 				"walk_front": {
-					"frames": ["walk_back_01.png", "walk_back_02.png"],
+					"frames": ["walk_front_01.png", "walk_front_02.png"],
 					"duration": [0.25, 0.25],
 					"mode": "loop",
 				},
@@ -1261,7 +1314,7 @@ var unit_data := {
 					"mode": "loop",
 				},
 				"idle_front": {
-					"frames": ["walk_back_01.png"],
+					"frames": ["walk_front_01.png"],
 					"duration": [0.3],
 					"mode": "loop",
 				},
@@ -1270,13 +1323,23 @@ var unit_data := {
 					"duration": [0.1, 0.1, 0.15],
 					"mode": "once",
 				},
-			"attack_front": {
-				"frames": ["attack_back_01.png", "attack_back_02.png", "attack_back_03.png"],
-				"duration": [0.1, 0.1, 0.15],
-				"mode": "once",
+				"attack_front": {
+					"frames": ["attack_front_01.png", "attack_front_02.png", "attack_front_03.png"],
+					"duration": [0.1, 0.1, 0.15],
+					"mode": "once",
+				},
 			},
 		},
-	},
+		# 官方原版补充：此前公主没有专属部署/射击音效。
+		"sfx": {
+			"deploy": "deploy_princess",
+			"deploy_voice": ["deploy_voice_princess_01", "deploy_voice_princess_02", "deploy_voice_princess_03", "deploy_voice_princess_04"],
+			"attack": "attack_princess",
+			"attack_voice": ["attack_voice_princess_02", "attack_voice_princess_03", "attack_voice_princess_04", "attack_voice_princess_06"],
+			"move": "move_princess",
+			"hit": "hit_princess",
+			"death": "death_princess",
+		},
 	},
 	"ranger": {
 		"id": "ranger",
@@ -1326,6 +1389,95 @@ var unit_data := {
 				"attack_back": { "frames": ["attack_back_01.png", "attack_back_02.png"], "duration": [0.1, 0.65], "mode": "once" },
 			},
 		},
+		# 官方 magic_archer 素材对应本项目的“神箭游侠”，此前该单位没有专属音效。
+		"sfx": {
+			"deploy": "deploy_magic_archer",
+			"attack": "attack_magic_archer",
+			"attack_voice": ["attack_voice_magic_archer_01", "attack_voice_magic_archer_02"],
+			"move": "move_magic_archer",
+		},
+	},
+	"goblin_cage": {
+		"id": "goblin_cage",
+		"display_name": "哥布林牢笼",
+		"max_hp": 780,
+		"shield": 0,
+		"move_speed": 0.0,
+		"movement_type": "ground",
+		"sight_range": 0.0,
+		"movement_targeting": "any",
+		"collision_radius": 0.6,
+		"hurt_radius": 0.6,
+		"mass": 0,
+		"knockback_immune": true,
+		"shadow_size": 0.8,
+		"deploy_time": 1.0,
+		"lifespan": 20.0,
+		"is_passive": true,
+		"death_spawn_unit_id": "goblin_brawler",
+		"death_spawn_count": 1,
+		"attacks": [],
+		"animation": {
+			"hide_placeholder": true,
+			"visual_offset_x": 0.0,
+			"visual_offset_y": -10.5,
+			"visual_scale": 0.015,
+			"health_bar_y": -70.0,
+			"texture_filter": "linear",
+			"states": {
+				"idle_front": { "frames": ["cage_front.png"], "duration": [1.0], "mode": "loop" },
+				"idle_back": { "frames": ["cage_back.png"], "duration": [1.0], "mode": "loop" },
+				"walk_front": { "frames": ["cage_front.png"], "duration": [1.0], "mode": "loop" },
+				"walk_back": { "frames": ["cage_back.png"], "duration": [1.0], "mode": "loop" },
+			},
+		},
+		"sfx": {
+			"deploy": "deploy_building",
+		},
+	},
+	"goblin_brawler": {
+		"id": "goblin_brawler",
+		"display_name": "哥布林斗士",
+		"max_hp": 1080,
+		"shield": 0,
+		"move_speed": 1.5,
+		"movement_type": "ground",
+		"sight_range": 5.5,
+		"movement_targeting": "any",
+		"collision_radius": 0.5,
+		"hurt_radius": 0.5,
+		"mass": 3,
+		"shadow_size": 0.5,
+		"deploy_time": 0.0,
+		"attacks": [{
+			"name": "brawl",
+			"targeting": "any",
+			"attack_ground": true,
+			"attack_air": false,
+			"attack_range": 0.8,
+			"attack_interval": 1.1,
+			"first_attack_delay": 0.2,
+			"delivery": "instant",
+			"impact_type": "single",
+			"impact_radius": 0.0,
+			"damage": 337,
+		}],
+		"animation": {
+			"hide_placeholder": true,
+			"visual_offset_x": 0.0,
+			"visual_offset_y": -7.5,
+			"visual_scale": 0.015,
+			"health_bar_y": -60.0,
+			"texture_filter": "linear",
+			"states": {
+				"walk_front": { "frames": ["walk_front_01.png", "walk_front_02.png"], "duration": [0.2, 0.2], "mode": "loop" },
+				"walk_back": { "frames": ["walk_back_01.png", "walk_back_02.png"], "duration": [0.2, 0.2], "mode": "loop" },
+				"idle_front": { "frames": ["walk_front_01.png"], "duration": [0.4], "mode": "loop" },
+				"idle_back": { "frames": ["walk_back_01.png"], "duration": [0.4], "mode": "loop" },
+				"attack_front": { "frames": ["attack_front_01.png", "attack_front_02.png"], "duration": [0.12, 0.25], "mode": "once" },
+				"attack_back": { "frames": ["attack_back_01.png", "attack_back_02.png"], "duration": [0.12, 0.25], "mode": "once" },
+			},
+		},
 	},
 	"phoenix": {
 		"id": "phoenix",
@@ -1344,6 +1496,7 @@ var unit_data := {
 		# 死亡留蛋：凤凰死亡后留下一颗凤凰蛋（蛋从空中落下造成范围伤害，见 phoenix_egg.spawn_damage）。
 		# 注：凤凰自身死亡不爆炸，范围伤害改由蛋落地造成（只复活一次：重生凤凰无任何亡语）。
 		"death_spawn_unit_id": "phoenix_egg",
+		"death_spawn_count": 1,  # 死亡时生成 1 颗凤凰蛋
 		"attacks": [{
 			"name": "fire_claw",
 			"targeting": "any",
@@ -1396,6 +1549,7 @@ var unit_data := {
 		"knockback_immune": true,
 		"shadow_size": 0.4,
 		"deploy_time": 0.3,  # 从空中落下（部署下落动画），落地时造成范围伤害
+		"deploy_drop_cells": 2.5,  # 从凤凰死亡模型高度（altitude=2.5格）下落到地面
 		# 落地冲击：蛋从空中落下造成范围伤害（只打敌方，对塔/地面单位/空中单位均生效）
 		"spawn_damage": 163,
 		"spawn_radius": 3.0,  # 范围伤害半径（格）
@@ -1440,6 +1594,8 @@ var card_data := {
 		"spawn_count": 1,
 		"spawn_spread": 0.0,
 		"icon": "res://assets/ui/cards/knight.png",
+		# 仅觉醒版播放官方觉醒骑士部署音；普通骑士仍走自己的 deploy_knight。
+		"awakening_deploy_sfx": "deploy_evolved_knight",
 		"description": "一个坚韧的近战战士。",
 		# ---- 觉醒配置（打出 2 次普通版后，下一次为觉醒版）----
 		# 觉醒效果在 UnitBase.apply_awakening() 中数据驱动应用，动作素材不变。
@@ -1474,7 +1630,7 @@ var card_data := {
 		"spawn_spread": 0.0,
 		"icon": "res://assets/ui/cards/musketeer.png",
 		"awakening_icon": "res://assets/ui/cards/musketeer_evolution.png",
-		"awakening_deploy_sfx": "deploy_awakened_musketeer",
+		"awakening_deploy_sfx": "deploy_evolved_musketeer",
 		"description": "远程射手，可对空对地。",
 		# ---- 觉醒配置（打出 1 次普通版后，下一次为觉醒版）----
 		# 普通火枪手仍然保留在牌库中；轮转后由 AwakeningTracker 决定下一次是否使用觉醒版。
@@ -1609,6 +1765,7 @@ var card_data := {
 		"icon": "res://assets/ui/cards/mortar.png",
 		"description": "远程建筑，发射范围伤害炮弹。不可移动，自动成为障碍。",
 		"awakening_icon": "res://assets/ui/cards/mortar_evolution.png",
+		"awakening_deploy_sfx": "deploy_evolved_mortar",
 		# ---- 觉醒配置（打出 1 次普通版后，下一次为觉醒版）----
 		# 觉醒迫击炮：炮弹落地先结算范围伤害，随后在同一落点召唤一只哥布林。
 		# 卡牌轮转仍使用普通 card_mortar。
@@ -1753,6 +1910,7 @@ var card_data := {
 			"targeting": "instant",
 			"cooldown": 8.0,               # 冷却时间（秒）
 			"icon": "",                    # 技能图标路径（空=用文字显示技能名）
+			"sfx_cast": "elite_knight_skill_cast",
 			"effect": {
 				"type": "holy_taunt",     # 金色圣光法阵完成后，强制范围内合格目标锁敌
 				"radius": 8.5,             # 法阵半径（格）
@@ -1788,6 +1946,8 @@ var card_data := {
 			"targeting": "instant",        # 自动锁敌，瞬发型
 			"cooldown": 8.0,
 			"icon": "",
+			"sfx_cast": "elite_mega_minion_skill_cast",
+			"sfx_impact": "elite_mega_minion_skill_impact",
 			"effect": {
 				"type": "dash_to_weakest", # 锁定血量最低敌方单位 + 冲刺 + 范围伤害
 				"dash_speed_cells": 30.0,   # 冲刺固定速度（格/秒）
@@ -1808,6 +1968,17 @@ var card_data := {
 		"spawn_spread": 0.0,
 		"icon": "res://assets/ui/cards/phoenix.png",
 		"description": "传奇飞行单位。死亡留下凤凰蛋，蛋从空中落下造成范围伤害；蛋3秒内未被摧毁则重生，重生凤凰只复活一次。",
+	},
+	"card_goblin_cage": {
+		"id": "card_goblin_cage",
+		"display_name": "哥布林牢笼",
+		"cost": 4,
+		"card_type": "troop",
+		"unit_id": "goblin_cage",
+		"spawn_count": 1,
+		"spawn_spread": 0.0,
+		"icon": "res://assets/ui/cards/goblin_cage.png",
+		"description": "被摧毁或寿命结束时，放出一名快速近战的哥布林斗士。",
 	},
 }
 
@@ -1950,7 +2121,7 @@ var sound_data := {
 		"priority": 3,
 	},
 	"charge_hit": {  # 王子冲锋命中
-		"stream": "res://assets/audio/sfx/王子冲锋命中.MP3",
+		"stream": "res://assets/audio/sfx/official_later_card_epic_prince_prince_charge_hit_01.ogg",
 		"volume_db": -2.0,
 		"pitch_range": [0.95, 1.05],
 		"max_polyphony": 2,
@@ -1973,7 +2144,7 @@ var sound_data := {
 		"priority": 3,
 	},
 	"mortar_launch": {  # 迫击炮发射（可单独配置或回退到 projectile_launch）
-		"stream": "res://assets/audio/sfx/迫击炮发射.MP3",
+		"stream": "res://assets/audio/sfx/official_remaining_mortar_mortar_fire_03.ogg",
 		"volume_db": -3.0,
 		"pitch_range": [0.95, 1.05],
 		"max_polyphony": 2,
@@ -1998,28 +2169,28 @@ var sound_data := {
 
 	# ---- 法术 ----
 	"fireball_launch": {  # 火球发射
-		"stream": "res://assets/audio/sfx/火球发射.MP3",
+		"stream": "res://assets/audio/sfx/official_later_card_rare_fireball_fire_ball_02.ogg",
 		"volume_db": -2.0,
 		"pitch_range": [1.0, 1.0],
 		"max_polyphony": 2,
 		"priority": 6,
 	},
 	"fireball_impact": {  # 火球爆炸
-		"stream": "res://assets/audio/sfx/火球命中.MP3",
+		"stream": "res://assets/audio/sfx/official_later_card_rare_fireball_fire_ball_explo_02.ogg",
 		"volume_db": 0.0,
 		"pitch_range": [0.95, 1.05],
 		"max_polyphony": 2,
 		"priority": 7,
 	},
 	"arrows_rain": {  # 万箭齐发箭雨
-		"stream": "res://assets/audio/sfx/万箭齐发.MP3",
+		"stream": "res://assets/audio/sfx/official_remaining_arrows_archer_queen_attack_02.ogg",
 		"volume_db": -4.0,
 		"pitch_range": [0.95, 1.05],
 		"max_polyphony": 2,
 		"priority": 5,
 	},
 	"poison_cast": {  # 毒药施放
-		"stream": "res://assets/audio/sfx/毒药.MP3",
+		"stream": "res://assets/audio/sfx/official_remaining_poison_poison_spell_01.ogg",
 		"volume_db": -4.0,
 		"pitch_range": [1.0, 1.0],
 		"max_polyphony": 2,
@@ -2035,7 +2206,7 @@ var sound_data := {
 		"priority": 2,
 	},
 	"tower_destroyed": {  # 塔被摧毁
-		"stream": "res://assets/audio/sfx/公主塔爆了.MP3",
+		"stream": "res://assets/audio/sfx/official_tower_destroyed.ogg",
 		"volume_db": 2.0,
 		"pitch_range": [1.0, 1.0],
 		"max_polyphony": 1,
@@ -2074,7 +2245,7 @@ var sound_data := {
 
 	# ---- 卡牌选中 ----
 	"card_select": {
-		"stream": "res://assets/audio/sfx/选中卡牌.MP3",
+		"stream": "res://assets/audio/sfx/official_card_select.ogg",
 		"volume_db": -4.0,
 		"pitch_range": [0.95, 1.05],
 		"max_polyphony": 2,
@@ -2083,86 +2254,213 @@ var sound_data := {
 
 	# ---- 倒计时 ----
 	"countdown_10s": {
-		"stream": "res://assets/audio/sfx/倒计时10秒.MP3",
+		"stream": "res://assets/audio/sfx/official_countdown_10s.ogg",
 		"volume_db": 0.0,
 		"pitch_range": [1.0, 1.0],
 		"max_polyphony": 1,
 		"priority": 8,
 	},
+	# 官方倒计时为 10 个独立数字音；BattleHUD 每秒按对应事件播放。
+	"countdown_1": { "stream": "res://assets/audio/sfx/official_countdown_01.ogg", "volume_db": 0.0, "pitch_range": [1.0, 1.0], "max_polyphony": 1, "priority": 8 },
+	"countdown_2": { "stream": "res://assets/audio/sfx/official_countdown_02.ogg", "volume_db": 0.0, "pitch_range": [1.0, 1.0], "max_polyphony": 1, "priority": 8 },
+	"countdown_3": { "stream": "res://assets/audio/sfx/official_countdown_03.ogg", "volume_db": 0.0, "pitch_range": [1.0, 1.0], "max_polyphony": 1, "priority": 8 },
+	"countdown_4": { "stream": "res://assets/audio/sfx/official_countdown_04.ogg", "volume_db": 0.0, "pitch_range": [1.0, 1.0], "max_polyphony": 1, "priority": 8 },
+	"countdown_5": { "stream": "res://assets/audio/sfx/official_countdown_05.ogg", "volume_db": 0.0, "pitch_range": [1.0, 1.0], "max_polyphony": 1, "priority": 8 },
+	"countdown_6": { "stream": "res://assets/audio/sfx/official_countdown_06.ogg", "volume_db": 0.0, "pitch_range": [1.0, 1.0], "max_polyphony": 1, "priority": 8 },
+	"countdown_7": { "stream": "res://assets/audio/sfx/official_countdown_07.ogg", "volume_db": 0.0, "pitch_range": [1.0, 1.0], "max_polyphony": 1, "priority": 8 },
+	"countdown_8": { "stream": "res://assets/audio/sfx/official_countdown_08.ogg", "volume_db": 0.0, "pitch_range": [1.0, 1.0], "max_polyphony": 1, "priority": 8 },
+	"countdown_9": { "stream": "res://assets/audio/sfx/official_countdown_09.ogg", "volume_db": 0.0, "pitch_range": [1.0, 1.0], "max_polyphony": 1, "priority": 8 },
+	"countdown_10": { "stream": "res://assets/audio/sfx/official_countdown_10.ogg", "volume_db": 0.0, "pitch_range": [1.0, 1.0], "max_polyphony": 1, "priority": 8 },
+
+	# ---- 精英技能 UI ----
+	"elite_skill_ready": {
+		"stream": "res://assets/audio/sfx/official_elite_skill_ready.ogg",
+		"volume_db": -3.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 2,
+		"priority": 6,
+	},
+	"elite_skill_press": {
+		"stream": "res://assets/audio/sfx/official_elite_skill_press.ogg",
+		"volume_db": -3.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 2,
+		"priority": 6,
+	},
+
+	# ---- 官方卡牌补充：动作变体、移动、命中、阵亡与精英技能 ----
+	"attack_knight_01": { "stream": "res://assets/audio/sfx/official_knight_attack_01.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 4, "priority": 4 },
+	"attack_knight_02": { "stream": "res://assets/audio/sfx/official_knight_attack_02.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 4, "priority": 4 },
+	"attack_knight_03": { "stream": "res://assets/audio/sfx/official_knight_attack_03.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 4, "priority": 4 },
+	"attack_knight_04": { "stream": "res://assets/audio/sfx/official_knight_attack_04.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 4, "priority": 4 },
+	"attack_knight_05": { "stream": "res://assets/audio/sfx/official_knight_attack_05.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 4, "priority": 4 },
+	"move_knight_01": { "stream": "res://assets/audio/sfx/official_knight_move_01.ogg", "volume_db": -11.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 2 },
+	"move_knight_02": { "stream": "res://assets/audio/sfx/official_knight_move_02.ogg", "volume_db": -11.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 2 },
+	"move_knight_03": { "stream": "res://assets/audio/sfx/official_knight_move_03.ogg", "volume_db": -11.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 2 },
+	"move_knight_04": { "stream": "res://assets/audio/sfx/official_knight_move_04.ogg", "volume_db": -11.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 2 },
+	"hit_knight": { "stream": "res://assets/audio/sfx/official_knight_hit.ogg", "volume_db": -7.0, "pitch_range": [0.96, 1.04], "max_polyphony": 3, "priority": 3 },
+	"death_knight": { "stream": "res://assets/audio/sfx/official_knight_death.ogg", "volume_db": -4.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 5 },
+	"evolved_knight_shield": { "stream": "res://assets/audio/sfx/official_evolved_knight_shield.ogg", "volume_db": -3.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 6 },
+
+	"move_princess": { "stream": "res://assets/audio/sfx/official_princess_move.ogg", "volume_db": -12.0, "pitch_range": [0.98, 1.02], "max_polyphony": 2, "priority": 2 },
+	"hit_princess": { "stream": "res://assets/audio/sfx/official_princess_hit.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 4 },
+	"death_princess": { "stream": "res://assets/audio/sfx/official_princess_death.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 5 },
+	"deploy_voice_princess_01": { "stream": "res://assets/audio/sfx/official_princess_deploy_voice_01.ogg", "volume_db": -8.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 3, "chance": 0.45 },
+	"deploy_voice_princess_02": { "stream": "res://assets/audio/sfx/official_princess_deploy_voice_02.ogg", "volume_db": -8.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 3, "chance": 0.45 },
+	"deploy_voice_princess_03": { "stream": "res://assets/audio/sfx/official_princess_deploy_voice_03.ogg", "volume_db": -8.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 3, "chance": 0.45 },
+	"deploy_voice_princess_04": { "stream": "res://assets/audio/sfx/official_princess_deploy_voice_04.ogg", "volume_db": -8.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 3, "chance": 0.45 },
+	"attack_voice_princess_02": { "stream": "res://assets/audio/sfx/official_princess_attack_voice_02.ogg", "volume_db": -12.0, "pitch_range": [1.0, 1.0], "max_polyphony": 1, "priority": 2, "chance": 0.18 },
+	"attack_voice_princess_03": { "stream": "res://assets/audio/sfx/official_princess_attack_voice_03.ogg", "volume_db": -12.0, "pitch_range": [1.0, 1.0], "max_polyphony": 1, "priority": 2, "chance": 0.18 },
+	"attack_voice_princess_04": { "stream": "res://assets/audio/sfx/official_princess_attack_voice_04.ogg", "volume_db": -12.0, "pitch_range": [1.0, 1.0], "max_polyphony": 1, "priority": 2, "chance": 0.18 },
+	"attack_voice_princess_06": { "stream": "res://assets/audio/sfx/official_princess_attack_voice_06.ogg", "volume_db": -12.0, "pitch_range": [1.0, 1.0], "max_polyphony": 1, "priority": 2, "chance": 0.18 },
+
+	"move_magic_archer": { "stream": "res://assets/audio/sfx/official_magic_archer_move.ogg", "volume_db": -11.0, "pitch_range": [0.98, 1.02], "max_polyphony": 2, "priority": 2 },
+	"attack_voice_magic_archer_01": { "stream": "res://assets/audio/sfx/official_magic_archer_attack_voice_01.ogg", "volume_db": -12.0, "pitch_range": [1.0, 1.0], "max_polyphony": 1, "priority": 2, "chance": 0.18 },
+	"attack_voice_magic_archer_02": { "stream": "res://assets/audio/sfx/official_magic_archer_attack_voice_02.ogg", "volume_db": -12.0, "pitch_range": [1.0, 1.0], "max_polyphony": 1, "priority": 2, "chance": 0.18 },
+
+	"impact_balloon": { "stream": "res://assets/audio/sfx/official_balloon_impact.ogg", "volume_db": -2.0, "pitch_range": [0.96, 1.04], "max_polyphony": 2, "priority": 6 },
+	"death_mega_minion": { "stream": "res://assets/audio/sfx/official_mega_minion_death.ogg", "volume_db": -6.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 4 },
+	"elite_knight_skill_cast": { "stream": "res://assets/audio/sfx/official_elite_knight_skill_cast.ogg", "volume_db": -3.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 6 },
+	"elite_mega_minion_skill_cast": { "stream": "res://assets/audio/sfx/official_elite_mega_minion_skill_cast.ogg", "volume_db": -3.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 6 },
+	"elite_mega_minion_skill_impact": { "stream": "res://assets/audio/sfx/official_elite_mega_minion_skill_impact.ogg", "volume_db": -1.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 7 },
+
+	# ---- 后续官方卡牌音频：按单位动作语义接入 ----
+	"attack_archers": { "stream": "res://assets/audio/sfx/official_later_gongjianshou_archer_attack_07.ogg", "volume_db": -7.0, "pitch_range": [0.96, 1.04], "max_polyphony": 4, "priority": 3 },
+	"move_archers": { "stream": "res://assets/audio/sfx/official_later_gongjianshou_archer_step_06.ogg", "volume_db": -12.0, "pitch_range": [0.98, 1.02], "max_polyphony": 3, "priority": 2 },
+	"hit_archers": { "stream": "res://assets/audio/sfx/official_later_gongjianshou_arrow_hit_13.ogg", "volume_db": -6.0, "pitch_range": [0.96, 1.04], "max_polyphony": 4, "priority": 4 },
+	"death_archers": { "stream": "res://assets/audio/sfx/official_later_gongjianshou_npc_die_02.ogg", "volume_db": -6.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 4 },
+
+	"move_musketeer_01": { "stream": "res://assets/audio/sfx/official_later_huoqiangshou_knight_footstep_01.ogg", "volume_db": -12.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 2 },
+	"move_musketeer_02": { "stream": "res://assets/audio/sfx/official_later_huoqiangshou_knight_footstep_02.ogg", "volume_db": -12.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 2 },
+	"move_musketeer_03": { "stream": "res://assets/audio/sfx/official_later_huoqiangshou_knight_footstep_03.ogg", "volume_db": -12.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 2 },
+	"move_musketeer_04": { "stream": "res://assets/audio/sfx/official_later_huoqiangshou_knight_footstep_04.ogg", "volume_db": -12.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 2 },
+	"hit_musketeer": { "stream": "res://assets/audio/sfx/official_later_huoqiangshou_musket_impact_01.ogg", "volume_db": -5.0, "pitch_range": [0.98, 1.02], "max_polyphony": 3, "priority": 4 },
+
+	"deploy_mini_pekka_official": { "stream": "res://assets/audio/sfx/official_later_minipika_minipekka_deploy_01.ogg", "volume_db": -3.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 5 },
+	"move_mini_pekka": { "stream": "res://assets/audio/sfx/official_later_minipika_minipekka_step_03.ogg", "volume_db": -10.0, "pitch_range": [0.98, 1.02], "max_polyphony": 3, "priority": 2 },
+	"impact_mini_pekka": { "stream": "res://assets/audio/sfx/official_later_minipika_mini_pekka_hit_03.ogg", "volume_db": -4.0, "pitch_range": [0.96, 1.04], "max_polyphony": 3, "priority": 5 },
+	"death_mini_pekka": { "stream": "res://assets/audio/sfx/official_later_minipika_npc_die_02.ogg", "volume_db": -6.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 4 },
+
+	"deploy_giant": { "stream": "res://assets/audio/sfx/official_later_card_rare_giant_giant_deploy_01.ogg", "volume_db": -3.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 5 },
+	"attack_giant_01": { "stream": "res://assets/audio/sfx/official_later_card_rare_giant_giant_attack_swing_01.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 4 },
+	"attack_giant_02": { "stream": "res://assets/audio/sfx/official_later_card_rare_giant_giant_attack_swing_02.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 4 },
+	"attack_giant_03": { "stream": "res://assets/audio/sfx/official_later_card_rare_giant_giant_attack_swing_03.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 4 },
+	"move_giant": { "stream": "res://assets/audio/sfx/official_later_card_rare_giant_demon_step_01.ogg", "volume_db": -9.0, "pitch_range": [0.98, 1.02], "max_polyphony": 2, "priority": 2 },
+	"impact_giant": { "stream": "res://assets/audio/sfx/official_later_card_rare_giant_giant_hit_01.ogg", "volume_db": -3.0, "pitch_range": [0.96, 1.04], "max_polyphony": 3, "priority": 5 },
+	"death_giant": { "stream": "res://assets/audio/sfx/official_later_card_rare_giant_npc_die_02.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 5 },
+
+	"attack_valkyrie_04": { "stream": "res://assets/audio/sfx/official_later_card_rare_valkyrie_valkyrie_atk_04.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 4 },
+	"attack_valkyrie_05": { "stream": "res://assets/audio/sfx/official_later_card_rare_valkyrie_valkyrie_atk_05.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 4 },
+	"attack_valkyrie_06": { "stream": "res://assets/audio/sfx/official_later_card_rare_valkyrie_valkyrie_atk_06.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 4 },
+	"attack_valkyrie_07": { "stream": "res://assets/audio/sfx/official_later_card_rare_valkyrie_valkyrie_atk_07.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 4 },
+	"attack_valkyrie_08": { "stream": "res://assets/audio/sfx/official_later_card_rare_valkyrie_valkyrie_atk_08.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 4 },
+	"attack_valkyrie_09": { "stream": "res://assets/audio/sfx/official_later_card_rare_valkyrie_valkyrie_atk_09.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 4 },
+	"attack_valkyrie_10": { "stream": "res://assets/audio/sfx/official_later_card_rare_valkyrie_valkyrie_atk_10.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 4 },
+	"move_valkyrie": { "stream": "res://assets/audio/sfx/official_later_card_rare_valkyrie_valk_step_02.ogg", "volume_db": -10.0, "pitch_range": [0.98, 1.02], "max_polyphony": 2, "priority": 2 },
+	"impact_valkyrie": { "stream": "res://assets/audio/sfx/official_later_card_rare_valkyrie_valkyrie_hit_01.ogg", "volume_db": -4.0, "pitch_range": [0.96, 1.04], "max_polyphony": 3, "priority": 5 },
+	"death_valkyrie": { "stream": "res://assets/audio/sfx/official_later_card_rare_valkyrie_npc_die_02.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 5 },
+	"deploy_end_valkyrie": { "stream": "res://assets/audio/sfx/official_later_card_rare_valkyrie_valkyrie_deploy_end_02.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 4 },
+
+	"attack_hog_rider_01": { "stream": "res://assets/audio/sfx/official_later_yezhuqishi_hogrider_atk_01.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 4 },
+	"attack_hog_rider_03": { "stream": "res://assets/audio/sfx/official_later_yezhuqishi_hogrider_atk_03.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 4 },
+	"move_hog_rider": { "stream": "res://assets/audio/sfx/official_later_yezhuqishi_hogrider_step_01.ogg", "volume_db": -9.0, "pitch_range": [0.98, 1.02], "max_polyphony": 3, "priority": 2 },
+	"impact_hog_rider": { "stream": "res://assets/audio/sfx/official_later_yezhuqishi_boulder_impact_01.ogg", "volume_db": -3.0, "pitch_range": [0.96, 1.04], "max_polyphony": 3, "priority": 5 },
+	"death_hog_rider": { "stream": "res://assets/audio/sfx/official_later_yezhuqishi_npc_die_02.ogg", "volume_db": -6.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 4 },
+	"deploy_end_hog_rider": { "stream": "res://assets/audio/sfx/official_later_yezhuqishi_hogrider_deploy_end_01.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 4 },
+
+	"attack_prince_02": { "stream": "res://assets/audio/sfx/official_later_card_epic_prince_prince_use_02.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 4 },
+	"attack_prince_04": { "stream": "res://assets/audio/sfx/official_later_card_epic_prince_prince_use_04.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 4 },
+	"attack_prince_09": { "stream": "res://assets/audio/sfx/official_later_card_epic_prince_prince_use_09.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 4 },
+	"attack_prince_10": { "stream": "res://assets/audio/sfx/official_later_card_epic_prince_prince_use_10.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 3, "priority": 4 },
+	"move_prince_01": { "stream": "res://assets/audio/sfx/official_later_card_epic_prince_horse_gallop_01.ogg", "volume_db": -10.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 2 },
+	"move_prince_02": { "stream": "res://assets/audio/sfx/official_later_card_epic_prince_horse_gallop_02.ogg", "volume_db": -10.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 2 },
+	"impact_prince": { "stream": "res://assets/audio/sfx/official_later_card_epic_prince_prince_hit_01.ogg", "volume_db": -4.0, "pitch_range": [0.96, 1.04], "max_polyphony": 3, "priority": 5 },
+	"prince_charge_impact": { "stream": "res://assets/audio/sfx/official_later_card_epic_prince_prince_charge_hit_01.ogg", "volume_db": -1.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 7 },
+	"deploy_end_mini_pekka": { "stream": "res://assets/audio/sfx/official_later_minipika_mini_pekka_deploy_end_06.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 4 },
+
+	# ---- 后续觉醒：仅在对应觉醒卡牌/机制中触发，不覆盖普通版 ----
+	"deploy_evolved_musketeer": { "stream": "res://assets/audio/sfx/official_awakened_觉醒火枪手_evo_musketeer_deploy_sfx_01.ogg", "volume_db": -3.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 6 },
+	"attack_evolved_musketeer_sniper": { "stream": "res://assets/audio/sfx/official_awakened_觉醒火枪手_evo_musketeer_fire_01.ogg", "volume_db": -3.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 6 },
+	"hit_evolved_musketeer": { "stream": "res://assets/audio/sfx/official_awakened_觉醒火枪手_evo_musketeer_hit_01.ogg", "volume_db": -5.0, "pitch_range": [0.98, 1.02], "max_polyphony": 3, "priority": 5 },
+	"impact_evolved_musketeer_big": { "stream": "res://assets/audio/sfx/official_awakened_觉醒火枪手_evo_musketeer_big_hit_01.ogg", "volume_db": -1.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 7 },
+	"reload_evolved_musketeer": { "stream": "res://assets/audio/sfx/official_awakened_觉醒火枪手_evo_musketeer_reload_01.ogg", "volume_db": -8.0, "pitch_range": [1.0, 1.0], "max_polyphony": 1, "priority": 3 },
+	"deploy_evolved_mortar": { "stream": "res://assets/audio/sfx/official_awakened_觉醒迫击炮_evo_mortar_dep_01.ogg", "volume_db": -3.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 6 },
+	"attack_evolved_mortar": { "stream": "res://assets/audio/sfx/official_awakened_觉醒迫击炮_evo_mortar_fire_01.ogg", "volume_db": -2.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 6 },
 
 	# ---- 单位专属部署音（unit_data.sfx.deploy 引用）----
 	"deploy_archers": {
-		"stream": "res://assets/audio/sfx/弓箭手部署.MP3",
+		"stream": "res://assets/audio/sfx/official_later_gongjianshou_clash_archer_deploy_01.ogg",
 		"volume_db": -3.0,
 		"pitch_range": [0.95, 1.05],
 		"max_polyphony": 2,
 		"priority": 5,
 	},
 	"deploy_goblins": {
-		"stream": "res://assets/audio/sfx/哥布林部署.MP3",
+		"stream": "res://assets/audio/sfx/official_remaining_goblins_goblin_deploy_14.ogg",
 		"volume_db": -3.0,
 		"pitch_range": [0.95, 1.05],
 		"max_polyphony": 2,
 		"priority": 5,
 	},
 	"deploy_mini_pekka": {
-		"stream": "res://assets/audio/sfx/小皮卡部署.MP3",
+		"stream": "res://assets/audio/sfx/official_later_minipika_minipekka_deploy_01.ogg",
 		"volume_db": -3.0,
 		"pitch_range": [0.95, 1.05],
 		"max_polyphony": 2,
 		"priority": 5,
 	},
 	"deploy_balloon": {
-		"stream": "res://assets/audio/sfx/气球部署.MP3",
+		"stream": "res://assets/audio/sfx/official_balloon_deploy.ogg",
 		"volume_db": -3.0,
 		"pitch_range": [0.95, 1.05],
 		"max_polyphony": 2,
 		"priority": 5,
 	},
 	"deploy_musketeer": {
-		"stream": "res://assets/audio/sfx/火枪手部署.MP3",
+		"stream": "res://assets/audio/sfx/official_later_huoqiangshou_musketeer_deploy_01.ogg",
 		"volume_db": -3.0,
 		"pitch_range": [0.95, 1.05],
 		"max_polyphony": 2,
 		"priority": 5,
 	},
 	"deploy_awakened_musketeer": {
-		"stream": "res://assets/audio/sfx/觉醒女枪出场.MP3",
+		# 本批没有独立觉醒部署 Foley，使用同一角色的官方部署音替换旧占位 MP3。
+		"stream": "res://assets/audio/sfx/official_later_huoqiangshou_musketeer_deploy_01.ogg",
 		"volume_db": -3.0,
 		"pitch_range": [1.0, 1.0],
 		"max_polyphony": 2,
 		"priority": 5,
 	},
 	"deploy_pekka": {
-		"stream": "res://assets/audio/sfx/皮卡出场.MP3",
+		"stream": "res://assets/audio/sfx/official_remaining_pekka_pekka_deploy_01.ogg",
 		"volume_db": -3.0,
 		"pitch_range": [1.0, 1.0],
 		"max_polyphony": 2,
 		"priority": 5,
 	},
 	"deploy_valkyrie": {
-		"stream": "res://assets/audio/sfx/女武神出场.MP3",
+		"stream": "res://assets/audio/sfx/official_later_card_rare_valkyrie_valkyrie_deploy_02.ogg",
 		"volume_db": -3.0,
 		"pitch_range": [1.0, 1.0],
 		"max_polyphony": 2,
 		"priority": 5,
 	},
 	"deploy_prince": {
-		"stream": "res://assets/audio/sfx/王子部署.MP3",
+		"stream": "res://assets/audio/sfx/official_later_card_epic_prince_prince_deploy_01.ogg",
 		"volume_db": -3.0,
 		"pitch_range": [0.95, 1.05],
 		"max_polyphony": 2,
 		"priority": 5,
 	},
 	"deploy_hog_rider": {
-		"stream": "res://assets/audio/sfx/野猪部署.MP3",
+		"stream": "res://assets/audio/sfx/official_later_yezhuqishi_hogrider_deploy_01.ogg",
 		"volume_db": -3.0,
 		"pitch_range": [0.95, 1.05],
 		"max_polyphony": 2,
 		"priority": 5,
 	},
 	"deploy_mega_minion": {
-		"stream": "res://assets/audio/sfx/亡灵重甲部署.MP3",
+		"stream": "res://assets/audio/sfx/official_mega_minion_deploy.ogg",
 		"volume_db": -3.0,
 		"pitch_range": [0.95, 1.05],
 		"max_polyphony": 2,
@@ -2178,42 +2476,42 @@ var sound_data := {
 
 	# ---- 单位专属攻击音（unit_data.sfx.attack 引用）----
 	"attack_mini_pekka": {
-		"stream": "res://assets/audio/sfx/小皮卡攻击.MP3",
+		"stream": "res://assets/audio/sfx/official_later_minipika_mini_pekka_atk_12.ogg",
 		"volume_db": -5.0,
 		"pitch_range": [0.9, 1.1],
 		"max_polyphony": 3,
 		"priority": 4,
 	},
 	"attack_giant": {
-		"stream": "res://assets/audio/sfx/巨人攻击.MP3",
+		"stream": "res://assets/audio/sfx/official_later_card_rare_giant_giant_attack_swing_01.ogg",
 		"volume_db": -5.0,
 		"pitch_range": [0.9, 1.1],
 		"max_polyphony": 3,
 		"priority": 4,
 	},
 	"attack_musketeer": {
-		"stream": "res://assets/audio/sfx/火枪手攻击.MP3",
+		"stream": "res://assets/audio/sfx/official_later_huoqiangshou_musket_fire_02.ogg",
 		"volume_db": -5.0,
 		"pitch_range": [0.95, 1.05],
 		"max_polyphony": 3,
 		"priority": 4,
 	},
 	"attack_awakened_musketeer": {
-		"stream": "res://assets/audio/sfx/觉醒女枪射击.MP3",
+		"stream": "res://assets/audio/sfx/official_later_huoqiangshou_musket_fire_02.ogg",
 		"volume_db": -5.0,
 		"pitch_range": [1.0, 1.0],
 		"max_polyphony": 3,
 		"priority": 4,
 	},
 	"attack_pekka": {
-		"stream": "res://assets/audio/sfx/皮卡攻击.MP3",
+		"stream": "res://assets/audio/sfx/official_remaining_pekka_pekka_atk_01.ogg",
 		"volume_db": -5.0,
 		"pitch_range": [1.0, 1.0],
 		"max_polyphony": 3,
 		"priority": 4,
 	},
 	"attack_valkyrie": {
-		"stream": "res://assets/audio/sfx/女武神攻击.MP3",
+		"stream": "res://assets/audio/sfx/official_later_card_rare_valkyrie_valkyrie_atk_04.ogg",
 		"volume_db": -5.0,
 		"pitch_range": [1.0, 1.0],
 		"max_polyphony": 3,
@@ -2222,16 +2520,45 @@ var sound_data := {
 
 	# ---- 迫击炮命中 ----
 	"mortar_impact": {
-		"stream": "res://assets/audio/sfx/迫击炮命中.MP3",
+		"stream": "res://assets/audio/sfx/official_remaining_mortar_boulder_impact_01.ogg",
 		"volume_db": -2.0,
 		"pitch_range": [0.9, 1.1],
 		"max_polyphony": 2,
 		"priority": 5,
 	},
 
+	# ---- 音频目录剩余官方素材：全部按现有卡牌动作接入 ----
+	"arrows_impact": { "stream": "res://assets/audio/sfx/official_remaining_arrows_arrow_norm_impact_06.ogg", "volume_db": -4.0, "pitch_range": [0.96, 1.04], "max_polyphony": 3, "priority": 5 },
+
+	"attack_goblins_01": { "stream": "res://assets/audio/sfx/official_remaining_goblins_gob_attack_01v2.ogg", "volume_db": -7.0, "pitch_range": [0.98, 1.02], "max_polyphony": 5, "priority": 3 },
+	"attack_goblins_02": { "stream": "res://assets/audio/sfx/official_remaining_goblins_gob_attack_02v2.ogg", "volume_db": -7.0, "pitch_range": [0.98, 1.02], "max_polyphony": 5, "priority": 3 },
+	"attack_goblins_03": { "stream": "res://assets/audio/sfx/official_remaining_goblins_gob_attack_03v2.ogg", "volume_db": -7.0, "pitch_range": [0.98, 1.02], "max_polyphony": 5, "priority": 3 },
+	"impact_goblins_01": { "stream": "res://assets/audio/sfx/official_remaining_goblins_footman_attack_hit_01.ogg", "volume_db": -7.0, "pitch_range": [0.96, 1.04], "max_polyphony": 5, "priority": 4 },
+	"impact_goblins_02": { "stream": "res://assets/audio/sfx/official_remaining_goblins_footman_attack_hit_02.ogg", "volume_db": -7.0, "pitch_range": [0.96, 1.04], "max_polyphony": 5, "priority": 4 },
+	"impact_goblins_03": { "stream": "res://assets/audio/sfx/official_remaining_goblins_footman_attack_hit_03.ogg", "volume_db": -7.0, "pitch_range": [0.96, 1.04], "max_polyphony": 5, "priority": 4 },
+	"impact_goblins_04": { "stream": "res://assets/audio/sfx/official_remaining_goblins_footman_attack_hit_04.ogg", "volume_db": -7.0, "pitch_range": [0.96, 1.04], "max_polyphony": 5, "priority": 4 },
+	"move_goblins_01": { "stream": "res://assets/audio/sfx/official_remaining_goblins_gob_step_01_v1.ogg", "volume_db": -14.0, "pitch_range": [1.0, 1.0], "max_polyphony": 4, "priority": 2 },
+	"move_goblins_02": { "stream": "res://assets/audio/sfx/official_remaining_goblins_gob_step_01_v2.ogg", "volume_db": -14.0, "pitch_range": [1.0, 1.0], "max_polyphony": 4, "priority": 2 },
+	"move_goblins_03": { "stream": "res://assets/audio/sfx/official_remaining_goblins_gob_step_01_v3.ogg", "volume_db": -14.0, "pitch_range": [1.0, 1.0], "max_polyphony": 4, "priority": 2 },
+	"move_goblins_04": { "stream": "res://assets/audio/sfx/official_remaining_goblins_gob_step_01_v4.ogg", "volume_db": -14.0, "pitch_range": [1.0, 1.0], "max_polyphony": 4, "priority": 2 },
+	"move_goblins_05": { "stream": "res://assets/audio/sfx/official_remaining_goblins_gob_step_01_v5.ogg", "volume_db": -14.0, "pitch_range": [1.0, 1.0], "max_polyphony": 4, "priority": 2 },
+	"death_goblins": { "stream": "res://assets/audio/sfx/official_remaining_goblins_npc_die_02.ogg", "volume_db": -7.0, "pitch_range": [1.0, 1.0], "max_polyphony": 4, "priority": 4 },
+
+	"deploy_elixir_collector": { "stream": "res://assets/audio/sfx/official_remaining_elixir_collector_elixir_collector_place_02.ogg", "volume_db": -3.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 5 },
+	"elixir_collector_collect": { "stream": "res://assets/audio/sfx/official_remaining_elixir_collector_get_elixir_02.ogg", "volume_db": -4.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 5 },
+	"death_elixir_collector": { "stream": "res://assets/audio/sfx/official_remaining_elixir_collector_building_destroyed_05.ogg", "volume_db": -4.0, "pitch_range": [0.98, 1.02], "max_polyphony": 2, "priority": 5 },
+
+	"deploy_end_pekka": { "stream": "res://assets/audio/sfx/official_remaining_pekka_pekka_deploy_end_03.ogg", "volume_db": -4.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 5 },
+	"impact_pekka": { "stream": "res://assets/audio/sfx/official_remaining_pekka_pekka_attack_hit_03.ogg", "volume_db": -3.0, "pitch_range": [0.96, 1.04], "max_polyphony": 3, "priority": 5 },
+	"move_pekka": { "stream": "res://assets/audio/sfx/official_remaining_pekka_pekka_footstep_02.ogg", "volume_db": -10.0, "pitch_range": [0.98, 1.02], "max_polyphony": 2, "priority": 2 },
+	"death_pekka": { "stream": "res://assets/audio/sfx/official_remaining_pekka_npc_die_02.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 5 },
+
+	"deploy_mortar": { "stream": "res://assets/audio/sfx/official_remaining_mortar_mortar_deploy.ogg", "volume_db": -3.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 5 },
+	"death_mortar": { "stream": "res://assets/audio/sfx/official_remaining_mortar_building_destroyed_05.ogg", "volume_db": -4.0, "pitch_range": [0.98, 1.02], "max_polyphony": 2, "priority": 5 },
+
 	# ---- 王子冲锋 ----
 	"prince_charge": {
-		"stream": "res://assets/audio/sfx/王子冲锋.MP3",
+		"stream": "res://assets/audio/sfx/official_later_card_epic_prince_rider_charge_03.ogg",
 		"volume_db": -1.0,
 		"pitch_range": [1.0, 1.0],
 		"max_polyphony": 1,
@@ -2240,10 +2567,96 @@ var sound_data := {
 
 	# ---- 野猪移动 ----
 	"hog_rider_move": {
-		"stream": "res://assets/audio/sfx/野猪移动.MP3",
+		"stream": "res://assets/audio/sfx/official_later_yezhuqishi_hogrider_step_01.ogg",
 		"volume_db": -8.0,
 		"pitch_range": [0.95, 1.05],
 		"max_polyphony": 2,
+		"priority": 2,
+	},
+
+	# ---- 官方原版首批补充（仅新增事件；不替换旧 MP3 事件）----
+	"deploy_knight": {
+		"stream": "res://assets/audio/sfx/official_knight_deploy.ogg",
+		"volume_db": -3.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+	"deploy_evolved_knight": {
+		"stream": "res://assets/audio/sfx/official_evolved_knight_deploy.ogg",
+		"volume_db": -3.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 2,
+		"priority": 6,
+	},
+	"deploy_inferno_tower": {
+		"stream": "res://assets/audio/sfx/official_inferno_deploy.ogg",
+		"volume_db": -3.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+	"attack_knight": {
+		"stream": "res://assets/audio/sfx/official_knight_attack.ogg",
+		"volume_db": -6.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 3,
+		"priority": 4,
+	},
+	"deploy_princess": {
+		"stream": "res://assets/audio/sfx/official_princess_deploy.ogg",
+		"volume_db": -3.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+	"attack_princess": {
+		"stream": "res://assets/audio/sfx/official_princess_attack.ogg",
+		"volume_db": -6.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 3,
+		"priority": 4,
+	},
+	"deploy_magic_archer": {
+		"stream": "res://assets/audio/sfx/official_magic_archer_deploy.ogg",
+		"volume_db": -3.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+	"attack_magic_archer": {
+		"stream": "res://assets/audio/sfx/official_magic_archer_attack.ogg",
+		"volume_db": -6.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 3,
+		"priority": 4,
+	},
+	"attack_balloon": {
+		"stream": "res://assets/audio/sfx/official_balloon_attack.ogg",
+		"volume_db": -5.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 2,
+		"priority": 5,
+	},
+	"balloon_fly_loop": {
+		"stream": "res://assets/audio/sfx/official_balloon_fly_loop.ogg",
+		"volume_db": -12.0,
+		"pitch_range": [1.0, 1.0],
+		"max_polyphony": 1,
+		"priority": 2,
+	},
+	"attack_mega_minion": {
+		"stream": "res://assets/audio/sfx/official_mega_minion_attack.ogg",
+		"volume_db": -6.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 3,
+		"priority": 4,
+	},
+	"mega_minion_wing": {
+		"stream": "res://assets/audio/sfx/official_mega_minion_wing.ogg",
+		"volume_db": -13.0,
+		"pitch_range": [0.95, 1.05],
+		"max_polyphony": 1,
 		"priority": 2,
 	},
 }
@@ -2257,11 +2670,13 @@ var sound_data := {
 
 var bgm_data := {
 	"battle": {
-		"stream": "",
+		# 此项原本为空；首次接入官方常规战斗循环，不覆盖任何既有 BGM 文件。
+		"stream": "res://assets/audio/bgm/official_battle_main.ogg",
 		"volume_db": -6.0,
 	},
 	"menu": {
-		"stream": "",
+		# 此项原本为空；主菜单进入时由 MainMenu 播放。
+		"stream": "res://assets/audio/bgm/official_lobby.ogg",
 		"volume_db": -8.0,
 	},
 	"victory": {
@@ -2481,6 +2896,14 @@ func _validate_all_data() -> void:
 			errors.append("单位 '%s' knockback_immune 必须为 bool" % uid)
 		if int(u.get("mass", -1)) == 0 and not bool(u.get("knockback_immune", false)):
 			errors.append("静态单位 '%s' 必须显式 knockback_immune=true" % uid)
+		if u.has("death_spawn_unit_id"):
+			var death_spawn_id := str(u.get("death_spawn_unit_id", ""))
+			if death_spawn_id.is_empty() or not unit_data.has(death_spawn_id):
+				errors.append("单位 '%s' death_spawn_unit_id 无效: '%s'" % [uid, death_spawn_id])
+			if int(u.get("death_spawn_count", 0)) < 1:
+				errors.append("单位 '%s' death_spawn_count 必须 >= 1" % uid)
+		elif u.has("death_spawn_count"):
+			errors.append("单位 '%s' 有 death_spawn_count 但缺少 death_spawn_unit_id" % uid)
 
 		# 死亡生成单位 / 孵化单位引用校验（如凤凰死亡留蛋、蛋孵化重生）
 		if u.has("death_spawn_unit_id"):

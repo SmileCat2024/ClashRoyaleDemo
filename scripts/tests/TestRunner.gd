@@ -16,6 +16,7 @@ const SUITES := [
 	preload("res://scripts/tests/test_data_registry.gd"),
 	preload("res://scripts/tests/test_attack_targeting.gd"),
 	preload("res://scripts/tests/test_charge_attack.gd"),
+	preload("res://scripts/tests/test_charge_movement.gd"),
 	preload("res://scripts/tests/test_river_jump.gd"),
 	preload("res://scripts/tests/test_tower_attack.gd"),
 	preload("res://scripts/tests/test_death_damage.gd"),
@@ -32,12 +33,14 @@ const SUITES := [
 	preload("res://scripts/tests/test_projectile_base.gd"),
 	preload("res://scripts/tests/test_inferno_tower.gd"),
 	preload("res://scripts/tests/test_elixir_collector.gd"),
+	preload("res://scripts/tests/test_goblin_cage.gd"),
 	preload("res://scripts/tests/test_instant_splash.gd"),
 	preload("res://scripts/tests/test_awakening_tracker.gd"),
 	preload("res://scripts/tests/test_elite_skill_dash.gd"),
 	preload("res://scripts/tests/test_elite_skill_holy_taunt.gd"),
 	preload("res://scripts/tests/test_piercing.gd"),
 	preload("res://scripts/tests/test_royal_ghost.gd"),
+	preload("res://scripts/tests/test_match_settlement.gd"),
 ]
 
 

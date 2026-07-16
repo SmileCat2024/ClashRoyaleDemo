@@ -361,7 +361,8 @@ func _execute_attack() -> void:
 	_play_attack_sfx()
 	# 冲锋伤害加成：owner 处于冲锋态时用 charge_damage 替代普通伤害（王子冲锋突刺）
 	var dmg := damage
-	if combatant.get("is_charging") == true:
+	var was_charging: bool = combatant.get("is_charging") == true
+	if was_charging:
 		var cd = combatant.get("charge_damage")
 		if cd != null:
 			dmg = int(cd)
@@ -390,6 +391,7 @@ func _execute_attack() -> void:
 					DamageSystem.deal_area_damage(center, impact_radius, dmg, combatant.team, -1, attack_ground, attack_air)
 			else:
 				DamageSystem.resolve_impact(current_target, dmg)
+				_play_impact_sfx("charge_impact" if was_charging else "impact")
 		"projectile":
 			_fire_projectile()
 
@@ -423,8 +425,12 @@ func _fire_projectile() -> void:
 	var is_piercing := impact_type == "piercing"
 	var max_range_px := max_range if is_piercing else 0.0
 	var pierce_radius_px := pierce_radius if is_piercing else 0.0
+	var source_unit_id := str(combatant.get("unit_id"))
+	var source_hit_event_id := ""
+	if combatant.get("is_awakened") == true and source_unit_id == "musketeer":
+		source_hit_event_id = "hit_evolved_musketeer"
 	if pm and pm.has_method("spawn_projectile"):
-		pm.spawn_projectile(spawn_pos, current_target, damage, projectile_speed, combatant.team, is_homing, splash_px, arc_height, emit_offset_y, is_piercing, max_range_px, pierce_radius_px)
+		pm.spawn_projectile(spawn_pos, current_target, damage, projectile_speed, combatant.team, is_homing, splash_px, arc_height, emit_offset_y, is_piercing, max_range_px, pierce_radius_px, source_unit_id, source_hit_event_id)
 		return
 	# 回退：DebugBattle 等场景无 ProjectileManager
 	var proj = preload("res://scenes/entities/Projectile.tscn").instantiate()
@@ -435,7 +441,7 @@ func _fire_projectile() -> void:
 		scene.add_child(proj)
 	var spawn_visual := spawn_pos
 	spawn_visual.y -= emit_offset_y
-	proj.setup(spawn_visual, current_target, damage, projectile_speed, combatant.team, is_homing, splash_px, is_piercing, max_range_px, pierce_radius_px)
+	proj.setup(spawn_visual, current_target, damage, projectile_speed, combatant.team, is_homing, splash_px, is_piercing, max_range_px, pierce_radius_px, source_unit_id, source_hit_event_id)
 	proj.arc_height = arc_height
 	SignalBus.projectile_spawned.emit(proj, combatant.team)
 
@@ -443,12 +449,24 @@ func _fire_projectile() -> void:
 ## 播放攻击音效。迫击炮（ballistic）用专用发射音；其他单位走 unit_data.sfx.attack。
 func _play_attack_sfx() -> void:
 	if trajectory == "ballistic":
-		AudioManager.play("mortar_launch", BattlePathing.game_position_of(combatant))
+		var ballistic_event := "mortar_launch"
+		if combatant.get("is_awakened") == true and str(combatant.get("unit_id")) == "mortar":
+			ballistic_event = "attack_evolved_mortar"
+		AudioManager.play(ballistic_event, BattlePathing.game_position_of(combatant))
 		return
 	var uid = combatant.get("unit_id")
 	if uid == null:
 		return
 	AudioManager.play_unit_sfx(uid, "attack", BattlePathing.game_position_of(combatant))
+	AudioManager.play_unit_sfx(uid, "attack_voice", BattlePathing.game_position_of(combatant))
+
+
+## 播放瞬发攻击的专属命中音。未配置 impact 的单位静默跳过。
+func _play_impact_sfx(sfx_key: String = "impact") -> void:
+	var uid = combatant.get("unit_id")
+	if uid == null:
+		return
+	AudioManager.play_unit_sfx(uid, sfx_key, BattlePathing.game_position_of(combatant))
 
 
 ## 显示瞬发范围攻击的地面警示环。

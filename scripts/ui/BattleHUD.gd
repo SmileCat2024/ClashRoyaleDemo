@@ -10,6 +10,10 @@ const TIMER_NORMAL_COLOR := Color.WHITE
 const TIMER_WARNING_COLOR := Color(0.95, 0.12, 0.08)
 const DARK_OUTLINE_COLOR := Color.BLACK
 const COUNTDOWN_COLOR := Color(1.0, 0.68, 0.16)
+const RESULT_REVEAL_DELAY := 0.75
+const VICTORY_COLOR := Color(1.0, 0.82, 0.22)
+const DEFEAT_COLOR := Color(0.96, 0.20, 0.16)
+const DRAW_COLOR := Color(0.82, 0.86, 0.92)
 
 var _announcement_time_left: float = 0.0
 var _announcement_persistent: bool = false
@@ -18,6 +22,7 @@ var _last_phase: String = ""
 var _last_multiplier: int = -1
 var _last_countdown_second: int = -1
 var _final_countdown_announced: bool = false
+var _result_display_pending: bool = false
 
 
 func _ready() -> void:
@@ -135,6 +140,9 @@ func _show_countdown(second: int) -> void:
 	$BattleAnnouncement/TitleLabel.text = str(second)
 	$BattleAnnouncement/SubtitleLabel.visible = false
 	$BattleAnnouncement.visible = true
+	# 官方倒计时素材为 ten 到 one 的独立音频，必须逐秒播放；
+	# overtime 末尾会因 _last_countdown_second 在 time_left>12 时被重置而再次触发。
+	AudioManager.play("countdown_%d" % second)
 
 
 ## 能量变化时更新显示
@@ -159,14 +167,39 @@ func _on_tower_destroyed(_tower_id: String, _team: String, _tower_type: String) 
 
 ## 战斗结束
 func _on_battle_ended(result: String) -> void:
+	if _result_display_pending:
+		return
+	_result_display_pending = true
 	_show_announcement("MATCH OVER!", "", -1.0)
 	$CenterMessageLabel.visible = false
+	# 留出塔摧毁/最后一击的反馈时间，再在画面中央揭示本地玩家的结算结果。
+	await get_tree().create_timer(RESULT_REVEAL_DELAY).timeout
+	if not is_inside_tree():
+		return
+	_show_match_result(result)
 	$EndPanel.visible = true
 	# 结束面板可见时，恢复按钮的鼠标响应
 	$EndPanel.mouse_filter = Control.MOUSE_FILTER_STOP
 	$EndPanel/VBoxContainer/RestartButton.mouse_filter = Control.MOUSE_FILTER_STOP
 	$EndPanel/VBoxContainer/MenuButton.mouse_filter = Control.MOUSE_FILTER_STOP
 	print("[BattleHUD] battle ended:", result)
+
+
+## 战斗结束后的居中胜负字样。draw 仅在双方最低塔血量完全相同时出现。
+func _show_match_result(result: String) -> void:
+	var title := "DRAW"
+	var color := DRAW_COLOR
+	match result:
+		"victory":
+			title = "VICTORY"
+			color = VICTORY_COLOR
+		"defeat":
+			title = "DEFEAT"
+			color = DEFEAT_COLOR
+	_show_announcement(title, "", -1.0)
+	$BattleAnnouncement/TitleLabel.add_theme_font_size_override("font_size", 36)
+	$BattleAnnouncement/TitleLabel.add_theme_constant_override("outline_size", 9)
+	$BattleAnnouncement/TitleLabel.add_theme_color_override("font_color", color)
 
 
 ## 点击"重新开始"按钮

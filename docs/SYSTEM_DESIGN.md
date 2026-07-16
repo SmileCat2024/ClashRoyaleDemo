@@ -952,7 +952,7 @@ DataRegistry._ready() 时自动运行 `_validate_all_data()`：
 ## 十三、胜负判定
 
 ### 即时胜负（P0，已实现）
-- 国王塔被摧毁 → 立即结束战斗（`end_battle("victory"/"defeat")`）
+- 任意阶段国王塔被摧毁 → 立即结束战斗（`end_battle("victory"/"defeat")`）
 
 ### 时间限制与加时赛（0.8.0，已实现）
 
@@ -961,19 +961,20 @@ DataRegistry._ready() 时自动运行 `_validate_all_data()`：
   ├─ 国王塔被摧毁 → 立即胜负
   └─ 时间到 → _check_time_limit()
       ├─ 双方存活塔数不等 → 多者胜
-      └─ 塔数相等 → 进入加时赛
+      └─ 塔数相等（平局）→ 进入加时赛
 
 加时赛 60s（圣水恢复 2x 加速）
-  ├─ 国王塔被摧毁 → 立即胜负
+  ├─ 任意皇冠塔（国王塔或公主塔）被摧毁 → 该方立即失败
   └─ 加时结束 → _determine_result_by_stats()
-      ├─ 比塔数 → 多者胜
-      ├─ 塔数相同 → 比总血量百分比 → 高者胜
-      └─ 都相同 → 平局（"draw"）
+      ├─ 分别取双方三座皇冠塔中最低的当前血量
+      ├─ 最低血量较高者胜
+      └─ 最低血量相同 → 平局（"draw"）
 ```
 
 - `battle_phase` 状态：`"regular"` / `"overtime"`
 - 进入加时时广播 `battle_phase_changed("overtime", remaining)` 信号，圣水间隔减半
 - 塔注册在 PlayerBattleState.towers 里
+- 战斗结束时，HUD 先显示短暂的 `MATCH OVER!`，0.75 秒后在中央显示 `VICTORY`、`DEFEAT` 或 `DRAW`。
 
 ---
 

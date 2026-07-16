@@ -96,3 +96,21 @@ func test_collector_card_config() -> void:
 	assert_eq(int(card.get("cost")), 6, "圣水收集器应为6费")
 	assert_eq(card.get("unit_id"), "elixir_collector", "卡牌应关联收集器实体")
 	assert_true(bool(card.get("exclude_from_initial_hand")), "收集器不能进入开局四张手牌")
+
+
+## 回归：静态建筑（move_speed=0）朝向与镜像必须固定，不随部署位置/目标方向变化。
+## Bug：圣水收集器部署后 _move_target 指向敌方塔，get_flip_h() 按 _get_target_x()>position.x
+## 决定镜像，导致在左/右不同 x 位置部署时贴图莫名左右翻转。
+func test_static_building_facing_and_flip_fixed() -> void:
+	_collector.move_speed = 0.0
+	_collector.team = "player"
+	_collector.position = Vector2(50, 500)
+	assert_eq(_collector.get_facing(), "back", "玩家静态建筑朝向固定为 back")
+	assert_false(_collector.get_flip_h(), "静态建筑不应镜像（左侧部署）")
+	# 模拟推进目标在另一侧，镜像必须仍然固定为 false
+	_collector.position = Vector2(300, 500)
+	assert_false(_collector.get_flip_h(), "静态建筑不应镜像（右侧部署）")
+	assert_eq(_collector.get_facing(), "back", "改变部署位置不改变朝向")
+	_collector.team = "enemy"
+	assert_eq(_collector.get_facing(), "front", "敌方静态建筑朝向固定为 front")
+	assert_false(_collector.get_flip_h(), "敌方静态建筑同样不应镜像")

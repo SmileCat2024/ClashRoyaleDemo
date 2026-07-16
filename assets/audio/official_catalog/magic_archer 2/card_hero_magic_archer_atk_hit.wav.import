@@ -1,0 +1,24 @@
+[remap]
+
+importer="wav"
+type="AudioStreamWAV"
+uid="uid://t7lnx1c7wolj"
+path="res://.godot/imported/card_hero_magic_archer_atk_hit.wav-71b397c9b5bbeea81f3d9a36d04d22a5.sample"
+
+[deps]
+
+source_file="res://assets/audio/official_catalog/magic_archer 2/card_hero_magic_archer_atk_hit.wav"
+dest_files=["res://.godot/imported/card_hero_magic_archer_atk_hit.wav-71b397c9b5bbeea81f3d9a36d04d22a5.sample"]
+
+[params]
+
+force/8_bit=false
+force/mono=false
+force/max_rate=false
+force/max_rate_hz=44100
+edit/trim=false
+edit/normalize=false
+edit/loop_mode=0
+edit/loop_begin=0
+edit/loop_end=-1
+compress/mode=2

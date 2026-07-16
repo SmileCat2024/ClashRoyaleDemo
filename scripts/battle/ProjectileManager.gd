@@ -28,7 +28,7 @@ var _next_net_id: int = 1
 ## splash: 溅射半径（可选，默认 0 = 单体伤害）
 ## arc_height_grids: 弹道弧高峰值（格，可选）。>0 时施加抛物线视觉偏移，不影响逻辑命中
 ## 返回: 生成的飞行物节点
-func spawn_projectile(spawn_pos: Vector2, target_node, damage: int, speed: float, team_name: String, is_homing: bool = true, splash: float = 0.0, arc_height_grids: float = 0.0, emit_offset_y: float = 0.0, is_piercing: bool = false, max_range_px: float = 0.0, pierce_radius_px: float = 0.0) -> Node2D:
+func spawn_projectile(spawn_pos: Vector2, target_node, damage: int, speed: float, team_name: String, is_homing: bool = true, splash: float = 0.0, arc_height_grids: float = 0.0, emit_offset_y: float = 0.0, is_piercing: bool = false, max_range_px: float = 0.0, pierce_radius_px: float = 0.0, source_unit_id: String = "", source_hit_event_id: String = "") -> Node2D:
 	var projectile = PROJECTILE_SCENE.instantiate()
 	projectiles_root.add_child(projectile)
 	# 飞行单位从视觉飞行高度发射（altitude 离地偏移），地面单位 emit_offset_y=0 不影响
@@ -41,7 +41,7 @@ func spawn_projectile(spawn_pos: Vector2, target_node, damage: int, speed: float
 		var grids := 2.5 if tp.y < spawn_pos.y else 0.5
 		visual_spawn.y -= grids * BattleConstants.CELL_SIZE
 	visual_spawn.y -= emit_offset_y
-	projectile.setup(visual_spawn, target_node, damage, speed, team_name, is_homing, splash, is_piercing, max_range_px, pierce_radius_px)
+	projectile.setup(visual_spawn, target_node, damage, speed, team_name, is_homing, splash, is_piercing, max_range_px, pierce_radius_px, source_unit_id, source_hit_event_id)
 	if arc_height_grids > 0.0:
 		projectile.arc_height = arc_height_grids
 	SignalBus.projectile_spawned.emit(projectile, team_name)
@@ -52,7 +52,7 @@ func spawn_projectile(spawn_pos: Vector2, target_node, damage: int, speed: float
 		_next_net_id += 1
 		projectile.name = net_name
 		# RPC 传地面 spawn_pos（不含 emit_offset）+ emit_offset_y，client 端 mirror 后自行减去偏移
-		_rpc_spawn_projectile.rpc(net_name, spawn_pos, target_pos, damage, speed, team_name, is_homing, splash, arc_height_grids, emit_offset_y, is_piercing, max_range_px, pierce_radius_px)
+		_rpc_spawn_projectile.rpc(net_name, spawn_pos, target_pos, damage, speed, team_name, is_homing, splash, arc_height_grids, emit_offset_y, is_piercing, max_range_px, pierce_radius_px, source_unit_id, source_hit_event_id)
 	return projectile
 
 
@@ -83,7 +83,7 @@ func spawn_mortar_shell(spawn_pos: Vector2, target_node, damage: int, splash_px:
 
 ## Host → Client：通知 Client 创建投射物。两端独立运行确定性飞行，client 端 _on_hit 跳过伤害。
 @rpc("authority", "call_remote", "reliable")
-func _rpc_spawn_projectile(proj_name: String, spawn_pos: Vector2, target_pos: Vector2, dmg: int, spd: float, team_name: String, is_homing: bool, splash: float, arc_height_grids: float, emit_offset_y: float = 0.0, is_piercing: bool = false, max_range_px: float = 0.0, pierce_radius_px: float = 0.0) -> void:
+func _rpc_spawn_projectile(proj_name: String, spawn_pos: Vector2, target_pos: Vector2, dmg: int, spd: float, team_name: String, is_homing: bool, splash: float, arc_height_grids: float, emit_offset_y: float = 0.0, is_piercing: bool = false, max_range_px: float = 0.0, pierce_radius_px: float = 0.0, source_unit_id: String = "", source_hit_event_id: String = "") -> void:
 	if NetworkManager.is_server():
 		return
 	# Client 端 team 翻转
@@ -101,7 +101,7 @@ func _rpc_spawn_projectile(proj_name: String, spawn_pos: Vector2, target_pos: Ve
 	projectile.name = proj_name
 	projectiles_root.add_child(projectile)
 	# Client 端飞向固定位置（非追踪），飞行轨迹与 host 端镜像对称
-	projectile.setup(m_spawn, null, dmg, spd, local_team, false, splash, is_piercing, max_range_px, pierce_radius_px)
+	projectile.setup(m_spawn, null, dmg, spd, local_team, false, splash, is_piercing, max_range_px, pierce_radius_px, source_unit_id, source_hit_event_id)
 	projectile._last_target_pos = m_target
 	projectile._start_pos = m_spawn
 	projectile._total_dist = m_spawn.distance_to(m_target)
