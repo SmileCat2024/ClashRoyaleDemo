@@ -254,7 +254,7 @@ var unit_data := {
 		"collision_radius": 0.45,
 		"hurt_radius": 0.45,
 		"mass": 4,
-		"shadow_size": 0.2,
+		"shadow_size": 0.7,
 		"deploy_time": 1.0,   # 部署时间（秒），期间虚影状态不行动但可受伤
 		"attacks": [{
 			"name": "blade_slash",
@@ -1555,6 +1555,7 @@ var card_data := {
 		"unit_id": "princess",
 		"spawn_count": 1,
 		"spawn_spread": 0.0,
+		"icon": "res://assets/ui/cards/princess.png",
 		"description": "超远程弓箭手，能从己方河岸狙击对方公主塔。箭矢带范围溅射，血量极低。",
 	},
 	"card_ranger": {
@@ -1577,22 +1578,22 @@ var card_data := {
 		"spawn_count": 1,
 		"spawn_spread": 0.0,
 		"icon": "res://assets/ui/cards/knight.png",
-		"description": "骑士的精英变种，拥有主动技能「集结号角」。",
+		"description": "骑士的精英变种，拥有主动技能「圣光嘲讽」。",
 		# ---- 精英技能配置 ----
 		# 打出后单位存活期间，屏幕右侧出现技能按钮。花圣水释放，单位死亡按钮消失。
 		# targeting: "instant"=瞬发（按下立即生效）| "targeted"=指向型（需点击战场选位置）
 		"elite_skill": {
-			"id": "knight_rally",
-			"display_name": "集结号角",
+			"id": "knight_holy_taunt",
+			"display_name": "圣光嘲讽",
 			"cost": 2,                    # 圣水花费（独立于卡牌费用）
 			"targeting": "instant",
 			"cooldown": 8.0,               # 冷却时间（秒）
 			"icon": "",                    # 技能图标路径（空=用文字显示技能名）
 			"effect": {
-				"type": "self_rage",       # 效果类型 id（UnitBase.trigger_skill 按 type 分流）
-				"duration": 5.0,           # 狂暴持续时间（秒）
-				"move_mult": 1.35,         # 移速倍率
-				"attack_mult": 1.35,       # 攻速倍率
+				"type": "holy_taunt",     # 金色圣光法阵完成后，强制范围内合格目标锁敌
+				"radius": 8.5,             # 法阵半径（格）
+				"duration": 4.0,           # 嘲讽持续时间（秒）
+				"formation_duration": 0.35,# 法阵由内向外展开的时长（秒）
 			},
 		},
 	},

@@ -25,6 +25,7 @@ const SUITES := [
 	preload("res://scripts/tests/test_poison_spell.gd"),
 	preload("res://scripts/tests/test_astar_pathfinder.gd"),
 	preload("res://scripts/tests/test_unit_separation.gd"),
+	preload("res://scripts/tests/test_unit_animation_facing.gd"),
 	preload("res://scripts/tests/test_status_effect.gd"),
 	preload("res://scripts/tests/test_deploy_snapping.gd"),
 	preload("res://scripts/tests/test_status_combatant.gd"),
@@ -34,6 +35,7 @@ const SUITES := [
 	preload("res://scripts/tests/test_instant_splash.gd"),
 	preload("res://scripts/tests/test_awakening_tracker.gd"),
 	preload("res://scripts/tests/test_elite_skill_dash.gd"),
+	preload("res://scripts/tests/test_elite_skill_holy_taunt.gd"),
 	preload("res://scripts/tests/test_piercing.gd"),
 ]
 

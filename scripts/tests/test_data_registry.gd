@@ -174,6 +174,15 @@ func test_troop_cards_have_spawn_count() -> void:
 			"卡牌 %s spawn_count 应 >= 1" % cid)
 
 
+func test_all_cards_have_existing_icons() -> void:
+	for cid in DataRegistry.card_data:
+		var c: Dictionary = DataRegistry.card_data[cid]
+		var icon_path: String = c.get("icon", "")
+		assert_false(icon_path == "", "卡牌缺少 icon: " + cid)
+		assert_true(FileAccess.file_exists(icon_path),
+			"卡牌 icon 文件不存在: %s (%s)" % [cid, icon_path])
+
+
 # ============================================================
 #  塔数据
 # ============================================================
