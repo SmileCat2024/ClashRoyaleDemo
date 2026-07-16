@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://scripts/ui/BattleHUD.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/ui/CardBar.tscn" id="2"]
-[ext_resource type="FontFile" path="res://assets/fonts/Clash_Regular.otf" id="3_timer_font"]
+[ext_resource type="Font" path="res://assets/ui/theme/ClashUIFont.tres" id="3_timer_font"]
 [ext_resource type="Texture2D" path="res://assets/ui/圣水.png" id="4_elixir_icon"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxTimerPanel"]

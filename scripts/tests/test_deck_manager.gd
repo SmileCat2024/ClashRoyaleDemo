@@ -28,6 +28,13 @@ func test_setup_next_card_exists() -> void:
 	assert_true(dm.get_next() != "", "预告牌不应为空")
 
 
+func test_setup_can_preserve_prepared_order() -> void:
+	var dm := DeckManager.new()
+	dm.setup(["c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7"], false)
+	assert_eq(dm.get_hand(), ["c0", "c1", "c2", "c3"], "预加载锁定的初始手牌顺序应原样复用")
+	assert_eq(dm.get_next(), "c4", "预加载锁定的预告牌应与实战一致")
+
+
 func test_setup_total_consistency() -> void:
 	var dm := _make_deck()
 	var hand := dm.get_hand()

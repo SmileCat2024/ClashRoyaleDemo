@@ -151,16 +151,28 @@ func start_battle() -> void:
 
 	if is_network_mode and is_host:
 		# Host 联机：初始化自己 + 远程玩家的卡组
-		deck_manager.setup(Game.get_selected_deck())
+		var prepared_player := Game.get_prepared_player_deck()
+		if prepared_player.size() >= 5:
+			deck_manager.setup(prepared_player, false)
+		else:
+			deck_manager.setup(Game.get_selected_deck())
 		_remote_deck = DeckManager.new()
 		_remote_deck.name = "RemoteDeck"
 		add_child(_remote_deck)
+		var prepared_enemy := Game.get_prepared_enemy_deck()
 		var remote_cards := Game.get_remote_deck()
-		_remote_deck.setup(remote_cards if remote_cards.size() >= 5 else DataRegistry.get_default_enemy_deck())
+		if prepared_enemy.size() >= 5:
+			_remote_deck.setup(prepared_enemy, false)
+		else:
+			_remote_deck.setup(remote_cards if remote_cards.size() >= 5 else DataRegistry.get_default_enemy_deck())
 		# 不启动 AI（远程玩家是真人）
 	elif not is_network_mode:
 		# 单机模式：初始化玩家卡组 + AI
-		deck_manager.setup(Game.get_selected_deck())
+		var prepared_player := Game.get_prepared_player_deck()
+		if prepared_player.size() >= 5:
+			deck_manager.setup(prepared_player, false)
+		else:
+			deck_manager.setup(Game.get_selected_deck())
 	else:
 		# Client：手牌由 host 通过 RPC 同步，此处不初始化
 		pass
@@ -172,7 +184,11 @@ func start_battle() -> void:
 
 	# 单机模式才 setup AI
 	if not is_network_mode and enemy_ai and enemy_ai.has_method("setup"):
-		enemy_ai.setup()
+		enemy_ai.setup(Game.get_prepared_enemy_deck())
+	# 开局资源交付后，用单后台线程续载双方剩余卡组。已经缓存的首手牌会被自动跳过。
+	_queue_remaining_deck_art()
+	# 牌序已经交给 DeckManager，避免重开场景误复用旧局顺序。
+	Game.clear_prepared_battle_decks()
 
 	# 延迟广播手牌状态，确保 CardBar 的 _ready 已连接信号
 	# Client 联机：手牌由 host 通过 RPC 同步，此处不广播（避免闪烁空手牌）
@@ -188,6 +204,30 @@ func start_battle() -> void:
 func _broadcast_hand_state() -> void:
 	SignalBus.hand_updated.emit(deck_manager.get_hand(), deck_manager.get_next())
 	SignalBus.selection_changed.emit(selected_hand_index)
+
+
+func _queue_remaining_deck_art() -> void:
+	var player_order := Game.get_prepared_player_deck()
+	var enemy_order := Game.get_prepared_enemy_deck()
+	if player_order.is_empty():
+		player_order = Game.get_selected_deck()
+	if enemy_order.is_empty():
+		enemy_order = Game.get_remote_deck() if is_network_mode else DataRegistry.get_default_enemy_deck()
+	# Client 的本地画面以自己为蓝方，和加载页采用相同的阵营换位。
+	if NetworkManager.is_networked_client():
+		var host_order := player_order
+		player_order = enemy_order
+		enemy_order = host_order
+	_queue_deck_unit_frames(player_order, "player")
+	_queue_deck_unit_frames(enemy_order, "enemy")
+
+
+func _queue_deck_unit_frames(cards: Array, team_name: String) -> void:
+	for card_id in cards:
+		var card := DataRegistry.get_card_data(card_id)
+		var unit_id: String = card.get("unit_id", "")
+		if not unit_id.is_empty():
+			SpriteRegistry.queue_sprite_frames(unit_id, team_name)
 
 
 ## 根据模式设置总时长与基础圣水恢复。联机 client 会由主机状态同步覆盖此配置。

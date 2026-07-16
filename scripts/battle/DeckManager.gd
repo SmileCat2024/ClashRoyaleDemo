@@ -16,13 +16,14 @@ var _next: String = ""          ## 下一张预告
 
 
 ## 初始化卡组。传入卡牌 id 列表（≥5张），打乱后分配到 hand/next/queue。
-func setup(deck_card_ids: Array) -> void:
+func setup(deck_card_ids: Array, shuffle_cards: bool = true) -> void:
 	_queue.clear()
 	_hand.clear()
 	_next = ""
 
 	var shuffled = deck_card_ids.duplicate()
-	shuffled.shuffle()
+	if shuffle_cards:
+		shuffled.shuffle()
 
 	# 标记了 exclude_from_initial_hand 的卡不能进入最初 4 张手牌（如圣水收集器）。
 	for card_id in shuffled:

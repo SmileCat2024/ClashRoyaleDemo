@@ -27,6 +27,9 @@ var match_mode: int = MatchMode.FAST_7X
 ## 大厅中选择的预设卡组。卡组由设计方固定，不开放编辑。
 var selected_deck_index: int = 0
 var remote_deck_cards: Array = []
+## 加载页提前洗好的本局牌序。BattleManager 复用它，保证预加载的初始手牌就是实际初始手牌。
+var prepared_player_deck_order: Array = []
+var prepared_enemy_deck_order: Array = []
 
 const PRESET_DECKS: Array[Dictionary] = [
 	{"name": "皇家冲锋", "cards": ["card_hog_rider", "card_musketeer", "card_knight_elite", "card_fireball", "card_archers", "card_goblins", "card_inferno_tower", "card_arrows"]},
@@ -65,10 +68,37 @@ func get_remote_deck() -> Array:
 	return remote_deck_cards.duplicate()
 
 
+## 在进入加载页前锁定本局双方牌序。只把洗牌时机前移，不改变牌组内容或轮转规则。
+func prepare_battle_decks(player_cards: Array, enemy_cards: Array) -> void:
+	prepared_player_deck_order = player_cards.duplicate()
+	prepared_enemy_deck_order = enemy_cards.duplicate()
+	prepared_player_deck_order.shuffle()
+	prepared_enemy_deck_order.shuffle()
+
+
+## 联机 Client 接收 Host 已锁定的牌序。
+func set_prepared_battle_decks(player_order: Array, enemy_order: Array) -> void:
+	prepared_player_deck_order = player_order.duplicate()
+	prepared_enemy_deck_order = enemy_order.duplicate()
+
+
+func get_prepared_player_deck() -> Array:
+	return prepared_player_deck_order.duplicate()
+
+
+func get_prepared_enemy_deck() -> Array:
+	return prepared_enemy_deck_order.duplicate()
+
+
+func clear_prepared_battle_decks() -> void:
+	prepared_player_deck_order.clear()
+	prepared_enemy_deck_order.clear()
+
+
 ## 进入战斗场景
-func start_battle() -> void:
+func start_battle(preloaded_scene: PackedScene = null) -> void:
 	current_state = GameState.BATTLE
-	SceneLoader.load_battle()
+	SceneLoader.load_battle(preloaded_scene)
 
 
 ## 返回主菜单

@@ -97,7 +97,8 @@ func test_elite_visual_overrides() -> void:
 	assert_true(float(animation.get("health_bar_y", 0.0)) < float(base_animation.get("health_bar_y", 0.0)),
 		"精英重甲亡灵血条应比普通版更靠上")
 	var mega := _make_elite_mega_minion(Vector2(100, 500))
-	assert_approx(mega.sprite_animator._base_scale.x, float(animation["visual_scale"]), 0.0001,
+	assert_approx(mega.sprite_animator._base_scale.x,
+		SpriteRegistry.get_render_scale(float(animation["visual_scale"])), 0.0001,
 		"精英卡牌视觉覆盖应传递给 SpriteAnimator")
 	assert_eq(mega.health_bar.position.y, float(animation["health_bar_y"]),
 		"精英卡牌视觉覆盖应传递给血条位置")

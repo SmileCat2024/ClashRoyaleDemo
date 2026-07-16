@@ -97,7 +97,7 @@ func _load_unit_texture(card_data: Dictionary) -> void:
 	var anim_cfg: Dictionary = unit_data.get("animation", {})
 	if anim_cfg.is_empty():
 		return
-	var vs: float = float(anim_cfg.get("visual_scale", 1.0))
+	var vs := SpriteRegistry.get_render_scale(float(anim_cfg.get("visual_scale", 1.0)))
 	_tex_scale = Vector2(vs, vs / BattleConstants.Y_COMPRESS)
 	_tex_offset = Vector2(
 		float(anim_cfg.get("visual_offset_x", 0.0)),

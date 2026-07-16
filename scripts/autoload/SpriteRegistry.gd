@@ -15,11 +15,30 @@
 
 extends Node
 
+signal sprite_frames_ready(unit_id: String, team: String, frames: SpriteFrames)
+
+# 序列帧导入缓存统一按原图 1/3 线性尺寸生成；渲染时乘回 3 倍，保持屏幕视觉尺寸不变。
+# 原始 PNG 不会被修改。单帧展开内存约降为原来的 1/9。
+const OPTIMIZED_IMPORT_RENDER_SCALE := 3.0
+const BACKGROUND_FINALIZE_FRAME_SECONDS := 1.0 / 55.0
+
 # 缓存："unit_id:team" → SpriteFrames（构建成功才入缓存）
 var _frames_cache: Dictionary = {}
 
 # 记录已尝试加载的 "unit_id:team"，避免重复尝试
 var _load_attempted: Dictionary = {}
+
+# 加载页通过 ResourceLoader 后台线程预取的资源。持有强引用，确保场景切换后仍命中缓存。
+var _preloaded_resources: Dictionary = {}
+
+# 战斗内低干扰续载：始终只运行一个 ResourceLoader 后台任务，且禁用会抢占主线程的子线程。
+var _background_jobs: Array[Dictionary] = []
+var _background_current: Dictionary = {}
+var _queued_frame_sets: Dictionary = {}
+
+
+func _process(delta: float) -> void:
+	_process_background_loading(delta)
 
 
 ## 获取指定单位在指定阵营下的 SpriteFrames。
@@ -70,6 +89,130 @@ func is_team_colored(unit_id: String) -> bool:
 	return false
 
 
+## 返回构建指定单位帧缓存所需的全部纹理路径（去重）。供加载页异步预取。
+func get_texture_paths(unit_id: String, team: String = "player") -> Array[String]:
+	var result: Array[String] = []
+	var seen: Dictionary = {}
+	var unit_data: Dictionary = DataRegistry.get_unit_data(unit_id)
+	var anim_data: Dictionary = unit_data.get("animation", {})
+	var sprite_dir: String = anim_data.get("sprite_dir", unit_id)
+	var base_path := "res://assets/sprites/" + sprite_dir + "/"
+	var states: Dictionary = anim_data.get("states", {})
+	for state_name in states:
+		var state_cfg: Dictionary = states[state_name]
+		var frames_raw = state_cfg.get("frames", [])
+		var frame_files: Array = frames_raw.get(team, []) if frames_raw is Dictionary else frames_raw
+		for file_name in frame_files:
+			var path := base_path + String(file_name)
+			if not seen.has(path) and ResourceLoader.exists(path):
+				seen[path] = true
+				result.append(path)
+	return result
+
+
+## 接收加载页完成的异步资源并持有引用。SpriteRegistry 后续 load(path) 会直接命中资源缓存。
+func retain_preloaded_resource(path: String, resource: Resource) -> void:
+	if resource != null:
+		_preloaded_resources[path] = resource
+
+
+func has_preloaded_resource(path: String) -> bool:
+	return _preloaded_resources.has(path)
+
+
+## 返回已经构建完成的帧，不触发任何同步加载。战斗实体必须优先使用此接口。
+func get_cached_sprite_frames(unit_id: String, team: String = "player") -> SpriteFrames:
+	return _frames_cache.get(unit_id + ":" + team, null)
+
+
+## 高清原图经导入缓存缩小后，在节点缩放上补回尺寸，画面大小保持不变。
+func get_render_scale(visual_scale: float) -> float:
+	return visual_scale * OPTIMIZED_IMPORT_RENDER_SCALE
+
+
+## 将一套单位动画加入战斗内续载队列。重复请求、已经完成的请求会自动忽略。
+func queue_sprite_frames(unit_id: String, team: String = "player") -> void:
+	var key := unit_id + ":" + team
+	if _frames_cache.has(key) or _queued_frame_sets.has(key):
+		return
+	var unit_data: Dictionary = DataRegistry.get_unit_data(unit_id)
+	if unit_data.get("animation", {}).is_empty():
+		return
+	_queued_frame_sets[key] = true
+	_background_jobs.append({
+		"key": key,
+		"unit_id": unit_id,
+		"team": team,
+		"paths": get_texture_paths(unit_id, team),
+		"index": 0,
+		"active_path": "",
+	})
+
+
+func _process_background_loading(delta: float) -> void:
+	if _background_current.is_empty():
+		if _background_jobs.is_empty():
+			return
+		_background_current = _background_jobs.pop_front()
+		return
+
+	var paths: Array = _background_current["paths"]
+	var index: int = int(_background_current["index"])
+	var active_path: String = _background_current["active_path"]
+
+	if active_path.is_empty():
+		if index >= paths.size():
+			# SpriteFrames 组装本身很轻，但仍只在上一帧平稳时执行，避免与战斗尖峰叠加。
+			if delta <= BACKGROUND_FINALIZE_FRAME_SECONDS:
+				_finish_background_frame_set()
+			return
+		var path: String = paths[index]
+		if _preloaded_resources.has(path):
+			_background_current["index"] = index + 1
+			return
+		if ResourceLoader.has_cached(path):
+			var cached := ResourceLoader.get_cached_ref(path)
+			if cached is Resource:
+				retain_preloaded_resource(path, cached)
+			_background_current["index"] = index + 1
+			return
+		# false：只使用 ResourceLoader 自身的单个后台线程，避免多核解码挤占游戏主线程。
+		var err := ResourceLoader.load_threaded_request(path, "", false)
+		if err == OK or err == ERR_BUSY:
+			_background_current["active_path"] = path
+		else:
+			push_warning("[SpriteRegistry] 后台预取请求失败: %s (%d)" % [path, err])
+			_background_current["index"] = index + 1
+		return
+
+	var progress: Array = []
+	var status := ResourceLoader.load_threaded_get_status(active_path, progress)
+	if status == ResourceLoader.THREAD_LOAD_LOADED:
+		# 收取资源可能触发纹理提交；卡帧时继续等待，且每帧最多收取一张。
+		if delta > BACKGROUND_FINALIZE_FRAME_SECONDS:
+			return
+		var resource := ResourceLoader.load_threaded_get(active_path)
+		if resource is Resource:
+			retain_preloaded_resource(active_path, resource)
+		_background_current["index"] = index + 1
+		_background_current["active_path"] = ""
+	elif status == ResourceLoader.THREAD_LOAD_FAILED \
+			or status == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+		push_warning("[SpriteRegistry] 后台预取失败: " + active_path)
+		_background_current["index"] = index + 1
+		_background_current["active_path"] = ""
+
+
+func _finish_background_frame_set() -> void:
+	var unit_id: String = _background_current["unit_id"]
+	var team: String = _background_current["team"]
+	var key: String = _background_current["key"]
+	var frames := get_sprite_frames(unit_id, team)
+	_queued_frame_sets.erase(key)
+	_background_current = {}
+	sprite_frames_ready.emit(unit_id, team, frames)
+
+
 ## 从动画配置和 PNG 文件构建 SpriteFrames。
 ## team 用于团队色帧选择（frames 为字典时取对应阵营帧）。
 ## 成功返回带动画的 SpriteFrames；无可用帧返回 null。
@@ -100,7 +243,9 @@ func _build_sprite_frames(unit_id: String, anim_data: Dictionary, team: String) 
 		for file_name in frame_files:
 			var path: String = base_path + String(file_name)
 			if ResourceLoader.exists(path):
-				var tex = load(path)
+				var tex = _preloaded_resources.get(path, null)
+				if tex == null:
+					tex = load(path)
 				if tex is Texture2D:
 					textures.append(tex)
 

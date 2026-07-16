@@ -28,7 +28,7 @@ var _tower_princess_idle_animation: String = ""
 var _hp_label: Label = null
 
 ## 战斗 UI 共用的 Clash Royale 风格数字字体（塔血量与右上倒计时保持一致）。
-const CLASH_FONT: FontFile = preload("res://assets/fonts/Clash_Regular.otf")
+const CLASH_FONT: Font = preload("res://assets/ui/theme/ClashUIFont.tres")
 
 
 ## 初始化塔属性。由 DebugBattle / BattleManager 在场景启动时调用。
@@ -166,7 +166,7 @@ func _create_tower_princess(princess_data: Dictionary) -> void:
 		float(princess_data.get("offset_x", 0.0)),
 		offset_y
 	)
-	var visual_scale: float = float(princess_data.get("visual_scale", 0.05))
+	var visual_scale := SpriteRegistry.get_render_scale(float(princess_data.get("visual_scale", 0.05)))
 	_tower_princess.scale = Vector2(visual_scale, visual_scale / BattleConstants.Y_COMPRESS)
 	_tower_princess.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	add_child(_tower_princess)

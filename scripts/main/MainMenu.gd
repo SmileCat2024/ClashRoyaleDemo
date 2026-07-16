@@ -4,6 +4,16 @@ extends Control
 const LOBBY_TEXTURE := preload("res://assets/ui/menu/lobby_reference.png")
 const DECK_TEXTURE := preload("res://assets/ui/menu/deck_reference.png")
 const LOADING_TEXTURE := preload("res://assets/ui/menu/battle_loading.jpg")
+## 与 deck_reference.png 中 1-5 号卡组按钮逐一对齐的热区。
+const PRESET_BUTTON_AREAS := [
+	Rect2(0.185, 0.257, 0.110, 0.054),
+	Rect2(0.314, 0.257, 0.111, 0.054),
+	Rect2(0.443, 0.257, 0.111, 0.054),
+	Rect2(0.577, 0.257, 0.110, 0.054),
+	Rect2(0.707, 0.257, 0.111, 0.054),
+]
+const MIN_LOADING_VISIBLE_SECONDS := 0.6
+const MAX_CONCURRENT_LOADS := 2
 
 enum Page { LOBBY, DECK }
 enum OnlineChoice { SOLO, HOST, JOIN }
@@ -17,7 +27,7 @@ var _found_hosts: Array[String] = []
 var _background: TextureRect
 var _lobby_layer: Control
 var _deck_layer: Control
-var _selected_marker: Button
+var _selected_marker: Panel
 var _card_layer: Control
 var _settings: Control
 var _room_overlay: Control
@@ -26,6 +36,8 @@ var _host_picker: OptionButton
 var _ip_input: LineEdit
 var _room_action: Button
 var _loading_overlay: Control
+var _loading_text: Label
+var _loading_progress: ProgressBar
 var _mode_select: OptionButton
 var _online_select: OptionButton
 
@@ -68,7 +80,7 @@ func _build_deck_layer() -> void:
 	_deck_layer = _full_layer()
 	add_child(_deck_layer)
 	for index in range(5):
-		_add_hotspot(_deck_layer, Rect2(0.185 + index * 0.132, 0.257, 0.108, 0.056), _select_preset.bind(index), "预设 %d" % (index + 1))
+		_add_hotspot(_deck_layer, PRESET_BUTTON_AREAS[index], _select_preset.bind(index), "预设 %d" % (index + 1))
 	_card_layer = _full_layer()
 	_deck_layer.add_child(_card_layer)
 	_add_hotspot(_deck_layer, Rect2(0.04, 0.855, 0.45, 0.145), _show_page.bind(Page.DECK), "卡组")
@@ -193,12 +205,23 @@ func _build_loading_overlay() -> void:
 	shade.color = Color("#05112670")
 	shade.mouse_filter = Control.MOUSE_FILTER_STOP
 	_loading_overlay.add_child(shade)
-	var text := _label("正在进入竞技场…", 26, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
-	text.position = Vector2(20, 620)
-	text.size = Vector2(400, 48)
-	text.add_theme_constant_override("outline_size", 7)
-	text.add_theme_color_override("font_outline_color", Color("#15253e"))
-	_loading_overlay.add_child(text)
+	_loading_text = _label("正在准备战斗资源…", 26, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	_loading_text.position = Vector2(20, 610)
+	_loading_text.size = Vector2(400, 48)
+	_loading_text.add_theme_constant_override("outline_size", 7)
+	_loading_text.add_theme_color_override("font_outline_color", Color("#15253e"))
+	_loading_overlay.add_child(_loading_text)
+	_loading_progress = ProgressBar.new()
+	_loading_progress.position = Vector2(55, 665)
+	_loading_progress.size = Vector2(330, 18)
+	_loading_progress.min_value = 0.0
+	_loading_progress.max_value = 100.0
+	_loading_progress.value = 0.0
+	_loading_progress.show_percentage = false
+	_loading_progress.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_loading_progress.add_theme_stylebox_override("background", _panel_style(Color("#071426cc"), 9, Color("#d8f3ff"), 2))
+	_loading_progress.add_theme_stylebox_override("fill", _panel_style(Color("#35b8ff"), 9))
+	_loading_overlay.add_child(_loading_progress)
 
 
 func _show_page(page: Page) -> void:
@@ -238,17 +261,23 @@ func _refresh_deck_cards() -> void:
 		image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 		image.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_card_layer.add_child(image)
-	# 唯一可见的控件覆盖：当前选中卡组的编号，黄色状态与需求一致。
+	# 选中态使用 Panel 而非 Button，避免字体的最小尺寸把高亮框撑出底图按钮。
 	if _selected_marker and is_instance_valid(_selected_marker):
 		_selected_marker.queue_free()
-	_selected_marker = _styled_button(str(_selected_preset + 1), Vector2.ZERO, Color("#c98208e8"), Color("#ffd24b"))
-	_selected_marker.flat = false
+	var selected_area: Rect2 = PRESET_BUTTON_AREAS[_selected_preset]
+	_selected_marker = Panel.new()
+	_selected_marker.add_theme_stylebox_override("panel", _panel_style(Color("#c98208e8"), 12, Color("#ffd24b"), 2))
 	_selected_marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_selected_marker.add_theme_font_size_override("font_size", 25)
-	_selected_marker.anchor_left = 0.185 + _selected_preset * 0.132
-	_selected_marker.anchor_right = _selected_marker.anchor_left + 0.108
-	_selected_marker.anchor_top = 0.257
-	_selected_marker.anchor_bottom = 0.313
+	_selected_marker.anchor_left = selected_area.position.x
+	_selected_marker.anchor_right = selected_area.end.x
+	_selected_marker.anchor_top = selected_area.position.y
+	_selected_marker.anchor_bottom = selected_area.end.y
+	var selected_label := _label(str(_selected_preset + 1), 25, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	selected_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	selected_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	selected_label.add_theme_constant_override("outline_size", 3)
+	selected_label.add_theme_color_override("font_outline_color", Color("#8a5100"))
+	_selected_marker.add_child(selected_label)
 	_deck_layer.add_child(_selected_marker)
 
 
@@ -258,6 +287,7 @@ func _on_battle_pressed() -> void:
 		OnlineChoice.SOLO:
 			NetworkManager.leave()
 			Game.set_network_mode(false)
+			Game.prepare_battle_decks(Game.get_selected_deck(), DataRegistry.get_default_enemy_deck())
 			_begin_loading()
 		OnlineChoice.HOST:
 			_open_host_room()
@@ -351,7 +381,9 @@ func _on_connected() -> void:
 	NetworkManager.stop_scanning()
 	if NetworkManager.is_client():
 		_rpc_submit_lobby_deck.rpc_id(1, Game.get_selected_deck())
-	_begin_loading()
+		_room_status.text = "已连接，正在等待主机锁定本局牌序…"
+	elif NetworkManager.is_server():
+		_room_status.text = "对手已连接，正在同步双方卡组…"
 
 
 func _on_connection_failed() -> void:
@@ -374,9 +406,164 @@ func _begin_loading() -> void:
 	_settings.visible = false
 	_room_overlay.visible = false
 	_loading_overlay.visible = true
-	await get_tree().create_timer(2.0).timeout
+	_loading_text.text = "正在准备战斗资源… 0%"
+	_loading_progress.value = 0.0
+	_load_battle_resources()
+
+
+## 真实加载流程：后台并发读取战斗场景、双方初始手牌帧、卡面和塔贴图；完成后才切场景。
+func _load_battle_resources() -> void:
+	var started_msec := Time.get_ticks_msec()
+	var manifest: Array[String] = []
+	var manifest_seen: Dictionary = {}
+	var frame_sets: Array[Dictionary] = []
+	var frame_set_seen: Dictionary = {}
+	_add_loading_path(SceneLoader.BATTLE_SCENE_PATH, manifest, manifest_seen)
+
+	var player_order := Game.get_prepared_player_deck()
+	var enemy_order := Game.get_prepared_enemy_deck()
+	# Client 视角会在战斗中翻转阵营：自己的牌是蓝方 player，Host 的牌是红方 enemy。
+	if NetworkManager.is_networked_client():
+		var host_order := player_order
+		player_order = enemy_order
+		enemy_order = host_order
+	var player_cards := _initial_hand_cards(player_order)
+	var enemy_cards := _initial_hand_cards(enemy_order)
+	# 卡面很小，加载页直接覆盖整副卡组；这样战斗内新预告牌刷新 UI 时不会再同步读图。
+	_collect_card_icons(player_order, manifest, manifest_seen)
+	_collect_card_icons(enemy_order, manifest, manifest_seen)
+	_collect_card_art(player_cards, "player", manifest, manifest_seen, frame_sets, frame_set_seen)
+	_collect_card_art(enemy_cards, "enemy", manifest, manifest_seen, frame_sets, frame_set_seen)
+
+	# 皇家塔贴图和塔顶公主由数据动态加载，不属于 BattleScene 的静态依赖，必须显式加入清单。
+	_queue_unit_frame_set("princess", "player", manifest, manifest_seen, frame_sets, frame_set_seen)
+	_queue_unit_frame_set("princess", "enemy", manifest, manifest_seen, frame_sets, frame_set_seen)
+	for tower_key in ["guard_tower", "king_tower"]:
+		var tower_data := DataRegistry.get_tower_data(tower_key)
+		var sprite_data: Dictionary = tower_data.get("sprite", {})
+		_add_loading_path(sprite_data.get("player_texture", ""), manifest, manifest_seen)
+		_add_loading_path(sprite_data.get("enemy_texture", ""), manifest, manifest_seen)
+
+	var pending: Dictionary = {}
+	var next_index := 0
+	var completed := 0
+	var failed := 0
+	var battle_scene: PackedScene = null
+	while completed + failed < manifest.size():
+		while pending.size() < MAX_CONCURRENT_LOADS and next_index < manifest.size():
+			var path := manifest[next_index]
+			next_index += 1
+			if SpriteRegistry.has_preloaded_resource(path) or ResourceLoader.has_cached(path):
+				var cached := load(path)
+				if cached is Resource:
+					SpriteRegistry.retain_preloaded_resource(path, cached)
+				if path == SceneLoader.BATTLE_SCENE_PATH and cached is PackedScene:
+					battle_scene = cached
+				completed += 1
+				continue
+			var err := ResourceLoader.load_threaded_request(path, "", true)
+			if err == OK or err == ERR_BUSY:
+				pending[path] = 0.0
+			else:
+				push_warning("[MainMenu] 预加载请求失败: %s (%d)" % [path, err])
+				failed += 1
+
+		# 每帧最多收取一个完成资源，避免集中完成时再次造成主线程尖峰。
+		for path in pending.keys():
+			var item_progress: Array = []
+			var status := ResourceLoader.load_threaded_get_status(path, item_progress)
+			pending[path] = float(item_progress[0]) if not item_progress.is_empty() else 0.0
+			if status == ResourceLoader.THREAD_LOAD_LOADED:
+				var resource := ResourceLoader.load_threaded_get(path)
+				if resource is Resource:
+					SpriteRegistry.retain_preloaded_resource(path, resource)
+				if path == SceneLoader.BATTLE_SCENE_PATH and resource is PackedScene:
+					battle_scene = resource
+				pending.erase(path)
+				completed += 1
+				break
+			elif status == ResourceLoader.THREAD_LOAD_FAILED or status == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+				push_warning("[MainMenu] 预加载失败: " + path)
+				pending.erase(path)
+				failed += 1
+				break
+
+		var partial := 0.0
+		for value in pending.values():
+			partial += float(value)
+		var progress := float(completed + failed) + partial
+		_set_loading_progress(progress / maxf(float(manifest.size()), 1.0))
+		await get_tree().process_frame
+
+	_loading_text.text = "正在整理单位动画…"
+	for frame_set in frame_sets:
+		SpriteRegistry.get_sprite_frames(frame_set["unit_id"], frame_set["team"])
+	_set_loading_progress(1.0)
+
+	var elapsed := (Time.get_ticks_msec() - started_msec) / 1000.0
+	print("[MainMenu] 战斗资源预加载完成: %d 项, 失败 %d 项, %.0f ms" % [
+		manifest.size(), failed, elapsed * 1000.0,
+	])
+	var remaining := MIN_LOADING_VISIBLE_SECONDS - elapsed
+	if remaining > 0.0:
+		await get_tree().create_timer(remaining).timeout
 	if is_instance_valid(self):
-		Game.start_battle()
+		Game.start_battle(battle_scene)
+
+
+## 按 DeckManager 的规则推导真正的初始 4 手牌 + 1 张预告牌。
+## 预告牌会在首次出牌后立即补位，7× 模式下也必须在对局前完成加载。
+func _initial_hand_cards(deck_order: Array) -> Array:
+	var hand: Array = []
+	for card_id in deck_order:
+		var card: Dictionary = DataRegistry.card_data.get(card_id, {})
+		if hand.size() < DeckManager.HAND_SIZE and not bool(card.get("exclude_from_initial_hand", false)):
+			hand.append(card_id)
+	for card_id in deck_order:
+		if not hand.has(card_id):
+			hand.append(card_id)
+			break
+	return hand
+
+
+func _collect_card_art(cards: Array, team: String, manifest: Array[String], manifest_seen: Dictionary,
+		frame_sets: Array[Dictionary], frame_set_seen: Dictionary) -> void:
+	for card_id in cards:
+		var card := DataRegistry.get_card_data(card_id)
+		var unit_id: String = card.get("unit_id", "")
+		if unit_id != "":
+			_queue_unit_frame_set(unit_id, team, manifest, manifest_seen, frame_sets, frame_set_seen)
+
+
+func _collect_card_icons(cards: Array, manifest: Array[String], manifest_seen: Dictionary) -> void:
+	for card_id in cards:
+		var card := DataRegistry.get_card_data(card_id)
+		_add_loading_path(card.get("icon", ""), manifest, manifest_seen)
+		_add_loading_path(card.get("awakening_icon", ""), manifest, manifest_seen)
+
+
+func _queue_unit_frame_set(unit_id: String, team: String, manifest: Array[String], manifest_seen: Dictionary,
+		frame_sets: Array[Dictionary], frame_set_seen: Dictionary) -> void:
+	var key := unit_id + ":" + team
+	if frame_set_seen.has(key):
+		return
+	frame_set_seen[key] = true
+	frame_sets.append({"unit_id": unit_id, "team": team})
+	for path in SpriteRegistry.get_texture_paths(unit_id, team):
+		_add_loading_path(path, manifest, manifest_seen)
+
+
+func _add_loading_path(path: String, manifest: Array[String], seen: Dictionary) -> void:
+	if path == "" or seen.has(path) or not ResourceLoader.exists(path):
+		return
+	seen[path] = true
+	manifest.append(path)
+
+
+func _set_loading_progress(ratio: float) -> void:
+	var clamped := clampf(ratio, 0.0, 1.0)
+	_loading_progress.value = clamped * 100.0
+	_loading_text.text = "正在加载战斗资源… %d%%" % roundi(clamped * 100.0)
 
 
 ## 在大厅场景完成卡组锁定，避免两端加载速度不同导致远端手牌被默认值覆盖。
@@ -390,6 +577,24 @@ func _rpc_submit_lobby_deck(cards: Array) -> void:
 			validated.append(card_id)
 	if validated.size() >= 5:
 		Game.set_remote_deck(validated)
+		Game.prepare_battle_decks(Game.get_selected_deck(), validated)
+		var peer_id := multiplayer.get_remote_sender_id()
+		_rpc_receive_prepared_decks.rpc_id(
+			peer_id,
+			Game.get_prepared_player_deck(),
+			Game.get_prepared_enemy_deck()
+		)
+		_begin_loading()
+
+
+## Host 把唯一的本局牌序发给 Client，双方据此加载完全相同的首发美术资源。
+@rpc("authority", "call_remote", "reliable")
+func _rpc_receive_prepared_decks(player_order: Array, enemy_order: Array) -> void:
+	if NetworkManager.is_server():
+		return
+	Game.set_remote_deck(player_order)
+	Game.set_prepared_battle_decks(player_order, enemy_order)
+	_begin_loading()
 
 
 func _full_layer() -> Control:

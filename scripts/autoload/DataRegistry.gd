@@ -497,7 +497,7 @@ var unit_data := {
 			"hide_placeholder": true,  # 使用正式巨人贴图，不显示测试占位格
 			"visual_offset_y": -35.0,
 			"visual_scale": 0.0768,
-			"health_bar_y": -100,
+			"health_bar_y": -85,
 			"states": {
 				"walk_front": {
 					"frames": ["walk_front_01.png", "walk_front_02.png"],
@@ -585,7 +585,7 @@ var unit_data := {
 			"visual_offset_x": 0.0,
 			"visual_offset_y": -24.0,   # 待校准
 			"visual_scale": 0.12,       # 扩大一倍（用户反馈）
-			"health_bar_y": -60.0,      # 待校准
+			"health_bar_y": -75.0,      # 血条上移 15px
 			"texture_filter": "linear",
 			"states": {
 				"walk_back": {
@@ -1180,7 +1180,7 @@ var unit_data := {
 		"animation": {
 			"hide_placeholder": true,
 			"visual_offset_x": 0.0,
-			"visual_offset_y": -24.0,
+			"visual_offset_y": -14.0,
 			"visual_scale": 0.05,
 			"health_bar_y": -60.0,
 			"texture_filter": "linear",
@@ -1253,7 +1253,7 @@ var unit_data := {
 		"animation": {
 			"hide_placeholder": true,   # 使用正式帧动画，移除底部 ColorRect 调试占位
 			"visual_offset_x": 0.0,
-			"visual_offset_y": -29.0,
+			"visual_offset_y": -19.0,
 			"visual_scale": 0.025,      # 小幅放大约 9%
 			"health_bar_y": -70.0,      # 随模型放大上移，保持在头顶
 			"texture_filter": "linear",

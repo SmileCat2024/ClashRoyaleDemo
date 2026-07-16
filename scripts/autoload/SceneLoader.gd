@@ -20,9 +20,12 @@ func load_main_menu() -> void:
 
 
 ## 切换到战斗场景
-func load_battle() -> void:
+func load_battle(preloaded_scene: PackedScene = null) -> void:
 	print("[SceneLoader] -> BattleScene")
-	get_tree().change_scene_to_file(BATTLE_SCENE_PATH)
+	if preloaded_scene != null:
+		get_tree().change_scene_to_packed(preloaded_scene)
+	else:
+		get_tree().change_scene_to_file(BATTLE_SCENE_PATH)
 
 
 ## 重新加载当前场景（用于重开战斗）

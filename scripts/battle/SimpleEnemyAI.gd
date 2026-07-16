@@ -22,11 +22,14 @@ var _target_index: int = -1
 
 
 ## 初始化敌方 AI（由 BattleManager.start_battle() 调用）
-func setup() -> void:
+func setup(prepared_deck_order: Array = []) -> void:
 	_deck = DeckManager.new()
 	_deck.name = "EnemyDeckManager"
 	add_child(_deck)
-	_deck.setup(DataRegistry.get_default_enemy_deck())
+	if prepared_deck_order.size() >= 5:
+		_deck.setup(prepared_deck_order, false)
+	else:
+		_deck.setup(DataRegistry.get_default_enemy_deck())
 	_target_index = -1
 	print("[SimpleEnemyAI] setup, hand:", _deck.get_hand(), " next:", _deck.get_next())
 

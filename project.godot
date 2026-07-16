@@ -37,7 +37,7 @@ window/handheld/orientation=1
 
 [gui]
 
-theme/custom_font="res://assets/fonts/simhei.ttf"
+theme/custom="res://assets/ui/theme/GameUITheme.tres"
 
 [rendering]
 
