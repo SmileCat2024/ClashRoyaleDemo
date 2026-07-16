@@ -1,76 +1,79 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene format=3 uid="uid://ctxoo6a668bl5"]
 
 [ext_resource type="PackedScene" path="res://scenes/battle/Arena.tscn" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/entities/towers/KingTower.tscn" id="2"]
 [ext_resource type="PackedScene" path="res://scenes/entities/towers/GuardTower.tscn" id="3"]
-[ext_resource type="Script" path="res://scripts/battle/BattleManager.gd" id="4"]
-[ext_resource type="Script" path="res://scripts/battle/SpawnManager.gd" id="5"]
-[ext_resource type="Script" path="res://scripts/battle/SimpleEnemyAI.gd" id="6"]
+[ext_resource type="Script" uid="uid://bnfe77m44w4tk" path="res://scripts/battle/BattleManager.gd" id="4"]
+[ext_resource type="Script" uid="uid://c603po5gufxwm" path="res://scripts/battle/SpawnManager.gd" id="5"]
+[ext_resource type="Script" uid="uid://prn21hik0fs6" path="res://scripts/battle/SimpleEnemyAI.gd" id="6"]
 [ext_resource type="PackedScene" path="res://scenes/ui/BattleHUD.tscn" id="7"]
-[ext_resource type="Script" path="res://scripts/battle/ProjectileManager.gd" id="8"]
-[ext_resource type="Script" path="res://scripts/battle/EffectManager.gd" id="9"]
-[ext_resource type="Script" path="res://scripts/battle/DeployPreview.gd" id="10"]
-[ext_resource type="Script" path="res://scripts/battle/SpellManager.gd" id="11"]
+[ext_resource type="Script" uid="uid://dj5ayfes4nr53" path="res://scripts/battle/ProjectileManager.gd" id="8"]
+[ext_resource type="Script" uid="uid://cu1viw4ieqxxb" path="res://scripts/battle/EffectManager.gd" id="9"]
+[ext_resource type="Script" uid="uid://dad8qocrnmoe7" path="res://scripts/battle/DeployPreview.gd" id="10"]
+[ext_resource type="Script" uid="uid://c5ml2gbheh78w" path="res://scripts/battle/SpellManager.gd" id="11"]
 
-[node name="BattleScene" type="Node2D"]
+[node name="BattleScene" type="Node2D" unique_id=1138836199]
 position = Vector2(40, 0)
 
-[node name="World" type="Node2D" parent="."]
+[node name="World" type="Node2D" parent="." unique_id=1904319773]
 position = Vector2(-3, 83.3)
 scale = Vector2(1, 0.7863)
 
-[node name="Arena" parent="World" instance=ExtResource("1")]
+[node name="Arena" parent="World" unique_id=2145938579 instance=ExtResource("1")]
 
-[node name="UnitsRoot" type="Node2D" parent="World"]
+[node name="UnitsRoot" type="Node2D" parent="World" unique_id=603743203]
 y_sort_enabled = true
 
-[node name="EnemyKingTower" parent="World/UnitsRoot" instance=ExtResource("2")]
+[node name="EnemyKingTower" parent="World/UnitsRoot" unique_id=1271726118 instance=ExtResource("2")]
 position = Vector2(180, 60)
 
-[node name="EnemyLeftTower" parent="World/UnitsRoot" instance=ExtResource("3")]
+[node name="EnemyLeftTower" parent="World/UnitsRoot" unique_id=1509238174 instance=ExtResource("3")]
 position = Vector2(70, 130)
 
-[node name="EnemyRightTower" parent="World/UnitsRoot" instance=ExtResource("3")]
+[node name="EnemyRightTower" parent="World/UnitsRoot" unique_id=758840879 instance=ExtResource("3")]
 position = Vector2(290, 130)
 
-[node name="PlayerLeftTower" parent="World/UnitsRoot" instance=ExtResource("3")]
+[node name="PlayerLeftTower" parent="World/UnitsRoot" unique_id=945571489 instance=ExtResource("3")]
 position = Vector2(70, 510)
 
-[node name="PlayerRightTower" parent="World/UnitsRoot" instance=ExtResource("3")]
+[node name="PlayerRightTower" parent="World/UnitsRoot" unique_id=1469214248 instance=ExtResource("3")]
 position = Vector2(290, 510)
 
-[node name="PlayerKingTower" parent="World/UnitsRoot" instance=ExtResource("2")]
+[node name="PlayerKingTower" parent="World/UnitsRoot" unique_id=743167776 instance=ExtResource("2")]
 position = Vector2(180, 580)
 
-[node name="ProjectilesRoot" type="Node2D" parent="World"]
+[node name="ProjectilesRoot" type="Node2D" parent="World" unique_id=1461116415]
 
-[node name="EffectsRoot" type="Node2D" parent="World"]
+[node name="EffectsRoot" type="Node2D" parent="World" unique_id=2120959813]
 
-[node name="DeployPreview" type="Node2D" parent="World"]
+[node name="DeployPreview" type="Node2D" parent="World" unique_id=1934207325]
 z_index = 100
 script = ExtResource("10")
 
-[node name="Managers" type="Node" parent="."]
+[node name="Managers" type="Node" parent="." unique_id=203227002]
 
-[node name="BattleManager" type="Node" parent="Managers"]
+[node name="BattleManager" type="Node" parent="Managers" unique_id=1379131981]
 script = ExtResource("4")
 
-[node name="SpawnManager" type="Node" parent="Managers"]
+[node name="SpawnManager" type="Node" parent="Managers" unique_id=1881399376]
 script = ExtResource("5")
 
-[node name="SimpleEnemyAI" type="Node" parent="Managers"]
+[node name="SimpleEnemyAI" type="Node" parent="Managers" unique_id=126838990]
 script = ExtResource("6")
 
-[node name="ProjectileManager" type="Node" parent="Managers"]
+[node name="ProjectileManager" type="Node" parent="Managers" unique_id=1300580003]
 script = ExtResource("8")
 
-[node name="EffectManager" type="Node" parent="Managers"]
+[node name="EffectManager" type="Node" parent="Managers" unique_id=1192718341]
 script = ExtResource("9")
 
-[node name="SpellManager" type="Node" parent="Managers"]
+[node name="SpellManager" type="Node" parent="Managers" unique_id=1646671446]
 script = ExtResource("11")
 
-[node name="CanvasLayer" type="CanvasLayer" parent="."]
+[node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=1829615884]
 offset = Vector2(40, 0)
+transform = Transform2D(1, 0, 0, 1, 40, 0)
 
-[node name="BattleHUD" parent="CanvasLayer" instance=ExtResource("7")]
+[node name="BattleHUD" parent="CanvasLayer" unique_id=1220870689 instance=ExtResource("7")]
+grow_horizontal = 2
+grow_vertical = 2
