@@ -27,6 +27,9 @@ var match_mode: int = MatchMode.FAST_7X
 ## 大厅中选择的预设卡组。卡组由设计方固定，不开放编辑。
 var selected_deck_index: int = 0
 var remote_deck_cards: Array = []
+## 自由组卡：玩家在选卡界面自选的 8 张卡牌。use_custom_deck 为 true 时优先于预设卡组。
+var custom_deck: Array = []
+var use_custom_deck: bool = false
 ## 加载页提前洗好的本局牌序。BattleManager 复用它，保证预加载的初始手牌就是实际初始手牌。
 var prepared_player_deck_order: Array = []
 var prepared_enemy_deck_order: Array = []
@@ -56,7 +59,16 @@ func set_selected_deck(index: int) -> void:
 	print("[Game] selected deck =", selected_deck_index)
 
 
+## 设置自由组卡（由选卡界面调用，选满 8 张后确认）
+func set_custom_deck(cards: Array) -> void:
+	custom_deck = cards.duplicate()
+	use_custom_deck = true
+	print("[Game] custom deck set:", custom_deck)
+
+
 func get_selected_deck() -> Array:
+	if use_custom_deck and custom_deck.size() >= 5:
+		return custom_deck.duplicate()
 	return PRESET_DECKS[selected_deck_index].get("cards", []).duplicate()
 
 

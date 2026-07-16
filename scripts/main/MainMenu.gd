@@ -40,6 +40,20 @@ var _loading_text: Label
 var _loading_progress: ProgressBar
 var _mode_select: OptionButton
 var _online_select: OptionButton
+# ---- 自由组卡层 ----
+var _builder_layer: Control
+var _builder_grid: Control
+var _builder_count: Label
+var _builder_confirm: Button
+var _builder_frames: Dictionary = {}  # card_id -> 选中金色边框 Panel
+var _builder_selection: Array = []    # 已选 card_id 列表
+const BUILDER_COLS: int = 4
+const BUILDER_CARD_W: float = 92.0
+const BUILDER_CARD_H: float = 92.0
+const BUILDER_MARGIN_X: float = 12.0
+const BUILDER_START_Y: float = 108.0
+const BUILDER_STEP_X: float = 107.0
+const BUILDER_STEP_Y: float = 94.0
 
 
 func _ready() -> void:
@@ -50,6 +64,7 @@ func _ready() -> void:
 	_build_settings()
 	_build_room_overlay()
 	_build_loading_overlay()
+	_build_deck_builder()
 	_show_page(Page.LOBBY)
 	NetworkManager.connected_to_server.connect(_on_connected)
 	NetworkManager.connection_failed.connect(_on_connection_failed)
@@ -85,6 +100,14 @@ func _build_deck_layer() -> void:
 	_deck_layer.add_child(_card_layer)
 	_add_hotspot(_deck_layer, Rect2(0.04, 0.855, 0.45, 0.145), _show_page.bind(Page.DECK), "卡组")
 	_add_hotspot(_deck_layer, Rect2(0.50, 0.855, 0.46, 0.145), _show_page.bind(Page.LOBBY), "大厅")
+	# 自由组卡入口
+	var builder_btn := Button.new()
+	builder_btn.text = "✎ 自由组卡"
+	builder_btn.position = Vector2(150, 8)
+	builder_btn.size = Vector2(140, 30)
+	builder_btn.add_theme_font_size_override("font_size", 16)
+	builder_btn.pressed.connect(_open_deck_builder)
+	_deck_layer.add_child(builder_btn)
 
 
 func _build_settings() -> void:
@@ -235,6 +258,7 @@ func _show_page(page: Page) -> void:
 
 func _select_preset(index: int) -> void:
 	_selected_preset = index
+	Game.use_custom_deck = false  # 选预设卡组时取消自定义卡组
 	Game.set_selected_deck(index)
 	_refresh_deck_cards()
 
@@ -242,7 +266,7 @@ func _select_preset(index: int) -> void:
 func _refresh_deck_cards() -> void:
 	for child in _card_layer.get_children():
 		child.queue_free()
-	var cards: Array = Game.PRESET_DECKS[_selected_preset].get("cards", [])
+	var cards: Array = Game.get_selected_deck()  # 自动返回自定义卡组或当前预设
 	for index in range(cards.size()):
 		var image := TextureRect.new()
 		var x := 0.077 + (index % 4) * 0.220
@@ -627,10 +651,6 @@ func _add_hotspot(parent: Control, area: Rect2, callback: Callable, tooltip: Str
 
 func _card_texture(card_id: String) -> Texture2D:
 	var asset_id := card_id.replace("card_", "")
-	if asset_id == "knight_elite":
-		asset_id = "knight"
-	elif asset_id == "mega_minion_elite":
-		asset_id = "mega_minion"
 	var path := "res://assets/ui/cards/%s.png" % asset_id
 	return load(path) as Texture2D if ResourceLoader.exists(path) else null
 
@@ -694,7 +714,138 @@ func _panel_style(fill: Color, radius: int, border := Color.TRANSPARENT, border_
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
-		if _settings.visible:
+		if _builder_layer and _builder_layer.visible:
+			_builder_layer.visible = false
+		elif _settings.visible:
 			_settings.visible = false
 		elif _room_overlay.visible:
 			_close_room_overlay()
+
+
+# ==================== 自由组卡层 ====================
+
+func _build_deck_builder() -> void:
+	_builder_layer = Control.new()
+	_builder_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_builder_layer.mouse_filter = Control.MOUSE_FILTER_STOP
+	_builder_layer.visible = false
+	add_child(_builder_layer)
+	var shade := ColorRect.new()
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	shade.color = Color(0.03, 0.08, 0.15, 0.94)
+	_builder_layer.add_child(shade)
+	var title := _label("自由组卡", 28, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	title.position = Vector2(20, 18)
+	title.size = Vector2(400, 44)
+	title.add_theme_constant_override("outline_size", 6)
+	title.add_theme_color_override("font_outline_color", Color("#15253e"))
+	_builder_layer.add_child(title)
+	_builder_count = _label("已选 0 / 8", 20, Color("#ffd966"), HORIZONTAL_ALIGNMENT_CENTER)
+	_builder_count.position = Vector2(20, 64)
+	_builder_count.size = Vector2(400, 28)
+	_builder_layer.add_child(_builder_count)
+	_builder_grid = Control.new()
+	_builder_grid.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_builder_grid.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_builder_layer.add_child(_builder_grid)
+	_builder_confirm = Button.new()
+	_builder_confirm.text = "确认出战（选满 8 张）"
+	_builder_confirm.position = Vector2(60, 700)
+	_builder_confirm.size = Vector2(200, 50)
+	_builder_confirm.add_theme_font_size_override("font_size", 16)
+	_builder_confirm.disabled = true
+	_builder_confirm.pressed.connect(_confirm_builder)
+	_builder_layer.add_child(_builder_confirm)
+	var cancel := Button.new()
+	cancel.text = "返回"
+	cancel.position = Vector2(280, 700)
+	cancel.size = Vector2(100, 50)
+	cancel.add_theme_font_size_override("font_size", 16)
+	cancel.pressed.connect(_close_deck_builder)
+	_builder_layer.add_child(cancel)
+
+
+func _open_deck_builder() -> void:
+	_builder_selection = Game.custom_deck.duplicate() if Game.use_custom_deck else []
+	_builder_layer.visible = true
+	_refresh_builder_grid()
+	_update_builder_hud()
+
+
+func _close_deck_builder() -> void:
+	_builder_layer.visible = false
+
+
+## 卡池：card_data 中所有带有效卡面 icon 的卡牌（含觉醒/精英），按 id 排序
+func _builder_pool() -> Array:
+	var pool := []
+	for card_id in DataRegistry.card_data:
+		var icon: String = DataRegistry.card_data[card_id].get("icon", "")
+		if icon != "" and ResourceLoader.exists(icon):
+			pool.append(card_id)
+	pool.sort()
+	return pool
+
+
+func _refresh_builder_grid() -> void:
+	for child in _builder_grid.get_children():
+		child.queue_free()
+	_builder_frames.clear()
+	var pool := _builder_pool()
+	for i in range(pool.size()):
+		var card_id: String = pool[i]
+		var col := i % BUILDER_COLS
+		var row := i / BUILDER_COLS
+		var slot := Control.new()
+		slot.position = Vector2(BUILDER_MARGIN_X + col * BUILDER_STEP_X, BUILDER_START_Y + row * BUILDER_STEP_Y)
+		slot.size = Vector2(BUILDER_CARD_W, BUILDER_CARD_H)
+		var tex := TextureRect.new()
+		tex.texture = _card_texture(card_id)
+		tex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		slot.add_child(tex)
+		var frame := Panel.new()
+		frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		frame.add_theme_stylebox_override("panel", _panel_style(Color(1, 0.85, 0.4, 0.0), 0, Color("#ffd966"), 4))
+		frame.visible = card_id in _builder_selection
+		slot.add_child(frame)
+		_builder_frames[card_id] = frame
+		var btn := Button.new()
+		btn.flat = true
+		btn.text = ""
+		btn.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		btn.add_theme_stylebox_override("normal", StyleBoxEmpty.new())
+		btn.add_theme_stylebox_override("hover", StyleBoxEmpty.new())
+		btn.add_theme_stylebox_override("pressed", StyleBoxEmpty.new())
+		btn.pressed.connect(_toggle_builder_card.bind(card_id))
+		slot.add_child(btn)
+		_builder_grid.add_child(slot)
+
+
+func _toggle_builder_card(card_id: String) -> void:
+	var idx := _builder_selection.find(card_id)
+	if idx >= 0:
+		_builder_selection.remove_at(idx)
+	else:
+		if _builder_selection.size() >= 8:
+			return
+		_builder_selection.append(card_id)
+	if _builder_frames.has(card_id):
+		_builder_frames[card_id].visible = card_id in _builder_selection
+	_update_builder_hud()
+
+
+func _update_builder_hud() -> void:
+	_builder_count.text = "已选 %d / 8" % _builder_selection.size()
+	_builder_count.add_theme_color_override("font_color", Color("#7fff7f") if _builder_selection.size() >= 8 else Color("#ffd966"))
+	_builder_confirm.disabled = _builder_selection.size() != 8
+
+
+func _confirm_builder() -> void:
+	if _builder_selection.size() != 8:
+		return
+	Game.set_custom_deck(_builder_selection)
+	_refresh_deck_cards()  # 卡组页立即显示新选的 8 张
+	_close_deck_builder()

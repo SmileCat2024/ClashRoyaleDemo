@@ -1576,7 +1576,7 @@ var card_data := {
 		"unit_id": "knight",   # 复用骑士单位数据（模型/动作不变，仅附加主动技能）
 		"spawn_count": 1,
 		"spawn_spread": 0.0,
-		"icon": "res://assets/ui/cards/knight.png",
+		"icon": "res://assets/ui/cards/knight_elite.png",
 		"description": "骑士的精英变种，拥有主动技能「集结号角」。",
 		# ---- 精英技能配置 ----
 		# 打出后单位存活期间，屏幕右侧出现技能按钮。花圣水释放，单位死亡按钮消失。
@@ -1604,7 +1604,7 @@ var card_data := {
 		"unit_id": "mega_minion",   # 复用重甲亡灵单位数据（模型/动作不变，仅附加主动技能）
 		"spawn_count": 1,
 		"spawn_spread": 0.0,
-		"icon": "res://assets/ui/cards/mega_minion.png",
+		"icon": "res://assets/ui/cards/mega_minion_elite.png",
 		"description": "重甲亡灵的精英变种，拥有主动技能「死亡俯冲」。锁定场上血量最低的敌方单位，在其脚下留下黑色标志后高速俯冲。",
 		# 仅精英变种的视觉微调；不影响普通重甲亡灵。
 		"visual_overrides": {
