@@ -134,6 +134,7 @@ var _beam: InfernoBeam = null
 ## Client 端光束同步状态（host 通过 RPC 同步，client 端 _update_beam_visual 读取替代 AttackComponent）
 var _sync_beam_active: bool = false
 var _sync_beam_target: Vector2 = Vector2.ZERO
+var _sync_beam_altitude: float = 0.0
 var _sync_beam_stage: int = 0
 
 # ---- 精英技能：冲刺（死亡俯冲等 dash 类技能的运行时状态机）----
@@ -720,7 +721,7 @@ func _update_beam_visual() -> void:
 			_beam = InfernoBeam.new()
 			add_child(_beam)
 		var from_pos_c := Vector2(0.0, beam_emit_offset_y)
-		var to_pos_c := _sync_beam_target - position + Vector2(0.0, -10.0)
+		var to_pos_c := _sync_beam_target - position + Vector2(0.0, -10.0 - _sync_beam_altitude * BattleConstants.CELL_SIZE)
 		_beam.set_params(from_pos_c, to_pos_c, _sync_beam_stage, 1.0)
 		_beam.visible = true
 		return
@@ -740,18 +741,19 @@ func _update_beam_visual() -> void:
 	if _beam == null or not is_instance_valid(_beam):
 		_beam = InfernoBeam.new()
 		add_child(_beam)
-	# 起点：塔顶喷口（本地坐标）；终点：目标逻辑位置（转父节点本地坐标 + 身体偏移）
+	# 起点：塔顶喷口（本地坐标）；终点：目标逻辑位置（转父节点本地坐标 + 身体偏移 + 空中离地偏移）
 	var from_pos := Vector2(0.0, beam_emit_offset_y)
-	var to_pos := BattlePathing.game_position_of(target) - position + Vector2(0.0, -10.0)
+	var to_pos := BattlePathing.game_position_of(target) - position + Vector2(0.0, -10.0 - target.altitude * BattleConstants.CELL_SIZE)
 	_beam.set_params(from_pos, to_pos, attack.get_ramp_stage_index(), 1.0)
 	_beam.visible = true
 
 
 ## Client 端：接收 host 同步的光束状态（由 BattleManager._rpc_sync_beams 调用）。
 ## target_pos 已由 BattleManager 做过镜像。
-func update_beam_from_sync(active: bool, target_pos: Vector2, stage: int) -> void:
+func update_beam_from_sync(active: bool, target_pos: Vector2, stage: int, altitude: float = 0.0) -> void:
 	_sync_beam_active = active
 	_sync_beam_target = target_pos
+	_sync_beam_altitude = altitude
 	_sync_beam_stage = stage
 
 

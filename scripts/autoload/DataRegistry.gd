@@ -1218,20 +1218,21 @@ var unit_data := {
 			"projectile_speed": 10.0,
 		}],
 		"animation": {
-			"hide_placeholder": true,
-			"visual_offset_x": 0.0,
-			"visual_offset_y": -14.0,
-			"visual_scale": 0.05,
-			"health_bar_y": -60.0,
-			"texture_filter": "linear",
-			"states": {
+		"hide_placeholder": true,
+		"visual_offset_x": 0.0,
+		"visual_offset_y": -14.0,
+		"visual_scale": 0.05,
+		"front_scale_mult": 1.3,
+		"health_bar_y": -60.0,
+		"texture_filter": "linear",
+		"states": {
 				"walk_back": {
 					"frames": ["walk_back_01.png", "walk_back_02.png"],
 					"duration": [0.25, 0.25],
 					"mode": "loop",
 				},
 				"walk_front": {
-					"frames": ["walk_back_01.png", "walk_back_02.png"],
+					"frames": ["walk_front_01.png", "walk_front_02.png"],
 					"duration": [0.25, 0.25],
 					"mode": "loop",
 				},
@@ -1241,7 +1242,7 @@ var unit_data := {
 					"mode": "loop",
 				},
 				"idle_front": {
-					"frames": ["walk_back_01.png"],
+					"frames": ["walk_front_01.png"],
 					"duration": [0.3],
 					"mode": "loop",
 				},
@@ -1251,11 +1252,10 @@ var unit_data := {
 					"mode": "once",
 				},
 				"attack_front": {
-					"frames": ["attack_back_01.png", "attack_back_02.png", "attack_back_03.png"],
+					"frames": ["attack_front_01.png", "attack_front_02.png", "attack_front_03.png"],
 					"duration": [0.1, 0.1, 0.15],
 					"mode": "once",
 				},
-			},
 		},
 		# 官方原版补充：此前公主没有专属部署/射击音效。
 		"sfx": {
