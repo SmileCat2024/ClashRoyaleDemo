@@ -226,3 +226,50 @@ func test_dash_moves_toward_target() -> void:
 	mega._process_dash(0.1)
 	# 重甲亡灵从 y=500 向 y=300 移动，y 应减小
 	assert_true(mega.position.y < 500.0, "冲刺应使单位向目标移动（y 减小）")
+
+
+# =====================================================================
+# 冲刺期间碰撞免疫
+# 修复：冲刺（死亡俯冲）中的单位对碰撞系统完全免疫，既不被同层单位挡住/推回，
+#       也不推开路过的单位。修复前冲刺单位（air）冲向同层目标时，半径和（24px）
+#       大于到达阈值（6px），被碰撞分离反复推开永远到不了目标脚下，且撞散路过单位。
+# =====================================================================
+
+## 冲刺中的单位与同层（air）单位完全重叠时，碰撞系统不应推开任何一方。
+func test_dash_unit_immune_to_collision() -> void:
+	var mega := _make_elite_mega_minion(Vector2(100, 300))
+	# 远处目标，确保 trigger_skill 进入冲刺态且不会被重叠的 blocker 抢占为目标
+	var far_target := _make_enemy(Vector2(100, 100), 50)
+	mega.trigger_skill(Vector2.ZERO)
+	assert_true(mega.is_dashing, "前置：应已进入冲刺态")
+	# 同层 air 单位，与冲刺单位完全重叠（模拟冲刺路径上/目标处的阻挡）
+	var blocker := _make_enemy(Vector2(100, 300), 500)
+	blocker.movement_type = "air"
+	blocker.collision_radius = 12.0
+	blocker.mass = 3
+	var mega_pos_before := mega.position
+	var blocker_pos_before := blocker.position
+
+	CollisionSystem.resolve_overlaps([mega, blocker])
+
+	assert_approx(mega.position.distance_to(mega_pos_before), 0.0, 0.001,
+		"冲刺单位不应被碰撞推开")
+	assert_approx(blocker.position.distance_to(blocker_pos_before), 0.0, 0.001,
+		"冲刺单位不应推开重叠的同层单位")
+
+
+## 回归保护：非冲刺的同层单位重叠时，碰撞分离仍正常生效。
+func test_non_dash_units_still_collide() -> void:
+	var a := _make_enemy(Vector2(100, 300), 500)
+	a.movement_type = "air"
+	a.collision_radius = 12.0
+	a.mass = 3
+	var b := _make_enemy(Vector2(100, 300), 500)
+	b.movement_type = "air"
+	b.collision_radius = 12.0
+	b.mass = 3
+
+	CollisionSystem.resolve_overlaps([a, b])
+
+	assert_true(a.position.distance_to(b.position) > 0.0,
+		"非冲刺同层单位重叠应被碰撞分离（核心碰撞功能不受冲刺免疫影响）")
