@@ -124,6 +124,10 @@ var _elixir_generation_amount: int = 0
 var _elixir_generation_timer: float = 0.0
 var _elixir_on_death: int = 0
 var _elixir_death_paid: bool = false
+## 死亡后召唤（哥布林牢笼等）。实际创建统一交给 SpawnManager。
+var _death_spawn_unit_id: String = ""
+var _death_spawn_count: int = 0
+var _death_spawned: bool = false
 ## 光束发射点 Y 偏移（像素，负=上移）。仅地狱塔配置，其他单位 = 0（无光束）。
 var beam_emit_offset_y: float = 0.0
 var _beam: InfernoBeam = null
@@ -236,6 +240,9 @@ func setup(unit_data: Dictionary, team_name: String, awakening_effects: Dictiona
 	_elixir_generation_timer = _elixir_generation_interval
 	_elixir_on_death = int(unit_data.get("elixir_on_death", 0))
 	_elixir_death_paid = false
+	_death_spawn_unit_id = str(unit_data.get("death_spawn_unit_id", ""))
+	_death_spawn_count = maxi(int(unit_data.get("death_spawn_count", 0)), 0)
+	_death_spawned = false
 	# 光束发射点偏移（仅地狱塔等递增光束单位配置）
 	beam_emit_offset_y = float(unit_data.get("beam_emit_offset_y", 0.0))
 
@@ -271,6 +278,8 @@ func setup(unit_data: Dictionary, team_name: String, awakening_effects: Dictiona
 		hb_y = float(anim_cfg.get("health_bar_y", hb_y))
 	health_bar.size = Vector2(hb_w, hb_h)
 	health_bar.position = Vector2(-hb_w / 2.0, hb_y)
+	# 帧动画精灵在运行时动态追加到实体末尾；血条显式置顶，避免被大尺寸透明贴图的有效像素覆盖。
+	health_bar.z_index = 10
 
 	# 调试标签（有动画模型的单位隐藏）
 	debug_label.text = display_name
@@ -1574,10 +1583,19 @@ func die() -> void:
 	if _is_remote():
 		# Client 端：不注销（未注册）、不触发死亡逻辑链，只播放视觉
 		return
+	_request_death_spawn()
 	EntityRegistry.unregister(self)
 	SignalBus.unit_died.emit(self, team)
 	print("[UnitBase] unit died:", unit_id)
 	queue_free()
+
+
+## 发起死亡召唤请求。生命周期自然结束同样调用 die()，因此会共用这条链路。
+func _request_death_spawn() -> void:
+	if _death_spawned or _death_spawn_unit_id.is_empty() or _death_spawn_count <= 0:
+		return
+	_death_spawned = true
+	SignalBus.unit_death_spawn_requested.emit(BattlePathing.game_position_of(self), _death_spawn_unit_id, team, _death_spawn_count)
 
 
 ## 联机 client 端：检测到 host 同步的 is_dead=true 后，延迟销毁（留 0.3 秒让死亡视觉播放）

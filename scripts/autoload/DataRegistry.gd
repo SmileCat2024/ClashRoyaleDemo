@@ -1267,6 +1267,88 @@ var unit_data := {
 			},
 		},
 	},
+	"goblin_cage": {
+		"id": "goblin_cage",
+		"display_name": "哥布林牢笼",
+		"max_hp": 780,
+		"shield": 0,
+		"move_speed": 0.0,
+		"movement_type": "ground",
+		"sight_range": 0.0,
+		"movement_targeting": "any",
+		"collision_radius": 0.6,
+		"hurt_radius": 0.6,
+		"mass": 0,
+		"knockback_immune": true,
+		"shadow_size": 0.8,
+		"deploy_time": 1.0,
+		"lifespan": 20.0,
+		"is_passive": true,
+		"death_spawn_unit_id": "goblin_brawler",
+		"death_spawn_count": 1,
+		"attacks": [],
+		"animation": {
+			"hide_placeholder": true,
+			"visual_offset_x": 0.0,
+			"visual_offset_y": -10.5,
+			"visual_scale": 0.015,
+			"health_bar_y": -70.0,
+			"texture_filter": "linear",
+			"states": {
+				"idle_front": { "frames": ["cage_front.png"], "duration": [1.0], "mode": "loop" },
+				"idle_back": { "frames": ["cage_back.png"], "duration": [1.0], "mode": "loop" },
+				"walk_front": { "frames": ["cage_front.png"], "duration": [1.0], "mode": "loop" },
+				"walk_back": { "frames": ["cage_back.png"], "duration": [1.0], "mode": "loop" },
+			},
+		},
+		"sfx": {
+			"deploy": "deploy_building",
+		},
+	},
+	"goblin_brawler": {
+		"id": "goblin_brawler",
+		"display_name": "哥布林斗士",
+		"max_hp": 1080,
+		"shield": 0,
+		"move_speed": 1.5,
+		"movement_type": "ground",
+		"sight_range": 5.5,
+		"movement_targeting": "any",
+		"collision_radius": 0.5,
+		"hurt_radius": 0.5,
+		"mass": 3,
+		"shadow_size": 0.5,
+		"deploy_time": 0.0,
+		"attacks": [{
+			"name": "brawl",
+			"targeting": "any",
+			"attack_ground": true,
+			"attack_air": false,
+			"attack_range": 0.8,
+			"attack_interval": 1.1,
+			"first_attack_delay": 0.2,
+			"delivery": "instant",
+			"impact_type": "single",
+			"impact_radius": 0.0,
+			"damage": 337,
+		}],
+		"animation": {
+			"hide_placeholder": true,
+			"visual_offset_x": 0.0,
+			"visual_offset_y": -7.5,
+			"visual_scale": 0.015,
+			"health_bar_y": -60.0,
+			"texture_filter": "linear",
+			"states": {
+				"walk_front": { "frames": ["walk_front_01.png", "walk_front_02.png"], "duration": [0.2, 0.2], "mode": "loop" },
+				"walk_back": { "frames": ["walk_back_01.png", "walk_back_02.png"], "duration": [0.2, 0.2], "mode": "loop" },
+				"idle_front": { "frames": ["walk_front_01.png"], "duration": [0.4], "mode": "loop" },
+				"idle_back": { "frames": ["walk_back_01.png"], "duration": [0.4], "mode": "loop" },
+				"attack_front": { "frames": ["attack_front_01.png", "attack_front_02.png"], "duration": [0.12, 0.25], "mode": "once" },
+				"attack_back": { "frames": ["attack_back_01.png", "attack_back_02.png"], "duration": [0.12, 0.25], "mode": "once" },
+			},
+		},
+	},
 }
 
 # ==============================================================================
@@ -1633,6 +1715,17 @@ var card_data := {
 				"mark_duration": 2.0,      # 目标脚下黑色标志显示时长（秒）
 			},
 		},
+	},
+	"card_goblin_cage": {
+		"id": "card_goblin_cage",
+		"display_name": "哥布林牢笼",
+		"cost": 4,
+		"card_type": "troop",
+		"unit_id": "goblin_cage",
+		"spawn_count": 1,
+		"spawn_spread": 0.0,
+		"icon": "res://assets/ui/cards/goblin_cage.png",
+		"description": "被摧毁或寿命结束时，放出一名快速近战的哥布林斗士。",
 	},
 }
 
@@ -2306,6 +2399,14 @@ func _validate_all_data() -> void:
 			errors.append("单位 '%s' knockback_immune 必须为 bool" % uid)
 		if int(u.get("mass", -1)) == 0 and not bool(u.get("knockback_immune", false)):
 			errors.append("静态单位 '%s' 必须显式 knockback_immune=true" % uid)
+		if u.has("death_spawn_unit_id"):
+			var death_spawn_id := str(u.get("death_spawn_unit_id", ""))
+			if death_spawn_id.is_empty() or not unit_data.has(death_spawn_id):
+				errors.append("单位 '%s' death_spawn_unit_id 无效: '%s'" % [uid, death_spawn_id])
+			if int(u.get("death_spawn_count", 0)) < 1:
+				errors.append("单位 '%s' death_spawn_count 必须 >= 1" % uid)
+		elif u.has("death_spawn_count"):
+			errors.append("单位 '%s' 有 death_spawn_count 但缺少 death_spawn_unit_id" % uid)
 
 	# ---- 校验塔 ----
 	for tid in tower_data:
