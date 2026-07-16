@@ -75,7 +75,9 @@ const MOVE_FACING_EPSILON := 0.05     ## 移动方向分量低于此值时保持
 
 # ---- 部署下落动画（前 DEPLOY_ANIM_DURATION 秒的视觉表现）----
 const DEPLOY_ANIM_DURATION := 0.35  ## 部署动画总时长（秒）= 下落 + 着地挤压弹跳
-const DEPLOY_DROP_CELLS := 3.5      ## 下落起始高度（格），从高处明显落下
+const DEPLOY_DROP_CELLS_DEFAULT := 3.5  ## 下落起始高度默认值（格）
+## 下落起始高度（格）。凤凰蛋从凤凰 altitude 高度下落（与死亡模型位置一致）。
+var _deploy_drop_cells: float = DEPLOY_DROP_CELLS_DEFAULT
 const DEPLOY_GHOST_ALPHA := 0.4     ## 虚影起始透明度（渐变到 1.0 实心，只改 alpha 不变暗）
 const DEPLOY_FALL_FRACTION := 0.55  ## 下落占总时长的比例（剩余为挤压弹跳）
 const DEPLOY_SQUASH_SCALE_Y := 0.6  ## 着地瞬间 Y 压缩比（高度变 60%）
@@ -118,6 +120,22 @@ var _lifespan_timer: float = 0.0
 ## 自然掉血速率（HP/秒）。建筑存在期间持续掉血，寿命到时血量恰好归零。
 var _burn_rate: float = 0.0
 var _burn_accumulator: float = 0.0
+# ---- 孵化重生（凤凰蛋专属；无 hatch_unit_id 配置时不启用）----
+## 孵化出的单位 id（空 = 不可孵化）。蛋在 hatch_time 内未被摧毁，则到期生成此单位。
+var hatch_unit_id: String = ""
+## 孵化所需时间（秒）。仅 hatch_unit_id 非空时有意义。
+var hatch_time: float = 0.0
+var _hatch_timer: float = 0.0
+## 蛋孵化前的蛋碎动画时长（秒）。_hatch_timer 递减到此阈值内时切换为 hatch 视觉。
+const HATCH_BREAK_DURATION := 0.4
+## 蛋碎开始后是否已生成重生凤凰（防止重复生成）。
+var _hatched: bool = false
+# ---- 落地冲击（凤凰蛋专属；无 spawn_damage 配置时不启用）----
+## 部署完成时从空中落下造成的范围伤害（0 = 无落地伤害）。
+var spawn_damage: int = 0
+## 落地伤害范围（像素，setup 时从格转换）。
+var spawn_radius: float = 0.0
+var _spawn_damage_dealt: bool = false
 ## 被动圣水生产（圣水收集器）。部署完成后才开始计时。
 var _elixir_generation_interval: float = 0.0
 var _elixir_generation_amount: int = 0
@@ -174,6 +192,17 @@ var _deploy_alpha: float = 1.0        ## 当前透明度（0~1，只改 modulate
 var _deploy_scale: Vector2 = Vector2.ONE  ## 部署挤压拉伸当前缩放（着地瞬间压扁→弹回正常）
 var _altitude_visual_dy: float = 0.0  ## 当前 altitude 离地视觉偏移（px，负=上移）
 
+# ---- 隐身（皇室幽灵，数据驱动；无 stealth 配置时 is_stealth_capable=false）----
+## 攻击显形持续时长（秒）：覆盖攻击动作 + 短暂恢复期，过后回到隐身。
+## 可被 unit_data.stealth.reveal_duration 覆盖。
+const STEALTH_REVEAL_DURATION := 0.7
+var is_stealth_capable: bool = false        ## 是否具备隐身能力（unit_data.stealth.enabled）
+var _stealth_reveal_duration: float = 0.7   ## 本次显形总时长（秒，默认 STEALTH_REVEAL_DURATION）
+var _stealth_reveal_timer: float = 0.0      ## 显形剩余时间（秒，>0 表示当前显形中）
+# ---- 攻击溅射范围显示（impact_offset 单位如皇室幽灵；无 impact_offset 时不显示）----
+var _attack_splash_radius: float = 0.0  ## 溅射显示半径（像素，0=不显示）
+var _attack_splash_offset: float = 0.0  ## 溅射圆心偏移距离（像素，0=不显示/自身中心）
+
 
 ## 初始化单位属性。由 SpawnManager 在生成单位后调用。
 ## awakening_effects: 觉醒效果配置（来自 AwakeningTracker.record_play 返回值），空字典=普通版。
@@ -216,6 +245,8 @@ func setup(unit_data: Dictionary, team_name: String, awakening_effects: Dictiona
 	death_damage = int(unit_data.get("death_damage", 0))
 	death_radius = BattleConstants.px(float(unit_data.get("death_radius", 0.0)))
 	death_fuse_time = float(unit_data.get("death_fuse_time", 0.0))
+	# 死亡生成单位（如凤凰死亡留下蛋）；与死亡炸弹可同时生效
+	death_spawn_unit_id = str(unit_data.get("death_spawn_unit_id", ""))
 
 	# 建筑机制配置（寿命/部署/自然掉血，仅建筑单位使用）
 	deploy_time = float(unit_data.get("deploy_time", 0.0))
@@ -224,12 +255,20 @@ func setup(unit_data: Dictionary, team_name: String, awakening_effects: Dictiona
 		_deploy_timer = deploy_time
 		# 部署下落动画初始化：启动 0.1 秒下落 + 半透明虚影
 		_deploy_anim_timer = DEPLOY_ANIM_DURATION
-		_deploy_drop_dy = -BattleConstants.px(DEPLOY_DROP_CELLS)
+		_deploy_drop_dy = -BattleConstants.px(_deploy_drop_cells)
 		_deploy_alpha = DEPLOY_GHOST_ALPHA
 	lifespan = float(unit_data.get("lifespan", 0.0))
 	if lifespan > 0.0:
 		_lifespan_timer = lifespan
 		_burn_rate = float(unit_data.get("lifespan_damage_per_sec", float(max_hp) / lifespan))
+	# 孵化重生配置（凤凰蛋专属；到期生成新单位而非死亡，期间不掉血）
+	hatch_unit_id = str(unit_data.get("hatch_unit_id", ""))
+	hatch_time = float(unit_data.get("hatch_time", 0.0))
+	if hatch_time > 0.0:
+		_hatch_timer = hatch_time
+	# 落地冲击伤害配置（凤凰蛋专属：部署完成时从空中落下造成范围伤害）
+	spawn_damage = int(unit_data.get("spawn_damage", 0))
+	spawn_radius = BattleConstants.px(float(unit_data.get("spawn_radius", 0.0)))
 	# 被动圣水生产。计时器在部署阶段不推进，部署完成后第 interval 秒产出首滴。
 	_elixir_generation_interval = float(unit_data.get("elixir_generation_interval", 0.0))
 	_elixir_generation_amount = int(unit_data.get("elixir_generation_amount", 0))
@@ -238,6 +277,18 @@ func setup(unit_data: Dictionary, team_name: String, awakening_effects: Dictiona
 	_elixir_death_paid = false
 	# 光束发射点偏移（仅地狱塔等递增光束单位配置）
 	beam_emit_offset_y = float(unit_data.get("beam_emit_offset_y", 0.0))
+
+	# 隐身配置（皇室幽灵：移动/待机隐身不可被锁定，攻击时显形）
+	var stealth_cfg: Dictionary = unit_data.get("stealth", {})
+	is_stealth_capable = bool(stealth_cfg.get("enabled", false))
+	_stealth_reveal_duration = float(stealth_cfg.get("reveal_duration", STEALTH_REVEAL_DURATION))
+	if is_stealth_capable:
+		is_stealthed = true  # 出生即隐身（视觉由 SpriteAnimator 播放 walk_stealth 透明素材实现）
+	# 攻击溅射范围显示（impact_offset 单位如皇室幽灵）：从主攻击组件读取半径与偏移
+	var _primary_atk = get_primary_attack()
+	if _primary_atk != null and _primary_atk.impact_radius > 0.0 and _primary_atk.impact_offset > 0.0:
+		_attack_splash_radius = _primary_atk.impact_radius
+		_attack_splash_offset = _primary_atk.impact_offset
 
 	# 碰撞几何参数（格 → 像素）
 	collision_radius = BattleConstants.px(float(unit_data.get("collision_radius", 0.5)))
@@ -283,6 +334,9 @@ func setup(unit_data: Dictionary, team_name: String, awakening_effects: Dictiona
 	if movement_type == "air":
 		altitude = float(unit_data.get("altitude", 2.5))
 		_set_visual_altitude(altitude)
+	# 统一刷新视觉偏移：确保所有单位（含地面单位）在 setup 中立即应用 altitude + deploy 偏移到精灵，
+	# 避免首帧渲染时精灵在错误位置，到第一帧 _process 才跳到下落起始位置
+	_refresh_visual_offsets()
 	# 部署虚影初始视觉（deploy_time > 0 时单位以半透明虚影状态出现）
 	if not is_deployed:
 		modulate.a = _deploy_alpha
@@ -547,6 +601,9 @@ func _find_weakest_enemy_unit():
 		# 跳过未部署完成的实体（is_deployed 是 UnitBase 属性，塔无此属性时 get 返回 null，不误过滤）
 		if e.get("is_deployed") == false:
 			continue
+		# 隐身过滤：隐身单位不可被索敌锁定（含精英技能锁定）
+		if e.get("is_stealthed") == true:
+			continue
 		var hp_val = e.get("current_hp")
 		if hp_val == null:
 			continue
@@ -661,6 +718,9 @@ func _draw() -> void:
 		draw_set_transform(Vector2(0, _shadow_offset_y), 0.0, Vector2(1.0, SHADOW_SQUASH))
 		draw_circle(Vector2.ZERO, _shadow_radius, Color(0, 0, 0, alpha))
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	# 攻击溅射范围指示（impact_offset 单位如皇室幽灵的前方落点溅射）：仅攻击时显示
+	if _attack_splash_offset > 0.0 and is_attacking():
+		_draw_attack_splash()
 	# 狙击锁定条（锁定新目标时显示一次，持续到 SNIPER_STRIP_DURATION 结束）
 	if _sniper_strip_timer > 0.0:
 		_draw_sniper_lock_strip()
@@ -688,6 +748,29 @@ func _draw_sniper_lock_strip() -> void:
 	# 左右边线
 	draw_line(Vector2(-half_w, top_y), Vector2(-half_w, bot_y), Color(purple.r, purple.g, purple.b, 0.35), 1.0)
 	draw_line(Vector2(half_w, top_y), Vector2(half_w, bot_y), Color(purple.r, purple.g, purple.b, 0.35), 1.0)
+
+
+## 绘制攻击溅射范围（impact_offset 单位如皇室幽灵）：以脚底朝目标方向 offset 处为圆心、radius 为半径的圆。
+## 地面投影——交由 World 的 Y_COMPRESS 自动压扁成椭圆，符合 2.5D 透视。
+## 隐身时由 modulate.a 统一淡化（淡但可见），显形时清晰。
+func _draw_attack_splash() -> void:
+	var center := _get_attack_splash_center()
+	var fill := Color(0.45, 0.32, 0.85, 0.22)
+	var border := Color(0.60, 0.48, 0.95, 0.55)
+	draw_circle(center, _attack_splash_radius, fill)
+	draw_arc(center, _attack_splash_radius, 0.0, TAU, 40, border, 1.2)
+
+
+## 攻击溅射圆心（本地坐标）。有锁定目标时在朝目标方向 offset 处；无目标时朝推进方向 offset 处。
+## Client 端不跑索敌，current_target 为 null，退化为推进方向。
+func _get_attack_splash_center() -> Vector2:
+	var dir := Vector2(0.0, -1.0) if team == "player" else Vector2(0.0, 1.0)
+	var atk = get_primary_attack()
+	if atk != null and is_instance_valid(atk) and atk.current_target != null and is_instance_valid(atk.current_target):
+		var d: Vector2 = BattlePathing.game_position_of(atk.current_target) - position
+		if d.length_squared() > 1.0:
+			dir = d.normalized()
+	return dir * _attack_splash_offset
 
 
 ## 地狱塔递增光束视觉更新：按需创建/隐藏 InfernoBeam 子节点，每帧传入起止/阶段。
@@ -751,6 +834,55 @@ func _process_lifespan(delta: float) -> void:
 		die()
 
 
+## 获取场景中的 SpawnManager（死亡生成单位 / 孵化生成单位复用）。沿用 MortarShell 同款查找。
+## 返回 Node（需调用方 has_method 判定后动态调用 spawn_unit_by_id）。
+func _get_spawn_manager() -> Node:
+	var scene := get_tree().current_scene
+	if scene == null:
+		return null
+	var sm := scene.get_node_or_null("Managers/SpawnManager")
+	if sm and sm.has_method("spawn_unit_by_id"):
+		return sm
+	return null
+
+
+## 孵化重生（凤凰蛋专属）。部署完成后倒计时，到期在原地生成 hatch_unit_id 指定的单位并销毁自身。
+## 蛋若在孵化前被攻击摧毁（take_damage → die），则不会到达此处，即不重生。
+func _process_hatching(delta: float) -> void:
+	_hatch_timer -= delta
+	if is_dead:
+		return
+	# 蛋碎开始（_hatch_timer ≤ HATCH_BREAK_DURATION）：立刻生成重生凤凰，不等蛋碎播完
+	if _hatch_timer <= HATCH_BREAK_DURATION and not _hatched:
+		_hatched = true
+		var spawn_manager := _get_spawn_manager()
+		if spawn_manager:
+			var reborn := spawn_manager.spawn_unit_by_id(hatch_unit_id, team, position) as UnitBase
+			if reborn != null:
+				# 重生凤凰不再留蛋：凤凰只能复活一次
+				reborn.death_spawn_unit_id = ""
+	# 蛋碎播完后销毁蛋
+	if _hatch_timer <= 0.0:
+		die()
+
+
+## 死亡生成单位（如凤凰死亡留下凤凰蛋）。在死亡位置生成 death_spawn_unit_id 指定的单位。
+## 经 SpawnManager.spawn_unit_by_id 创建，Host→Client 联机生成自动同步。
+func _spawn_death_unit_if_any() -> void:
+	if death_spawn_unit_id.is_empty():
+		return
+	var spawn_manager := _get_spawn_manager()
+	if spawn_manager:
+		var egg: Node = spawn_manager.spawn_unit_by_id(death_spawn_unit_id, team, position)
+		# 蛋从凤凰模型位置（altitude 高度）开始下落到地面
+		if egg is UnitBase and altitude > 0.0:
+			egg._deploy_drop_cells = altitude
+			egg._deploy_drop_dy = -BattleConstants.px(altitude)
+			egg._refresh_visual_offsets()
+	else:
+		push_error("[UnitBase] Missing SpawnManager for death spawn: " + unit_id)
+
+
 ## 推进被动圣水生产。满圣水时 BattleManager 不会增加能量，因此本次产出直接舍弃。
 func _process_elixir_generation(delta: float) -> void:
 	if _elixir_generation_interval <= 0.0 or _elixir_generation_amount <= 0:
@@ -805,6 +937,9 @@ func _end_charge() -> void:
 func _process(delta: float) -> void:
 	if not initialized or is_dead:
 		return
+	# 攻击溅射圆心随目标方向变化，需每帧重绘（impact_offset 单位如皇室幽灵）
+	if _attack_splash_offset > 0.0:
+		queue_redraw()
 	# Client 端：position 由 BattleManager 手动 RPC 同步（已镜像），本地 lerp 插值平滑。
 	# _is_moving 由两个 RPC 包的目标位置变化判断（host 端单位是否在移动）。
 	# 本地运行部署动画倒计时。
@@ -827,6 +962,12 @@ func _process(delta: float) -> void:
 				_finish_deploy_anim()
 		# 地狱塔光束视觉更新（用 RPC 同步的状态驱动，client 端不跑索敌逻辑）
 		_update_beam_visual()
+		# 隐身视觉（client 端 is_stealthed 由 _rpc_sync_units 同步，直接读取）
+		if is_stealth_capable:
+			_update_stealth_visual()
+		# client 端蛋孵化视觉计时（纯视觉，不生成单位；生成由 host RPC 同步）
+		if not hatch_unit_id.is_empty() and is_deployed:
+			_hatch_timer -= delta
 		return
 	# 部署倒计时（deploy_time 期间不能行动；部署完成后才开始寿命/掉血/攻击）
 	if not is_deployed:
@@ -836,9 +977,24 @@ func _process(delta: float) -> void:
 			is_deployed = true
 			_finish_deploy_anim()
 		return
+	# 落地冲击（凤凰蛋专属）：部署完成时从空中落下造成范围伤害（只触发一次）
+	if spawn_damage > 0 and not _spawn_damage_dealt:
+		_spawn_damage_dealt = true
+		DamageSystem.deal_area_damage(position, spawn_radius, spawn_damage, team)
+	# 隐身状态维护（皇室幽灵）：攻击显形计时器递减，过期回隐身
+	if is_stealth_capable:
+		if _stealth_reveal_timer > 0.0:
+			_stealth_reveal_timer -= delta
+		is_stealthed = _stealth_reveal_timer <= 0.0
+		_update_stealth_visual()
 	# 建筑寿命 + 自然掉血（仅 lifespan > 0 的建筑，部署完成后才开始）
 	if lifespan > 0.0:
 		_process_lifespan(delta)
+		if is_dead:
+			return
+	# 孵化重生（凤凰蛋专属；到期生成新单位并销毁自身，期间不掉血）
+	if not hatch_unit_id.is_empty():
+		_process_hatching(delta)
 		if is_dead:
 			return
 	_process_elixir_generation(delta)
@@ -1151,7 +1307,7 @@ func _update_deploy_anim(delta: float) -> void:
 		return
 	_deploy_anim_timer -= delta
 	var t := 1.0 - clampf(_deploy_anim_timer / DEPLOY_ANIM_DURATION, 0.0, 1.0)
-	var start_dy := -BattleConstants.px(DEPLOY_DROP_CELLS)
+	var start_dy := -BattleConstants.px(_deploy_drop_cells)
 
 	if t < DEPLOY_FALL_FRACTION:
 		# 下落阶段：匀速线性下落 + 透明度渐变
@@ -1191,6 +1347,13 @@ func _finish_deploy_anim() -> void:
 	_refresh_visual_offsets()
 
 
+## 隐身视觉：隐身透明由 SpriteAnimator 播放 walk_stealth 素材实现，不再用 modulate.a。
+## is_stealthed 仅控制索敌过滤（不可被锁定）+ SpriteAnimator 动画切换（walk↔walk_stealth），
+## 不改变整体透明度。保留为 _process 钩子点（部署完成后调用）。
+func _update_stealth_visual() -> void:
+	pass
+
+
 ## 从 attacks_data 读取主攻击的射程（格→像素），用于决定何时停下
 func _get_primary_attack_range() -> float:
 	if attacks_data.is_empty():
@@ -1225,6 +1388,13 @@ func _on_attack_triggered() -> void:
 	if sprite_animator == null or not sprite_animator._has_animation:
 		return
 	_rpc_attack_trigger.rpc(get_attack_facing(), get_flip_h())
+
+
+## AttackComponent 每次出手时调用（仅 host 端，client 不跑 AttackComponent 逻辑）。
+## 隐身单位进入显形态：启动显形计时器，覆盖攻击动作 + 短暂恢复期后回到隐身。
+func _on_attack_started() -> void:
+	if is_stealth_capable:
+		_stealth_reveal_timer = _stealth_reveal_duration
 
 
 ## Host → Client：同步一次攻击触发。
@@ -1281,6 +1451,9 @@ func _clear_attack_flag() -> void:
 ## 覆写视觉状态：移动中返回 "walk"，否则返回 "idle"。
 ## SpriteAnimator 每帧轮询此方法决定播放什么动画。
 func get_visual_state() -> String:
+	# 凤凰蛋孵化临近：最后 HATCH_BREAK_DURATION 秒播放蛋碎（host/client 共享，需部署完成且存活）
+	if not hatch_unit_id.is_empty() and not is_dead and is_deployed and _hatch_timer <= HATCH_BREAK_DURATION:
+		return "hatch"
 	if _is_remote():
 		# Client 端本地推断：_net_visual_state 从未 RPC 同步，改用 _is_moving
 		if is_dead:
@@ -1574,6 +1747,7 @@ func die() -> void:
 	if _is_remote():
 		# Client 端：不注销（未注册）、不触发死亡逻辑链，只播放视觉
 		return
+	_spawn_death_unit_if_any()  # 死亡生成单位（如凤凰死亡留下蛋），client 端已在上方 return 跳过
 	EntityRegistry.unregister(self)
 	SignalBus.unit_died.emit(self, team)
 	print("[UnitBase] unit died:", unit_id)

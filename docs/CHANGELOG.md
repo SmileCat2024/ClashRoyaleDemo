@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## [版本待定] - 2026-07-16 — 皇室幽灵帧动画接入
+
+### 美术
+- **皇室幽灵（royal_ghost）帧动画接入**：首个隐身单位接入帧动画。中性单套贴图（1024×768 横向，linear 过滤），walk/idle × front/back（单帧移动）+ walk_stealth × front/back（透明版移动，隐身时播放）+ attack × front/back 各 2 帧（起手→劈砍，mode=once，damage_delay=0.1 对齐起手帧末）。素材复制至 `assets/sprites/royal_ghost/`（8 张）。隐身透明由 SpriteAnimator 切换 walk↔walk_stealth 素材实现（不再用 `modulate.a`）。卡面裁剪透明边距 + CardIcon `stretch_mode=COVERED`。攻击范围圆仅攻击时显示。
+
+## [版本待定] - 2026-07-16 — 凤凰（留蛋 + 蛋落地伤害 + 孵化重生）
+
+### 新增
+- **凤凰（phoenix）新卡牌**：传奇空中近战单位。HP1052 / 伤害217 / 攻速0.9s / 费4 / 中速1.0格秒 / 长距离近战1.6格 / 对空对地（instant single）。帧动画已接入（walk/idle × front/back + attack × front/back 各2帧）。死亡时**不爆炸**，只留蛋（`death_spawn_unit_id`）。
+- **凤凰蛋（phoenix_egg）单位**：凤凰死亡后留下的蛋，HP363 / 不可移动（mass=0，is_passive）/ 3 秒孵化出一只新凤凰；蛋被摧毁则不重生。帧动画已接入（idle + hatch 蛋碎）。**蛋从空中下落**（0.3秒部署动画），**落地造成 163 范围伤害**（半径 3 格，`spawn_damage`/`spawn_radius`，只打敌方）。蛋孵化到期先播放蛋碎再重生凤凰。
+- **死亡生成单位（death_spawn_unit_id）机制**：`CombatantBase` 新增 `death_spawn_unit_id` 字段（死亡时在死亡位置生成指定单位）。`UnitBase.die()` 通过 `SpawnManager.spawn_unit_by_id` 创建，复用实体注册与 Host→Client 联机生成同步（与 MortarShell 落点召唤同款）。凤凰死亡留下蛋即用此机制。
+- **孵化重生（hatch_unit_id / hatch_time）机制**：`UnitBase` 新增孵化计时器，部署完成后倒计时，到期在原地生成 `hatch_unit_id` 指定的单位并销毁自身（蛋消失，无死亡炸弹/亡语）。与 lifespan 建筑掉血机制独立（蛋期间不掉血）。**重生凤凰的 `death_spawn_unit_id` 被清空**——凤凰只复活一次，重生凤凰死亡无任何亡语。
+
+### 改动
+- 蛋落地伤害（`spawn_damage`/`spawn_radius`）取代旧的凤凰死亡自爆（`death_damage`）。范围伤害来源从凤凰死亡转移到蛋落地冲击，凤凰自身死亡不再造成伤害。蛋从凤凰死亡模型位置（altitude 高度）开始下落到地面。
+- `DataRegistry._validate_all_data` 新增 `death_spawn_unit_id` / `hatch_unit_id` 引用单位存在性校验。
+- 死亡生成单位 / 孵化生成单位均经 `SpawnManager.spawn_unit_by_id`（不经出牌流程，不扣圣水，不轮转卡组），与觉醒迫击炮召唤哥布林一致。
+- 部署首帧跳变修复：`setup()` 统一调用 `_refresh_visual_offsets()`（不再仅 air 单位），确保所有单位精灵在 setup 中即应用 altitude + deploy 偏移。
+
 ## [版本待定] - 2026-07-16 — 精英重甲亡灵死亡标志敌我区分 + 切换干脆化
 
 ### 改进
@@ -13,6 +32,19 @@
 - **精英骑士技能重做**：移除「集结号角」自身狂暴，改为「圣光嘲讽」。以自身为圆心建立偏黄色圣光法阵；法阵半径 **8.5 格**，短暂展开后，对阵内可攻击地面部队的敌方目标施加 **4 秒**强制锁敌。只攻击建筑的单位不受影响。
 - **通用嘲讽强制目标层**：`AttackComponent` 新增时效性强制目标，优先于常规索敌，因此单位追击、寻路和攻击会统一追随精英骑士。效果结束后保持既有近距离锁定；若尚在追击则恢复普通索敌。
 - **视觉与回归测试**：新增金色双环、辐射线与符文组成的 `TauntHolyCircleEffect`，并为每个被嘲讽目标添加淡金色双环和环绕光点状态标识；新增 `test_elite_skill_holy_taunt`，覆盖法阵完成时机、范围边界、建筑目标免疫、强制覆盖普通索敌，以及结束后的锁定恢复。
+
+## [版本待定] - 2026-07-16 — 皇室幽灵（隐身 + 前方偏移全圆溅射）
+
+### 新增
+- **皇室幽灵（royal_ghost）新卡牌**：地面隐身近战，HP1210 / 伤害261 / 攻速1.8s / 费3 / 快速1.5格秒 / 攻击距离1.2格、溅射半径1.0格（圆心偏移1.2格，在身前落点全圆溅射）。帧动画已接入（walk/idle/attack × front/back + walk_stealth × front/back）。
+- **隐身机制（stealth）**：数据驱动 `unit_data.stealth.enabled`。移动/待机时 `is_stealthed=true` 不可被索敌锁定（`TargetingSystem.find_best_target` / `find_nearest_enemy_unit` + 精英技能 `UnitBase._find_weakest_enemy_unit` 均跳过隐身单位）；攻击出手时显形 2.0 秒后回隐身（`AttackComponent._notify_attack_visual` → `UnitBase._on_attack_started` 启动计时器）。**隐身状态仍可被范围伤害/法术命中受伤，但不退出隐身**（`take_damage` 不修改 `is_stealthed`）。隐身透明由 SpriteAnimator 切换 walk↔walk_stealth 素材实现（不再用 `modulate.a`）。`CombatantBase` 新增 `is_stealthed` 属性（基类持有，塔恒 false）。联机：`is_stealthed` 加入 `_rpc_sync_units` 定频同步（host 权威，client 直接读）。
+- **偏移溅射（impact_offset）**：attack 新增 `impact_offset` 字段（格）。`AttackComponent._execute_attack` 的 instant+splash 分支：`impact_offset>0 且有锁定目标` 时，溅射圆心 = 攻击者位置 + 朝目标方向 × impact_offset（皇室幽灵在身前 1.2 格处全圆溅射），否则溅射在自身位置（瓦基里自身中心全圆，向后兼容）。皇室幽灵为全圆 `deal_area_damage`（无 `impact_arc`）。扇形机制（`impact_arc` + `DamageSystem.deal_arc_damage`）作为通用机制保留但当前无单位使用。
+- **测试**：test_royal_ghost（数据校验：攻击距离1.2/溅射半径1.0/偏移1.2 + deal_arc_damage 扇形通用机制回归测试 + 隐身索敌过滤/仅隐身返回null/显形可锁定 + 隐身受伤不退出）。
+
+### 改动
+- `_rpc_sync_units` 数据格式扩展：`[name,x,y,hp,shield,is_dead]` → `[name,x,y,hp,shield,is_dead,stealthed]`（向后兼容：解包检查 `s.size()>6`）。
+- `AttackComponent._notify_attack_visual` 新增 `_on_attack_started` 通知（与 `_on_attack_triggered` 解耦，用于隐身显形触发）。
+- **皇室幽灵攻击范围显示**：`UnitBase._draw` 新增 `_draw_attack_splash()`，impact_offset 单位（当前仅皇室幽灵）在身前偏移处绘制紫色圆形溅射范围（圆心在朝目标方向 offset 处、半径 impact_radius，半透明填充 + 边线）。由 World 的 Y_COMPRESS 自动压扁成椭圆符合 2.5D 地面投影。**仅攻击时显示**（`_draw` 加 `is_attacking()` 条件，非攻击时隐藏）。`_process` 每帧 `queue_redraw` 跟随目标更新圆心。纯视觉，对联机透明。
 
 ## [版本待定] - 2026-07-15 — 游侠与公主视觉校准
 

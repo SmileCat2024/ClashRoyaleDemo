@@ -966,6 +966,66 @@ var unit_data := {
 			"attack": "attack_valkyrie",
 		},
 	},
+	"royal_ghost": {
+		"id": "royal_ghost",
+		"display_name": "皇室幽灵",
+		"max_hp": 1210,
+		"shield": 0,
+		"move_speed": 1.5,  # 快速（Fast）
+		"movement_type": "ground",
+		"sight_range": 5.0,
+		"movement_targeting": "any",
+		"collision_radius": 0.5,
+		"hurt_radius": 0.5,
+		"mass": 5,
+		"knockback_immune": false,
+		"shadow_size": 0.5,
+		"deploy_time": 1.0,
+		# 隐身（皇室幽灵专属）：移动/待机时隐身不可被索敌锁定，攻击时显形。
+		# 隐身状态仍可被范围伤害/法术命中受伤，但不退出隐身。
+		"stealth": {
+			"enabled": true,
+			"reveal_duration": 2.0,  # 攻击后显形 2 秒，期间不攻击则转回隐身
+		},
+		"attacks": [{
+			"name": "cleave",
+			"targeting": "any",
+			"attack_ground": true,
+			"attack_air": false,  # 仅攻击地面单位
+			"attack_range": 1.2,  # 攻击距离（单位在此距离停下出手）
+			"attack_interval": 1.8,
+			"first_attack_delay": 0.5,
+			"delivery": "instant",
+			"impact_type": "splash",
+			"impact_radius": 1.0,   # 溅射半径（格），全圆
+			"impact_offset": 1.2,   # 溅射圆心在朝目标方向此距离处（= 攻击距离，劈砍落点溅射）
+			"damage": 261,
+			"damage_delay": 0.1,   # 美术接入后对齐劈砍命中帧
+		}],
+		# ---- 帧动画配置 ----
+		# 皇室幽灵：地面近战，中性单套贴图（1024×768 横向，linear 过滤）
+		# walk/idle × front/back（显形·非透明）；walk_stealth × front/back（隐身·透明素材）
+		# attack × front/back 各 2 帧（起手→劈砍，mode=once）
+		# 隐身/显形由 SpriteAnimator 按 is_stealthed 切换 walk↔walk_stealth，不用 modulate.a
+		"animation": {
+			"visual_offset_x": 0.0,
+			"visual_offset_y": -15.0,
+			"visual_scale": 0.03,
+			"health_bar_y": -38.0,
+			"texture_filter": "linear",
+			"states": {
+				"walk_front": { "frames": ["walk_front_01.png"], "duration": [0.3], "mode": "loop" },
+				"walk_back": { "frames": ["walk_back_01.png"], "duration": [0.3], "mode": "loop" },
+				"idle_front": { "frames": ["walk_front_01.png"], "duration": [0.3], "mode": "loop" },
+				"idle_back": { "frames": ["walk_back_01.png"], "duration": [0.3], "mode": "loop" },
+				"walk_stealth_front": { "frames": ["walk_stealth_front_01.png"], "duration": [0.3], "mode": "loop" },
+				"walk_stealth_back": { "frames": ["walk_stealth_back_01.png"], "duration": [0.3], "mode": "loop" },
+				"attack_front": { "frames": ["attack_front_01.png", "attack_front_02.png"], "duration": [0.1, 0.55], "mode": "once" },
+				"attack_back": { "frames": ["attack_back_01.png", "attack_back_02.png"], "duration": [0.1, 0.55], "mode": "once" },
+			},
+		},
+		"sfx": {},
+	},
 	"goblins": {
 		"id": "goblins",
 		"display_name": "哥布林",
@@ -1266,6 +1326,99 @@ var unit_data := {
 				"attack_back": { "frames": ["attack_back_01.png", "attack_back_02.png"], "duration": [0.1, 0.65], "mode": "once" },
 			},
 		},
+	},
+	"phoenix": {
+		"id": "phoenix",
+		"display_name": "凤凰",
+		"max_hp": 1052,
+		"shield": 0,
+		"move_speed": 1.0,  # 中速
+		"movement_type": "air",  # 传奇飞行单位
+		"sight_range": 5.5,
+		"movement_targeting": "any",
+		"collision_radius": 0.5,
+		"hurt_radius": 0.5,
+		"mass": 4,
+		"shadow_size": 0.7,
+		"deploy_time": 1.0,
+		# 死亡留蛋：凤凰死亡后留下一颗凤凰蛋（蛋从空中落下造成范围伤害，见 phoenix_egg.spawn_damage）。
+		# 注：凤凰自身死亡不爆炸，范围伤害改由蛋落地造成（只复活一次：重生凤凰无任何亡语）。
+		"death_spawn_unit_id": "phoenix_egg",
+		"attacks": [{
+			"name": "fire_claw",
+			"targeting": "any",
+			"attack_ground": true,
+			"attack_air": true,  # 飞行单位，对空对地
+			"attack_range": 1.6,  # 长距离近战
+			"attack_interval": 0.9,
+			"first_attack_delay": 0.5,
+			"damage_delay": 0.15,  # 美术接入后对齐扑击命中帧
+			"delivery": "instant",
+			"trajectory": "",
+			"impact_type": "single",  # 近战非范围攻击
+			"impact_radius": 0.0,
+			"damage": 217,
+		}],
+		# ---- 帧动画配置 ----
+		# 凤凰：传奇飞行近战，中性单套贴图（1024×768 横向，linear 过滤）
+		# walk/idle × front/back（单帧移动）；attack × front/back 各 2 帧（起手→扑击）
+		# 飞行离地高度由 altitude 自动处理，此处仅精灵偏移
+		# 未校准：以下为初始估计值，保留 ColorRect 占位便于位置调试
+		"animation": {
+			"visual_offset_x": 0.0,
+			"visual_offset_y": 6.0,
+			"visual_scale": 0.03,
+			"health_bar_y": -15.0,
+			"texture_filter": "linear",
+			"states": {
+				"walk_front": { "frames": ["walk_front_01.png"], "duration": [0.3], "mode": "loop" },
+				"walk_back": { "frames": ["walk_back_01.png"], "duration": [0.3], "mode": "loop" },
+				"idle_front": { "frames": ["walk_front_01.png"], "duration": [0.3], "mode": "loop" },
+				"idle_back": { "frames": ["walk_back_01.png"], "duration": [0.3], "mode": "loop" },
+				"attack_front": { "frames": ["attack_front_01.png", "attack_front_02.png"], "duration": [0.15, 0.45], "mode": "once" },
+				"attack_back": { "frames": ["attack_back_01.png", "attack_back_02.png"], "duration": [0.15, 0.45], "mode": "once" },
+			},
+		},
+		"sfx": {},
+	},
+	"phoenix_egg": {
+		"id": "phoenix_egg",
+		"display_name": "凤凰蛋",
+		"max_hp": 363,
+		"shield": 0,
+		"move_speed": 0.0,  # 不可移动
+		"movement_type": "ground",
+		"sight_range": 0.0,
+		"movement_targeting": "any",
+		"collision_radius": 0.4,
+		"hurt_radius": 0.4,
+		"mass": 0,  # 不可移动，自动成为寻路障碍（可被 building_only 单位锁定摧毁）
+		"knockback_immune": true,
+		"shadow_size": 0.4,
+		"deploy_time": 0.3,  # 从空中落下（部署下落动画），落地时造成范围伤害
+		# 落地冲击：蛋从空中落下造成范围伤害（只打敌方，对塔/地面单位/空中单位均生效）
+		"spawn_damage": 163,
+		"spawn_radius": 3.0,  # 范围伤害半径（格）
+		"is_passive": true,  # 被动单位：无攻击能力，可被攻击；attacks 为空需 is_passive 放行校验
+		# 孵化重生：3 秒后在原地孵化出一只新凤凰；蛋被摧毁则不孵化。
+		"hatch_unit_id": "phoenix",
+		"hatch_time": 3.0,
+		"attacks": [],
+		# ---- 帧动画配置 ----
+		# 凤凰蛋：静态被动单位，单帧 idle（无方向无攻击）
+		# 未校准：以下为初始估计值
+		"animation": {
+			"visual_offset_x": -1.5,
+			"visual_offset_y": -7.0,
+			"visual_scale": 0.0375,
+			"health_bar_y": -6.0,
+			"texture_filter": "linear",
+			"states": {
+				"idle": { "frames": ["idle_01.png"], "duration": [0.3], "mode": "loop" },
+				"hatch": { "frames": ["hatch_01.png"], "duration": [0.4], "mode": "once" },
+			},
+		},
+		"sfx": {},
 	},
 }
 
@@ -1569,6 +1722,17 @@ var card_data := {
 		"icon": "res://assets/ui/cards/ranger.png",
 		"description": "远程穿透射手，箭矢沿直线飞行，穿透路径上所有敌人。",
 	},
+	"card_royal_ghost": {
+		"id": "card_royal_ghost",
+		"display_name": "皇室幽灵",
+		"cost": 3,
+		"card_type": "troop",
+		"unit_id": "royal_ghost",
+		"spawn_count": 1,
+		"spawn_spread": 0.0,
+		"icon": "res://assets/ui/cards/royal_ghost.png",
+		"description": "地面隐身单位。移动时隐身不可被锁定，攻击时显形2秒后回隐身，并在身前造成范围伤害。",
+	},
 	"card_knight_elite": {
 		"id": "card_knight_elite",
 		"display_name": "精英骑士",
@@ -1633,6 +1797,17 @@ var card_data := {
 				"mark_duration": 2.0,      # 目标脚下黑色标志显示时长（秒）
 			},
 		},
+	},
+	"card_phoenix": {
+		"id": "card_phoenix",
+		"display_name": "凤凰",
+		"cost": 4,
+		"card_type": "troop",
+		"unit_id": "phoenix",
+		"spawn_count": 1,
+		"spawn_spread": 0.0,
+		"icon": "res://assets/ui/cards/phoenix.png",
+		"description": "传奇飞行单位。死亡留下凤凰蛋，蛋从空中落下造成范围伤害；蛋3秒内未被摧毁则重生，重生凤凰只复活一次。",
 	},
 }
 
@@ -2306,6 +2481,18 @@ func _validate_all_data() -> void:
 			errors.append("单位 '%s' knockback_immune 必须为 bool" % uid)
 		if int(u.get("mass", -1)) == 0 and not bool(u.get("knockback_immune", false)):
 			errors.append("静态单位 '%s' 必须显式 knockback_immune=true" % uid)
+
+		# 死亡生成单位 / 孵化单位引用校验（如凤凰死亡留蛋、蛋孵化重生）
+		if u.has("death_spawn_unit_id"):
+			var spawn_uid := str(u["death_spawn_unit_id"])
+			if not spawn_uid.is_empty() and not unit_data.has(spawn_uid):
+				errors.append("单位 '%s' 的 death_spawn_unit_id 引用了不存在的单位: '%s'" % [uid, spawn_uid])
+		if u.has("hatch_unit_id"):
+			var hatch_uid := str(u["hatch_unit_id"])
+			if hatch_uid.is_empty() or not unit_data.has(hatch_uid):
+				errors.append("单位 '%s' 的 hatch_unit_id 引用了不存在的单位: '%s'" % [uid, hatch_uid])
+			if float(u.get("hatch_time", 0)) <= 0:
+				errors.append("单位 '%s' 配置了 hatch_unit_id 但 hatch_time <= 0" % uid)
 
 	# ---- 校验塔 ----
 	for tid in tower_data:

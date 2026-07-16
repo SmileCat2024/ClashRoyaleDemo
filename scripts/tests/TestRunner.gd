@@ -37,6 +37,7 @@ const SUITES := [
 	preload("res://scripts/tests/test_elite_skill_dash.gd"),
 	preload("res://scripts/tests/test_elite_skill_holy_taunt.gd"),
 	preload("res://scripts/tests/test_piercing.gd"),
+	preload("res://scripts/tests/test_royal_ghost.gd"),
 ]
 
 

@@ -19,7 +19,7 @@ anchor_bottom = 1.0
 texture_filter = 1
 mouse_filter = 2
 expand_mode = 1
-stretch_mode = 0
+stretch_mode = 6
 
 [node name="NameLabel" type="Label" parent="."]
 layout_mode = 1

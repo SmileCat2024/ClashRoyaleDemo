@@ -185,6 +185,9 @@ func _update_animation() -> void:
 		# 无攻击动画 → 正常走 walk/idle（伤害照算，只是没动画表现）
 
 	# 常规状态：walk / idle / death（带方向 + 跨方向降级）
+	# 皇室幽灵隐身：is_stealthed 时 walk/idle 切换为 walk_stealth（透明素材），显形时走 walk（非透明）
+	if (state == "walk" or state == "idle") and combatant.is_stealthed:
+		state = "walk_stealth"
 	_play_with_fallback(state)
 
 

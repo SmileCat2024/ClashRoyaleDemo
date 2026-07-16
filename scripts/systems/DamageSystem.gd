@@ -18,6 +18,51 @@ static func resolve_impact(target: Node, damage: int) -> void:
 		target.take_damage(damage)
 
 
+## 方向扇形范围伤害结算（皇室幽灵前方 180° 劈砍）。
+## 与 deal_area_damage 相同的命中判定，额外增加角度过滤：
+## 仅命中以 facing_dir 为中心、±arc_deg/2 范围内的目标（即目标位于 center 前方扇形内）。
+## arc_deg=360 时退化为全圆（与 deal_area_damage 等价），但通常用 180 表示前方半圆。
+## facing_dir 为零向量时退化为全圆（无明确方向，安全兜底）。
+static func deal_arc_damage(
+	center: Vector2, radius: float, arc_deg: float, facing_dir: Vector2,
+	damage: int, attacker_team: String,
+	tower_damage: int = -1, attack_ground: bool = true, attack_air: bool = true
+) -> void:
+	# 半角余弦：目标方向与 facing_dir 的点积 >= 此值即在扇形内
+	# arc_deg/2 的余弦；全圆(arc_deg>=360)或无方向时阈值取 -1（任意方向都命中）
+	var half_cos: float = -1.0
+	var dir_len := facing_dir.length()
+	if arc_deg < 360.0 and dir_len > 0.001:
+		half_cos = cos(deg_to_rad(arc_deg * 0.5))
+	var facing_norm := facing_dir / dir_len if dir_len > 0.001 else Vector2.ZERO
+	var enemies = EntityRegistry.get_enemies_of(attacker_team)
+	for e in enemies:
+		var mt = e.get("movement_type")
+		var is_air: bool = mt == "air"
+		if is_air and not attack_air:
+			continue
+		if not is_air and not attack_ground:
+			continue
+		var e_pos := BattlePathing.game_position_of(e)
+		var hr = e.get("hurt_radius")
+		var hurt_r: float = float(hr) if hr != null else 0.0
+		var offset := e_pos - center
+		# 距离过滤（含受击半径，大体积目标更易被命中）
+		if offset.length() > radius + hurt_r:
+			continue
+		# 方向过滤：目标中心相对 center 的方向与 facing_dir 夹角 <= 半角
+		if half_cos > -1.0:
+			var to_len := offset.length()
+			if to_len > 0.001:
+				if facing_norm.dot(offset / to_len) < half_cos:
+					continue  # 在扇形之外（背后/侧面）
+		if e.has_method("take_damage"):
+			var dmg := damage
+			if tower_damage >= 0 and e.get("tower_type") != null:
+				dmg = tower_damage
+			e.take_damage(dmg)
+
+
 ## 范围伤害结算。对 center 周围 radius 范围内的所有敌方实体造成全额伤害（无衰减）。
 ## 通过 EntityRegistry 查询，不遍历场景树。
 ## center 使用 World 本地游戏空间坐标。
