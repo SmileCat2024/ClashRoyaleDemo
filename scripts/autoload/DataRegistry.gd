@@ -698,7 +698,9 @@ var unit_data := {
 			"arc_height": 7.0,           # 最大射程处弧高（格），近处按距离比例自动降低
 		}],
 		"sfx": {
-			"deploy": "deploy_building",
+			"deploy": "deploy_mortar",
+			"impact": "mortar_impact",
+			"death": "death_mortar",
 		},
 		# 迫击炮建筑贴图（314×464）。首次使用团队色双套贴图：
 		# player 用蓝方贴图，enemy 用红方贴图（联机下 team flip 后两端各看己方蓝/敌方红）。
@@ -921,7 +923,11 @@ var unit_data := {
 		},
 		"sfx": {
 			"deploy": "deploy_pekka",
+			"deploy_end": "deploy_end_pekka",
 			"attack": "attack_pekka",
+			"move": "move_pekka",
+			"impact": "impact_pekka",
+			"death": "death_pekka",
 		},
 	},
 	"valkyrie": {
@@ -1079,6 +1085,10 @@ var unit_data := {
 		},
 		"sfx": {
 			"deploy": "deploy_goblins",
+			"attack": ["attack_goblins_01", "attack_goblins_02", "attack_goblins_03"],
+			"move": ["move_goblins_01", "move_goblins_02", "move_goblins_03", "move_goblins_04", "move_goblins_05"],
+			"impact": ["impact_goblins_01", "impact_goblins_02", "impact_goblins_03", "impact_goblins_04"],
+			"death": "death_goblins",
 		},
 	},
 	"inferno_tower": {
@@ -1182,7 +1192,9 @@ var unit_data := {
 			},
 		},
 		"sfx": {
-			"deploy": "deploy_building",
+			"deploy": "deploy_elixir_collector",
+			"collect": "elixir_collector_collect",
+			"death": "death_elixir_collector",
 		},
 	},
 	"princess": {
@@ -1955,7 +1967,7 @@ var sound_data := {
 		"priority": 3,
 	},
 	"mortar_launch": {  # 迫击炮发射（可单独配置或回退到 projectile_launch）
-		"stream": "res://assets/audio/sfx/迫击炮发射.MP3",
+		"stream": "res://assets/audio/sfx/official_remaining_mortar_mortar_fire_03.ogg",
 		"volume_db": -3.0,
 		"pitch_range": [0.95, 1.05],
 		"max_polyphony": 2,
@@ -1994,14 +2006,14 @@ var sound_data := {
 		"priority": 7,
 	},
 	"arrows_rain": {  # 万箭齐发箭雨
-		"stream": "res://assets/audio/sfx/万箭齐发.MP3",
+		"stream": "res://assets/audio/sfx/official_remaining_arrows_archer_queen_attack_02.ogg",
 		"volume_db": -4.0,
 		"pitch_range": [0.95, 1.05],
 		"max_polyphony": 2,
 		"priority": 5,
 	},
 	"poison_cast": {  # 毒药施放
-		"stream": "res://assets/audio/sfx/毒药.MP3",
+		"stream": "res://assets/audio/sfx/official_remaining_poison_poison_spell_01.ogg",
 		"volume_db": -4.0,
 		"pitch_range": [1.0, 1.0],
 		"max_polyphony": 2,
@@ -2207,7 +2219,7 @@ var sound_data := {
 		"priority": 5,
 	},
 	"deploy_goblins": {
-		"stream": "res://assets/audio/sfx/哥布林部署.MP3",
+		"stream": "res://assets/audio/sfx/official_remaining_goblins_goblin_deploy_14.ogg",
 		"volume_db": -3.0,
 		"pitch_range": [0.95, 1.05],
 		"max_polyphony": 2,
@@ -2243,7 +2255,7 @@ var sound_data := {
 		"priority": 5,
 	},
 	"deploy_pekka": {
-		"stream": "res://assets/audio/sfx/皮卡出场.MP3",
+		"stream": "res://assets/audio/sfx/official_remaining_pekka_pekka_deploy_01.ogg",
 		"volume_db": -3.0,
 		"pitch_range": [1.0, 1.0],
 		"max_polyphony": 2,
@@ -2315,7 +2327,7 @@ var sound_data := {
 		"priority": 4,
 	},
 	"attack_pekka": {
-		"stream": "res://assets/audio/sfx/皮卡攻击.MP3",
+		"stream": "res://assets/audio/sfx/official_remaining_pekka_pekka_atk_01.ogg",
 		"volume_db": -5.0,
 		"pitch_range": [1.0, 1.0],
 		"max_polyphony": 3,
@@ -2331,12 +2343,41 @@ var sound_data := {
 
 	# ---- 迫击炮命中 ----
 	"mortar_impact": {
-		"stream": "res://assets/audio/sfx/迫击炮命中.MP3",
+		"stream": "res://assets/audio/sfx/official_remaining_mortar_boulder_impact_01.ogg",
 		"volume_db": -2.0,
 		"pitch_range": [0.9, 1.1],
 		"max_polyphony": 2,
 		"priority": 5,
 	},
+
+	# ---- 音频目录剩余官方素材：全部按现有卡牌动作接入 ----
+	"arrows_impact": { "stream": "res://assets/audio/sfx/official_remaining_arrows_arrow_norm_impact_06.ogg", "volume_db": -4.0, "pitch_range": [0.96, 1.04], "max_polyphony": 3, "priority": 5 },
+
+	"attack_goblins_01": { "stream": "res://assets/audio/sfx/official_remaining_goblins_gob_attack_01v2.ogg", "volume_db": -7.0, "pitch_range": [0.98, 1.02], "max_polyphony": 5, "priority": 3 },
+	"attack_goblins_02": { "stream": "res://assets/audio/sfx/official_remaining_goblins_gob_attack_02v2.ogg", "volume_db": -7.0, "pitch_range": [0.98, 1.02], "max_polyphony": 5, "priority": 3 },
+	"attack_goblins_03": { "stream": "res://assets/audio/sfx/official_remaining_goblins_gob_attack_03v2.ogg", "volume_db": -7.0, "pitch_range": [0.98, 1.02], "max_polyphony": 5, "priority": 3 },
+	"impact_goblins_01": { "stream": "res://assets/audio/sfx/official_remaining_goblins_footman_attack_hit_01.ogg", "volume_db": -7.0, "pitch_range": [0.96, 1.04], "max_polyphony": 5, "priority": 4 },
+	"impact_goblins_02": { "stream": "res://assets/audio/sfx/official_remaining_goblins_footman_attack_hit_02.ogg", "volume_db": -7.0, "pitch_range": [0.96, 1.04], "max_polyphony": 5, "priority": 4 },
+	"impact_goblins_03": { "stream": "res://assets/audio/sfx/official_remaining_goblins_footman_attack_hit_03.ogg", "volume_db": -7.0, "pitch_range": [0.96, 1.04], "max_polyphony": 5, "priority": 4 },
+	"impact_goblins_04": { "stream": "res://assets/audio/sfx/official_remaining_goblins_footman_attack_hit_04.ogg", "volume_db": -7.0, "pitch_range": [0.96, 1.04], "max_polyphony": 5, "priority": 4 },
+	"move_goblins_01": { "stream": "res://assets/audio/sfx/official_remaining_goblins_gob_step_01_v1.ogg", "volume_db": -14.0, "pitch_range": [1.0, 1.0], "max_polyphony": 4, "priority": 2 },
+	"move_goblins_02": { "stream": "res://assets/audio/sfx/official_remaining_goblins_gob_step_01_v2.ogg", "volume_db": -14.0, "pitch_range": [1.0, 1.0], "max_polyphony": 4, "priority": 2 },
+	"move_goblins_03": { "stream": "res://assets/audio/sfx/official_remaining_goblins_gob_step_01_v3.ogg", "volume_db": -14.0, "pitch_range": [1.0, 1.0], "max_polyphony": 4, "priority": 2 },
+	"move_goblins_04": { "stream": "res://assets/audio/sfx/official_remaining_goblins_gob_step_01_v4.ogg", "volume_db": -14.0, "pitch_range": [1.0, 1.0], "max_polyphony": 4, "priority": 2 },
+	"move_goblins_05": { "stream": "res://assets/audio/sfx/official_remaining_goblins_gob_step_01_v5.ogg", "volume_db": -14.0, "pitch_range": [1.0, 1.0], "max_polyphony": 4, "priority": 2 },
+	"death_goblins": { "stream": "res://assets/audio/sfx/official_remaining_goblins_npc_die_02.ogg", "volume_db": -7.0, "pitch_range": [1.0, 1.0], "max_polyphony": 4, "priority": 4 },
+
+	"deploy_elixir_collector": { "stream": "res://assets/audio/sfx/official_remaining_elixir_collector_elixir_collector_place_02.ogg", "volume_db": -3.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 5 },
+	"elixir_collector_collect": { "stream": "res://assets/audio/sfx/official_remaining_elixir_collector_get_elixir_02.ogg", "volume_db": -4.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 5 },
+	"death_elixir_collector": { "stream": "res://assets/audio/sfx/official_remaining_elixir_collector_building_destroyed_05.ogg", "volume_db": -4.0, "pitch_range": [0.98, 1.02], "max_polyphony": 2, "priority": 5 },
+
+	"deploy_end_pekka": { "stream": "res://assets/audio/sfx/official_remaining_pekka_pekka_deploy_end_03.ogg", "volume_db": -4.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 5 },
+	"impact_pekka": { "stream": "res://assets/audio/sfx/official_remaining_pekka_pekka_attack_hit_03.ogg", "volume_db": -3.0, "pitch_range": [0.96, 1.04], "max_polyphony": 3, "priority": 5 },
+	"move_pekka": { "stream": "res://assets/audio/sfx/official_remaining_pekka_pekka_footstep_02.ogg", "volume_db": -10.0, "pitch_range": [0.98, 1.02], "max_polyphony": 2, "priority": 2 },
+	"death_pekka": { "stream": "res://assets/audio/sfx/official_remaining_pekka_npc_die_02.ogg", "volume_db": -5.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 5 },
+
+	"deploy_mortar": { "stream": "res://assets/audio/sfx/official_remaining_mortar_mortar_deploy.ogg", "volume_db": -3.0, "pitch_range": [1.0, 1.0], "max_polyphony": 2, "priority": 5 },
+	"death_mortar": { "stream": "res://assets/audio/sfx/official_remaining_mortar_building_destroyed_05.ogg", "volume_db": -4.0, "pitch_range": [0.98, 1.02], "max_polyphony": 2, "priority": 5 },
 
 	# ---- 王子冲锋 ----
 	"prince_charge": {

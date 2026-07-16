@@ -144,6 +144,7 @@ func _connect_signals() -> void:
 	SignalBus.tower_destroyed.connect(_on_tower_destroyed)
 	SignalBus.projectile_spawned.connect(_on_projectile_spawned)
 	SignalBus.projectile_hit.connect(_on_projectile_hit)
+	SignalBus.elixir_generated.connect(_on_elixir_generated)
 	SignalBus.card_selected.connect(_on_card_selected)
 
 
@@ -230,6 +231,11 @@ func _on_projectile_spawned(_projectile: Node2D, _team: String) -> void:
 
 func _on_projectile_hit(_pos: Vector2, _team: String) -> void:
 	play("projectile_hit")
+
+
+## 圣水收集器每次产出（含死亡返还）播放其专属收集反馈。
+func _on_elixir_generated(pos: Vector2, _team: String, _amount: int, _is_death: bool) -> void:
+	play_unit_sfx("elixir_collector", "collect", pos)
 
 
 # ==============================================================================
