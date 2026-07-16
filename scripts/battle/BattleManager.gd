@@ -11,6 +11,7 @@ extends Node
 # ---- 战斗状态 ----
 var battle_running: bool = false
 var battle_time: float = 0.0
+var match_result: String = ""             ## 本局最终结果："victory" | "defeat" | "draw"
 var max_battle_time: float = 180.0       ## 常规时间（秒）
 var battle_phase: String = "regular"      ## "regular" | "overtime"
 var overtime_duration: float = 60.0       ## 极速 1 分钟 / 经典 2 分钟
@@ -135,6 +136,7 @@ func _setup_towers() -> void:
 func start_battle() -> void:
 	battle_running = true
 	battle_time = 0.0
+	match_result = ""
 	battle_phase = "regular"
 	_set_elixir_multiplier(7 if match_mode == Game.MatchMode.FAST_7X else 1, false)
 	_player_state.reset()
@@ -274,6 +276,7 @@ func end_battle(result: String) -> void:
 	if not battle_running:
 		return
 	battle_running = false
+	match_result = result
 	if deploy_preview:
 		deploy_preview.hide_preview()
 	SignalBus.battle_ended.emit(result)
@@ -575,14 +578,24 @@ func _cast_elite_skill(unit: Node, skill_data: Dictionary, target_pos: Vector2) 
 ## 接收 SignalBus.tower_destroyed 信号
 func _on_tower_destroyed(tower_id: String, team_name: String, tower_type: String) -> void:
 	print("[BattleManager] tower destroyed:", tower_id, team_name, tower_type)
+	# 任意阶段国王塔被摧毁都立即结束；加时赛则升级为任意皇冠塔被毁即负。
 	if tower_type == "king":
-		if team_name == "enemy":
-			end_battle("victory")
-		elif team_name == "player":
-			end_battle("defeat")
+		_end_for_destroyed_tower(team_name)
+		return
+	if battle_phase == "overtime":
+		_end_for_destroyed_tower(team_name)
+		return
 	elif tower_type == "guard":
 		# 公主塔被毁后激活同阵营的国王塔
 		_activate_king_tower(team_name)
+
+
+## 根据被摧毁塔的阵营结算本地玩家胜负。
+func _end_for_destroyed_tower(destroyed_team: String) -> void:
+	if destroyed_team == "enemy":
+		end_battle("victory")
+	elif destroyed_team == "player":
+		end_battle("defeat")
 
 
 ## 激活指定阵营的国王塔（公主塔被毁时触发）
@@ -600,13 +613,12 @@ func _activate_king_tower(team_name: String) -> void:
 func _check_time_limit() -> void:
 	if battle_phase == "regular":
 		if battle_time >= max_battle_time:
-			var player_towers := _count_alive_towers("player")
-			var enemy_towers := _count_alive_towers("enemy")
-			if player_towers != enemy_towers:
-				var result := "victory" if player_towers > enemy_towers else "defeat"
-				end_battle(result)
-			else:
+			if _are_sides_tied():
 				_enter_overtime()
+			else:
+				var player_towers := _count_alive_towers("player")
+				var enemy_towers := _count_alive_towers("enemy")
+				end_battle("victory" if player_towers > enemy_towers else "defeat")
 	elif battle_phase == "overtime":
 		if battle_time >= max_battle_time + overtime_duration:
 			end_battle(_determine_result_by_stats())
@@ -630,33 +642,29 @@ func _count_alive_towers(team_name: String) -> int:
 	return count
 
 
-## 计算指定阵营所有塔的总血量百分比（含已毁塔，分母为总 max_hp）
-func _get_total_hp_percent(team_name: String) -> float:
-	var total_hp := 0
-	var total_max := 0
+## 常规时间结束时，双方剩余皇冠塔数相同才算平局，进入加时赛。
+func _are_sides_tied() -> bool:
+	return _count_alive_towers("player") == _count_alive_towers("enemy")
+
+
+## 返回指定阵营三座皇冠塔中最低的当前血量；已毁塔按 0 计。
+func _get_lowest_tower_hp(team_name: String) -> int:
+	var lowest_hp := -1
 	for tower in _towers:
-		if tower.team == team_name:
-			total_hp += tower.current_hp
-			total_max += tower.max_hp
-	if total_max == 0:
-		return 0.0
-	return float(total_hp) / float(total_max)
+		if tower.team != team_name:
+			continue
+		var tower_hp: int = 0 if tower.is_dead else max(0, tower.current_hp)
+		lowest_hp = tower_hp if lowest_hp < 0 else min(lowest_hp, tower_hp)
+	return max(lowest_hp, 0)
 
 
-## 时间到时的综合判定：塔数 → 总血量百分比 → 平局
+## 加时结束结算：比较双方皇冠塔中的最低当前血量；较高者获胜，相同则平局。
 func _determine_result_by_stats() -> String:
-	var player_towers := _count_alive_towers("player")
-	var enemy_towers := _count_alive_towers("enemy")
-	if player_towers > enemy_towers:
+	var player_lowest_hp := _get_lowest_tower_hp("player")
+	var enemy_lowest_hp := _get_lowest_tower_hp("enemy")
+	if player_lowest_hp > enemy_lowest_hp:
 		return "victory"
-	elif enemy_towers > player_towers:
-		return "defeat"
-	# 塔数相同，比总血量百分比
-	var player_pct := _get_total_hp_percent("player")
-	var enemy_pct := _get_total_hp_percent("enemy")
-	if player_pct > enemy_pct:
-		return "victory"
-	elif enemy_pct > player_pct:
+	elif enemy_lowest_hp > player_lowest_hp:
 		return "defeat"
 	return "draw"
 
@@ -824,7 +832,13 @@ func _rpc_sync_state(p_energy: int, e_energy: int, p_progress: float, e_progress
 func _rpc_battle_end(result: String) -> void:
 	if is_host:
 		return
-	end_battle(result)
+	# Host 发送的是主机视角的结果；Client 的本地 player 是主机的 enemy。
+	var local_result := result
+	if result == "victory":
+		local_result = "defeat"
+	elif result == "defeat":
+		local_result = "victory"
+	end_battle(local_result)
 
 
 ## Host 端调用：打包当前状态发送给 client
